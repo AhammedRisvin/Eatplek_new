@@ -23,7 +23,7 @@ Future<void> main() async {
     };
   }
   await Store.init();
-  log('token ${Store.userToken}');
+  log('token123 ${Store.userToken}');
   runApp(const MyApp());
 }
 
