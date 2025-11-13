@@ -91,7 +91,7 @@ class OrdersController extends GetxController with GetSingleTickerProviderStateM
   }
 
   void refreshOrder(String orderId) {
-    print('Refreshing order: $orderId'); // Debug log
+    debugPrint('Refreshing order: $orderId'); // Debug log
 
     // Find and update the order status in delivery orders
     final deliveryIndex = deliveryOrders.indexWhere((order) => order.id == orderId);
@@ -113,7 +113,7 @@ class OrdersController extends GetxController with GetSingleTickerProviderStateM
         orderDate: currentOrder.orderDate,
       );
 
-      print('Order status updated to: ${deliveryOrders[deliveryIndex].statusText}'); // Debug log
+      debugPrint('Order status updated to: ${deliveryOrders[deliveryIndex].statusText}'); // Debug log
 
       // Update the specific order card and the entire delivery list
       update(['order_card_$orderId', 'delivery_orders']);
@@ -126,7 +126,7 @@ class OrdersController extends GetxController with GetSingleTickerProviderStateM
         duration: const Duration(seconds: 2),
       );
     } else {
-      print('Order not found: $orderId'); // Debug log
+      debugPrint('Order not found: $orderId'); // Debug log
     }
   }
 

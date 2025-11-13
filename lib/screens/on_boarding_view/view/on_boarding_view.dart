@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:percent_indicator/flutter_percent_indicator.dart';
 
 import '../../../core/routes/routes.dart';
+import '../../../core/util/storage.dart';
 import '../controller/on_boaring_contreoller.dart';
 
 class OnBoardingView extends StatelessWidget {
@@ -202,6 +203,7 @@ class OnBoardingView extends StatelessWidget {
                       fontSize: 16,
                       height: 60,
                       onTap: () {
+                        Store.showedOnBoarding = 'true';
                         Get.offAllNamed(Routes.login);
                       },
                       width: context.wp(80),

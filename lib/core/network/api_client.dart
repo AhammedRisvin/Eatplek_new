@@ -19,12 +19,49 @@ class FittorConnect {
   FittorConnect() {
     _client = FittorClient(defaultTimeout: const Duration(seconds: 30), enableLogging: true);
 
-    // Add logging interceptor
+    // 🔵 ADD DETAILED LOGGING INTERCEPTOR
+    _client.addInterceptor(
+      CallbackInterceptor(
+        onRequest: (request) async {
+          debugPrint("🔵 REQUEST");
+          debugPrint("URL: ${request.url}");
+          debugPrint("Method: ${request.method}");
+
+          try {
+            debugPrint("Body: ${utf8.decode(request.body)}");
+          } catch (_) {
+            debugPrint("Body: (binary or empty)");
+          }
+
+          return request;
+        },
+        onResponse: (response) async {
+          debugPrint("🟢 RESPONSE");
+          debugPrint("Status: ${response.statusCode}");
+
+          try {
+            debugPrint("Response Body: ${utf8.decode(response.bodyBytes)}");
+          } catch (_) {
+            debugPrint("Response Body: (binary or unreadable)");
+          }
+
+          return response;
+        },
+        onError: (error, stack) async {
+          debugPrint("🔴 ERROR");
+          debugPrint("Error: $error");
+
+          return error; // must return
+        },
+      ),
+    );
+
+    // Add normal logging interceptor (disabled but keeping your config)
     _client.addInterceptor(
       LoggingInterceptor(logRequest: false, logResponse: false, logError: false, logTag: 'FittorConnect'),
     );
 
-    // Add retry interceptor
+    // Add retry
     _client.addInterceptor(
       RetryInterceptor(
         maxRetries: 3,
@@ -38,7 +75,6 @@ class FittorConnect {
     _client.addInterceptor(
       CallbackInterceptor(
         onRequest: (request) async {
-          // Add common headers to all requests
           _commonHeaders.forEach((key, value) {
             request.headers.set(key, value);
           });
@@ -71,7 +107,6 @@ class FittorConnect {
       return 'Network error occurred: ${error.message}';
     } else if (error is FittorHttpException) {
       final statusCode = error.statusCode;
-      // Try to parse error message from response if available
       String errorMessage = error.message;
       switch (statusCode) {
         case 400:
@@ -83,21 +118,19 @@ class FittorConnect {
         case 404:
           return errorMessage.isNotEmpty ? errorMessage : 'Resource not found';
         case 500:
-          return errorMessage.isNotEmpty ? errorMessage : 'Internal server error';
+          return errorMessage.isNotEmpty ? errorMessage : 'Server error';
         default:
           return 'HTTP error occurred: $statusCode';
       }
     } else if (error is FittorException) {
       return error.message;
     } else {
-      return 'Unexpected error occurred: $error';
+      return 'Unexpected error: $error';
     }
   }
 
   String _buildUrl(String endpoint) {
-    if (endpoint.startsWith('http')) {
-      return endpoint;
-    }
+    if (endpoint.startsWith('http')) return endpoint;
     return '${Urls.baseUrl}$endpoint';
   }
 
@@ -108,6 +141,7 @@ class FittorConnect {
   }) async {
     try {
       final response = await _client.get(_buildUrl(endpoint), queryParameters: queryParameters, headers: headers);
+
       if (response.isSuccessful) {
         return parseResponse<T>(response);
       } else {
@@ -119,12 +153,9 @@ class FittorConnect {
               Get.offAllNamed(Routes.login);
             }
             throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
-          } else {
-            throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
           }
-        } else {
-          throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
         }
+        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
       }
     } catch (e) {
       throw _handleError(e);
@@ -156,12 +187,9 @@ class FittorConnect {
               Get.offAllNamed(Routes.login);
             }
             throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
-          } else {
-            throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
           }
-        } else {
-          throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
         }
+        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
       }
     } catch (e) {
       throw _handleError(e);
@@ -193,12 +221,9 @@ class FittorConnect {
               Get.offAllNamed(Routes.login);
             }
             throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
-          } else {
-            throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
           }
-        } else {
-          throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
         }
+        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
       }
     } catch (e) {
       throw _handleError(e);
@@ -230,12 +255,9 @@ class FittorConnect {
               Get.offAllNamed(Routes.login);
             }
             throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
-          } else {
-            throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
           }
-        } else {
-          throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
         }
+        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
       }
     } catch (e) {
       throw _handleError(e);
@@ -269,23 +291,19 @@ class FittorConnect {
     Function(double progress)? onProgress,
   }) async {
     try {
-      // Read file
       final file = File(filePath);
       final fileBytes = await file.readAsBytes();
       final fileName = file.path.split('/').last;
 
-      // Create multipart form data manually
       final boundary = 'fittor-boundary-${DateTime.now().millisecondsSinceEpoch}';
       final List<int> body = [];
 
-      // Add file part
       body.addAll('--$boundary\r\n'.codeUnits);
       body.addAll('Content-Disposition: form-data; name="$fieldName"; filename="$fileName"\r\n'.codeUnits);
       body.addAll('Content-Type: application/octet-stream\r\n\r\n'.codeUnits);
       body.addAll(fileBytes);
       body.addAll('\r\n'.codeUnits);
 
-      // Add extra data
       if (extraData != null) {
         for (final entry in extraData.entries) {
           body.addAll('--$boundary\r\n'.codeUnits);
@@ -348,7 +366,6 @@ class FittorConnect {
     }
   }
 
-  // Keep your existing Cloudinary methods as they are
   Future<List<String>> uploadImagesToCloudinary({
     required Map<String, File> files,
     required Function(double progress) progressCallback,
@@ -357,18 +374,11 @@ class FittorConnect {
     Completer<List<String>> completer = Completer<List<String>>();
     MIconsUploader.uploadFiles(files: files, folder: "images").listen(
       (progress) {
-        if (progress.url != null) {
-          urls.add(progress.url!);
-        }
+        if (progress.url != null) urls.add(progress.url!);
         progressCallback(progress.progress);
       },
-      onDone: () {
-        completer.complete(urls);
-      },
-      onError: (error) {
-        debugPrint("Error: $error");
-        completer.completeError(error);
-      },
+      onDone: () => completer.complete(urls),
+      onError: (error) => completer.completeError(error),
     );
     return completer.future;
   }
@@ -378,7 +388,7 @@ class FittorConnect {
   }
 }
 
-// Keep your existing UploadProgress and MIconsUploader classes as they are
+// UploadProgress + uploader (unchanged)
 class UploadProgress {
   final String fileKey;
   final String fileName;
@@ -425,7 +435,6 @@ class MIconsUploader {
         uploadedUrls[fileKey] = response.secureUrl ?? '';
         controller.add(UploadProgress(fileKey: fileKey, fileName: fileName, progress: 1.0, url: response.secureUrl));
       } catch (e) {
-        debugPrint("error is $e");
         controller.add(UploadProgress(fileKey: fileKey, fileName: fileName, progress: 0.0, error: e.toString()));
       }
     }
@@ -434,6 +443,7 @@ class MIconsUploader {
       controller.add(UploadProgress(fileKey: 'all', fileName: 'all', progress: 1.0, urls: uploadedUrls));
       controller.close();
     });
+
     return controller.stream;
   }
 }

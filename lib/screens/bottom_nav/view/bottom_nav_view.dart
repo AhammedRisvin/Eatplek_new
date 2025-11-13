@@ -32,9 +32,14 @@ class _BottomNavViewState extends State<BottomNavView> {
     const ProfileView(),
     const OfferView(),
   ];
+
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
+    final double navHeight = size.height * 0.085; // 8.5% of screen height
+    final double fabSize = size.width * 0.15; // 15% of screen width
+    final double fabPositionBottom = navHeight * 0.45;
+
     return GetBuilder(
       id: 'currentIndex',
       init: controller,
@@ -47,108 +52,100 @@ class _BottomNavViewState extends State<BottomNavView> {
                 left: 0,
                 child: SizedBox(height: context.hp(100), width: context.wp(100), child: bodyList[updater.currentIndex]),
               ),
+
+              /// BOTTOM NAVIGATION
               Positioned(
                 bottom: 0,
                 left: 0,
-                child: SizedBox(
+                child: Container(
                   width: size.width,
-                  height: 80,
+                  height: navHeight,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 12,
+                        spreadRadius: 0,
+                        offset: const Offset(0, -4), // Shadow only at top
+                      ),
+                    ],
+                  ),
                   child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      CustomPaint(size: Size(size.width, 90), painter: BNBCustomPainter()),
-                      Center(
-                        heightFactor: 0.68,
-                        child: FloatingActionButton(
-                          shape: RoundedRectangleBorder(
-                            side: const BorderSide(color: AppColor.appPrimary),
-                            borderRadius: BorderRadius.circular(50),
+                      // Background Painter
+                      CustomPaint(size: Size(size.width, navHeight), painter: BNBCustomPainter()),
+
+                      // Center Floating Button
+                      Positioned(
+                        bottom: fabPositionBottom,
+                        left: size.width / 2 - (fabSize / 2),
+                        child: Container(
+                          height: fabSize,
+                          width: fabSize,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColor.appPrimary,
+                            boxShadow: [
+                              BoxShadow(color: AppColor.appPrimary.withOpacity(.32), blurRadius: 16, spreadRadius: 3),
+                            ],
                           ),
-                          backgroundColor: AppColor.appPrimary,
-                          elevation: 0.1,
-                          onPressed: () {
-                            controller.setBottomBarIndex(4);
-                          },
-                          child: SvgPicture.string(marketPlaceSvg),
+                          child: IconButton(
+                            icon: SvgPicture.string(marketPlaceSvg),
+                            onPressed: () {
+                              controller.setBottomBarIndex(4);
+                            },
+                          ),
                         ),
                       ),
-                      SizedBox(
-                        width: size.width,
-                        height: 90,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                controller.setBottomBarIndex(0);
-                              },
-                              icon: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.string(updater.currentIndex == 0 ? activeHomeSvg : inActiveHomeSvg),
-                                  pointFiveSpacer(),
-                                  commonText(
-                                    "Home",
-                                    updater.currentIndex == 0 ? AppColor.appPrimary : AppColor.lightBlue,
-                                  ),
-                                ],
+
+                      // Navigation Icons + Labels + Indicators
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                          height: navHeight * 0.95,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              navItem(
+                                iconActive: activeHomeSvg,
+                                iconInactive: inActiveHomeSvg,
+                                label: "Home",
+                                index: 0,
+                                isActive: updater.currentIndex == 0,
+                                screenSize: size,
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                controller.setBottomBarIndex(1);
-                              },
-                              icon: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.string(
-                                    updater.currentIndex == 1 ? activeCategorySvg : inActiveCategorySvg,
-                                  ),
-                                  pointFiveSpacer(),
-                                  commonText(
-                                    "Categories",
-                                    updater.currentIndex == 1 ? AppColor.appPrimary : AppColor.lightBlue,
-                                  ),
-                                ],
+                              navItem(
+                                iconActive: activeCategorySvg,
+                                iconInactive: inActiveCategorySvg,
+                                label: "Orders",
+                                index: 1,
+                                isActive: updater.currentIndex == 1,
+                                screenSize: size,
                               ),
-                            ),
-                            Container(width: size.width * 0.20),
-                            IconButton(
-                              onPressed: () {
-                                controller.setBottomBarIndex(2);
-                              },
-                              icon: Column(
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.string(updater.currentIndex == 2 ? activeCartSvg : inActiveCartSvg),
-                                  pointFiveSpacer(),
-                                  commonText(
-                                    "Cart",
-                                    updater.currentIndex == 2 ? AppColor.appPrimary : AppColor.lightBlue,
-                                  ),
-                                ],
+
+                              SizedBox(width: fabSize * 1.1), // FAB space
+
+                              navItem(
+                                iconActive: activeCartSvg,
+                                iconInactive: inActiveCartSvg,
+                                label: "Cart",
+                                index: 2,
+                                isActive: updater.currentIndex == 2,
+                                screenSize: size,
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                controller.setBottomBarIndex(3);
-                              },
-                              icon: Column(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.string(updater.currentIndex == 3 ? wishlistIconSvg : heartIcon),
-                                  pointFiveSpacer(),
-                                  commonText(
-                                    "Wishlist",
-                                    updater.currentIndex == 3 ? AppColor.appPrimary : AppColor.lightBlue,
-                                  ),
-                                ],
+                              navItem(
+                                iconActive: wishlistIconSvg,
+                                iconInactive: heartIcon,
+                                label: "Profile",
+                                index: 3,
+                                isActive: updater.currentIndex == 3,
+                                screenSize: size,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -162,16 +159,50 @@ class _BottomNavViewState extends State<BottomNavView> {
     );
   }
 
-  SizedBox pointFiveSpacer() => SizedBox(width: 5);
+  /// COMMON WIDGET FOR NAV ITEMS WITH INDICATOR AT TOP
+  Widget navItem({
+    required String iconActive,
+    required String iconInactive,
+    required String label,
+    required int index,
+    required bool isActive,
+    required Size screenSize,
+  }) {
+    final iconSize = screenSize.width * 0.055; // Responsive icon size
+    final labelFontSize = screenSize.width * 0.032; // Responsive font size
+    final indicatorHeight = screenSize.height * 0.004; // Responsive indicator height
+    final indicatorWidth = screenSize.width * 0.08; // Responsive indicator width
 
-  Text commonText(String text, Color color) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w400,
-        fontFamily: GoogleFonts.urbanist().fontFamily,
-        color: color,
+    return GestureDetector(
+      onTap: () => controller.setBottomBarIndex(index),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Blue indicator at TOP of active icon
+          if (isActive)
+            Padding(
+              padding: EdgeInsets.only(bottom: screenSize.height * 0.006),
+              child: Container(
+                width: indicatorWidth,
+                height: indicatorHeight,
+                decoration: BoxDecoration(
+                  color: AppColor.appPrimary,
+                  borderRadius: BorderRadius.circular(screenSize.height * 0.002),
+                ),
+              ),
+            ),
+          SvgPicture.string(isActive ? iconActive : iconInactive, width: iconSize, height: iconSize),
+          SizedBox(height: screenSize.height * 0.004),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: labelFontSize,
+              color: isActive ? AppColor.appPrimary : AppColor.lightBlue,
+              fontFamily: GoogleFonts.urbanist().fontFamily,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
       ),
     );
   }

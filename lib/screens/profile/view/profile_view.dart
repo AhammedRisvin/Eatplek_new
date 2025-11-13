@@ -1,5 +1,7 @@
 import 'dart:developer';
 
+import 'package:eatplek_app/core/routes/routes.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -177,6 +179,14 @@ class _ProfileViewState extends State<ProfileView> {
       ProfileTile(title: 'Privacy and Policy', svgIcon: privacySvg, onTap: () => _handleTileTap('Privacy and Policy')),
       ProfileTile(title: 'Terms & Conditions', svgIcon: termsSvg, onTap: () => _handleTileTap('Terms & Conditions')),
       ProfileTile(title: 'Refer and Earn', svgIcon: referSvg, onTap: () => _handleTileTap('Refer and Earn')),
+      ProfileTile(
+        title: 'Logout',
+        svgIcon: referSvg,
+        onTap: () async {
+          await Store.clear();
+          Get.offAllNamed(Routes.splash);
+        },
+      ),
     ];
   }
 

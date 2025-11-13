@@ -61,8 +61,7 @@ class OnBoardingController extends GetxController with GetSingleTickerProviderSt
       _updateAnimations();
       update(['page_content', 'page_indicators', 'progress_button']);
     } else {
-      // Navigate to next screen (login/home)
-      Get.offNamed('/login'); // Replace with your route
+      Get.offNamed('/login');
     }
   }
 

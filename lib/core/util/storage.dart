@@ -20,8 +20,7 @@ class Store {
   }
 
   static String get userToken => _preference.getString(_userToken) ?? '';
-  static set userToken(String value) =>
-      _preference.setString(_userToken, value);
+  static set userToken(String value) => _preference.setString(_userToken, value);
 
   static String get id => _preference.getString("id") ?? '';
   static set id(String value) => _preference.setString("id", value);
@@ -37,4 +36,12 @@ class Store {
 
   static String get role => _preference.getString("role") ?? '';
   static set role(String value) => _preference.setString("role", value);
+
+  static String get status => _preference.getString("status") ?? '';
+  static set status(String value) => _preference.setString("status", value);
+
+  static String get showedOnBoarding => _preference.getString("showedOnBoarding") ?? 'false';
+  static set showedOnBoarding(String value) => _preference.setString("showedOnBoarding", value);
+
+  //status
 }

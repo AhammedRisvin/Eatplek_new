@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -22,13 +24,32 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _navigateToLoginScreen() {
     Future.delayed(const Duration(seconds: 2), () {
-      if (Store.userToken.isNotEmpty) {
-        return Get.offAllNamed(Routes.bottomNav);
-      } else {
+      final showedOnboarding = Store.showedOnBoarding == 'true';
+      log('showedOnboarding $showedOnboarding');
+      final hasToken = Store.userToken.isNotEmpty;
+      final isRegistered = Store.status == 'registered';
+
+      // 1. First time user (no onboarding shown & no token)
+      if (!showedOnboarding && !hasToken) {
         return Get.offAllNamed(Routes.onBoardingView);
       }
+
+      // 2. Onboarding already shown but user not logged in
+      if (!hasToken) {
+        return Get.offAllNamed(Routes.login);
+      }
+
+      // 3. Token exists & user fully registered → go home
+      if (isRegistered) {
+        return Get.offAllNamed(Routes.bottomNav);
+      }
+
+      // 4. Token exists but not fully registered
+      return Get.offAllNamed(Routes.login);
     });
   }
+
+  //Store.showOnBoarding
 
   @override
   Widget build(BuildContext context) {

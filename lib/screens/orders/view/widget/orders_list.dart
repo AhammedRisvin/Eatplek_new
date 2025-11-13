@@ -177,7 +177,7 @@ class OrdersList extends StatelessWidget {
     return button(
       name: isRefreshButton ? 'Refresh' : 'View Details',
       onTap: () {
-        print('Button tapped for order ${order.id}, isRefreshButton: $isRefreshButton'); // Debug log
+        debugPrint('Button tapped for order ${order.id}, isRefreshButton: $isRefreshButton'); // Debug log
         if (isRefreshButton) {
           controller.refreshOrder(order.id);
         } else {
