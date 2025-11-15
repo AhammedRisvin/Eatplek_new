@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'core/network/api_client.dart';
 import 'core/routes/routes.dart';
 import 'core/util/app_color.dart';
 import 'core/util/storage.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
   }
   await Store.init();
   log('token123 ${Store.userToken}');
+  Get.put<FittorConnect>(FittorConnect());
   runApp(const MyApp());
 }
 

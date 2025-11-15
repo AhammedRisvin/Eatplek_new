@@ -14,19 +14,46 @@ class OrderPreferenceModel {
   OrderPreferenceModel({required this.id, required this.title, required this.emoji, required this.value});
 }
 
+// 🆕 GetX Controller for dialog state
+class OrderPreferenceDialogController extends GetxController {
+  late String currentPreference;
+  final RxString selectedPreference = ''.obs;
+  final RxBool isLoading = false.obs;
+
+  OrderPreferenceDialogController({required String initial}) {
+    currentPreference = initial;
+    selectedPreference.value = initial;
+  }
+
+  void selectPreference(String value) {
+    selectedPreference.value = value;
+    debugPrint('🎯 Selected: $value');
+  }
+
+  bool isSelected(String value) {
+    return selectedPreference.value.contains(value);
+  }
+}
+
 class OrderPreferenceDialog extends StatelessWidget {
   final String currentPreference;
   final Function(String) onPreferenceSelected;
   final String? title;
   final String? subtitle;
+  final bool isDismissible;
 
-  const OrderPreferenceDialog({
+  late final OrderPreferenceDialogController _controller;
+
+  OrderPreferenceDialog({
     super.key,
     required this.currentPreference,
     required this.onPreferenceSelected,
     this.title,
     this.subtitle,
-  });
+    this.isDismissible = true,
+  }) {
+    _controller = OrderPreferenceDialogController(initial: currentPreference);
+  }
 
   // Static method to show the dialog
   static void show({
@@ -37,7 +64,7 @@ class OrderPreferenceDialog extends StatelessWidget {
   }) {
     showDialog(
       context: Get.context!,
-      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.5), // 🆕 Better visibility
       builder:
           (context) => OrderPreferenceDialog(
             currentPreference: currentPreference,
@@ -50,16 +77,22 @@ class OrderPreferenceDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: Get.width * 0.9,
-        decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [_buildHeader(), _buildDivider(), _buildPreferenceOptions(), 20.h],
-        ),
-      ),
+    return GetBuilder<OrderPreferenceDialogController>(
+      init: _controller,
+      builder: (controller) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetAnimationDuration: const Duration(milliseconds: 300),
+          child: Container(
+            width: Get.width * 0.9,
+            decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(20)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [_buildHeader(), _buildDivider(), _buildPreferenceOptions(controller), 20.h],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -91,7 +124,7 @@ class OrderPreferenceDialog extends StatelessWidget {
     return Divider(color: AppColor.black.withOpacity(0.1), height: 1);
   }
 
-  Widget _buildPreferenceOptions() {
+  Widget _buildPreferenceOptions(OrderPreferenceDialogController controller) {
     final preferences = _getPreferenceOptions();
 
     return Padding(
@@ -99,19 +132,25 @@ class OrderPreferenceDialog extends StatelessWidget {
       child: Column(
         children: [
           20.h,
-          ...preferences.map(
-            (preference) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: OrderPreferenceOptionWidget(
-                preference: preference,
-                isSelected: currentPreference == preference.value,
-                onTap: () {
-                  onPreferenceSelected("${preference.emoji} ${preference.value}");
-                  Get.back();
-                },
+          ...preferences.map((preference) {
+            return Obx(
+              () => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: OrderPreferenceOptionWidget(
+                  preference: preference,
+                  isSelected: controller.isSelected(preference.value),
+                  onTap: () {
+                    // 1️⃣ Update selection visually
+                    controller.selectPreference(preference.value);
+
+                    // 2️⃣ Call callback immediately
+                    String fullPreference = "${preference.emoji}  ${preference.value}";
+                    onPreferenceSelected(fullPreference);
+                  },
+                ),
               ),
-            ),
-          ),
+            );
+          }),
         ],
       ),
     );
@@ -131,7 +170,7 @@ class OrderPreferenceDialog extends StatelessWidget {
 class OrderPreferenceOptionWidget extends StatelessWidget {
   final OrderPreferenceModel preference;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const OrderPreferenceOptionWidget({
     super.key,
@@ -145,27 +184,46 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 300), // 🆕 Longer animation
+        curve: Curves.easeInOut,
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
         decoration: BoxDecoration(
-          color: isSelected ? AppColor.appPrimary.withOpacity(0.1) : AppColor.scaffoldColor,
+          color: isSelected ? AppColor.appPrimary.withOpacity(0.15) : AppColor.scaffoldColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? AppColor.appPrimary.withOpacity(0.3) : AppColor.black.withOpacity(0.06),
-            width: isSelected ? 1.5 : 1,
+            color: isSelected ? AppColor.appPrimary.withOpacity(0.5) : AppColor.black.withOpacity(0.08),
+            width: isSelected ? 2 : 1,
           ),
+          boxShadow:
+              isSelected
+                  ? [BoxShadow(color: AppColor.appPrimary.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))]
+                  : [],
         ),
         child: Row(
           children: [
-            text(
-              text: '${preference.emoji}   ${preference.title}',
-              size: 16,
-              fontWeight: FontWeight.w500,
-              color: isSelected ? AppColor.appPrimary : AppColor.black,
+            // 🆕 Animated emoji
+            AnimatedScale(
+              scale: isSelected ? 1.2 : 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: text(
+                text: '${preference.emoji}   ${preference.title}',
+                size: 16,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? AppColor.appPrimary : AppColor.black,
+              ),
             ),
             const Spacer(),
-            if (isSelected) Icon(Icons.check_circle, color: AppColor.appPrimary, size: 20),
+            // 🆕 Animated checkmark
+            AnimatedOpacity(
+              opacity: isSelected ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: AnimatedScale(
+                scale: isSelected ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Icon(Icons.check_circle, color: AppColor.appPrimary, size: 22),
+              ),
+            ),
           ],
         ),
       ),

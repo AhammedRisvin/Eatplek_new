@@ -6,6 +6,7 @@ import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 import '../controller/home_controller.dart';
 import 'widget/restaurant_card_widget.dart';
@@ -16,7 +17,7 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetBuilder<HomeController>(
-      init: HomeController(),
+      // ✅ REMOVED: init: HomeController() - Already initialized in main.dart
       builder: (controller) {
         return Scaffold(
           body: Column(
@@ -25,17 +26,34 @@ class HomeView extends StatelessWidget {
               _buildAppBar(controller),
               // Scrollable Content
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Column(
-                    children: [
-                      20.h,
-                      _buildCarouselSection(controller),
-                      _buildOrderPreferenceSection(controller),
-                      _buildRestaurantsSection(controller),
-                      100.h, // Bottom padding
-                    ],
-                  ),
+                child: GetBuilder<HomeController>(
+                  id: HomeController.restaurantsId,
+                  builder: (controller) {
+                    // Show error screen if there's an error
+                    if (controller.hasError && controller.restaurants.isEmpty) {
+                      return _buildErrorScreen(controller);
+                    }
+
+                    return SingleChildScrollView(
+                      controller: controller.scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        children: [
+                          20.h,
+                          _buildCarouselSection(controller),
+                          _buildOrderPreferenceSection(controller),
+                          _buildRestaurantsSection(controller),
+                          // Show loading indicator at bottom if loading more
+                          if (controller.isLoadingMore)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              child: _buildLoadingMoreIndicator(),
+                            ),
+                          100.h, // Bottom padding
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -83,7 +101,7 @@ class HomeView extends StatelessWidget {
             5.h,
             Row(
               children: [
-                text(text: controller.userLocation, size: 14, fontWeight: FontWeight.w300, color: AppColor.black),
+                text(text: controller.userCity, size: 14, fontWeight: FontWeight.w300, color: AppColor.black),
                 10.w,
                 GestureDetector(
                   onTap: controller.onLocationChangeTapped,
@@ -199,7 +217,7 @@ class HomeView extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   text(
-                    text: controller.orderPreference,
+                    text: controller.orderPreference.isEmpty ? 'Select Preference' : controller.orderPreference,
                     size: 18,
                     fontWeight: FontWeight.w500,
                     color: AppColor.appPrimary,
@@ -247,39 +265,191 @@ class HomeView extends StatelessWidget {
   }
 
   Widget _buildRestaurantsGrid(HomeController controller) {
-    return GetBuilder<HomeController>(
-      id: HomeController.restaurantsId,
-      builder: (controller) {
-        if (controller.isLoadingRestaurants) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    // Show skeleton loading
+    if (controller.isLoadingRestaurants && controller.restaurants.isEmpty) {
+      return _buildSkeletonGrid();
+    }
 
-        return GridView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 12,
-            childAspectRatio: Get.height * 0.001,
+    // Show empty state
+    if (!controller.isLoadingRestaurants && !controller.hasError && controller.restaurants.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: Column(
+            children: [
+              Icon(Icons.restaurant_menu, size: 60, color: Colors.grey[300]),
+              12.h,
+              text(
+                text: 'No restaurants found',
+                size: 16,
+                fontWeight: FontWeight.w500,
+                color: AppColor.black.withOpacity(0.5),
+              ),
+            ],
           ),
-          itemCount: controller.restaurants.length,
-          itemBuilder: (context, index) {
-            final restaurant = controller.restaurants[index];
-            return RestaurantCardWidget(restaurant: restaurant, onTap: () => controller.onRestaurantTapped(restaurant));
-          },
-        );
+        ),
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 12,
+        childAspectRatio: Get.height * 0.001,
+      ),
+      itemCount: controller.restaurants.length,
+      itemBuilder: (context, index) {
+        final restaurant = controller.restaurants[index];
+        return RestaurantCardWidget(restaurant: restaurant, onTap: () => controller.onRestaurantTapped(restaurant));
       },
     );
   }
+
+  Widget _buildSkeletonGrid() {
+    return Skeletonizer(
+      enabled: true,
+      effect: ShimmerEffect(
+        baseColor: Colors.grey.shade200,
+        highlightColor: Colors.grey.shade50,
+        duration: const Duration(milliseconds: 1500),
+      ),
+      child: GridView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 12,
+          childAspectRatio: Get.height * 0.001,
+        ),
+        itemCount: 6, // Show 6 skeleton cards
+        itemBuilder: (context, index) {
+          return Container(
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.grey[300]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Skeleton.leaf(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(10),
+                          topRight: Radius.circular(10),
+                        ),
+                        color: Colors.grey[300],
+                      ),
+                    ),
+                  ),
+                ),
+                10.h,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Skeleton.leaf(child: Container(height: 12, color: Colors.grey[300])),
+                ),
+                5.h,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Skeleton.leaf(child: Container(height: 10, width: 80, color: Colors.grey[300])),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadingMoreIndicator() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 40,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColor.appPrimary),
+                  ),
+                ),
+                12.w,
+                text(
+                  text: 'Loading more...',
+                  size: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColor.black.withOpacity(0.6),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorScreen(HomeController controller) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          children: [
+            20.h,
+            _buildCarouselSection(controller),
+            _buildOrderPreferenceSection(controller),
+            // Error content takes remaining space
+            SizedBox(
+              height: Get.height * 0.4,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 80, color: AppColor.redColor),
+                  20.h,
+                  text(
+                    text: 'Oops! Something went wrong',
+                    size: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColor.black,
+                    textAlign: TextAlign.center,
+                  ),
+                  12.h,
+                  text(
+                    text:
+                        controller.errorMessage.isEmpty
+                            ? 'Unable to fetch restaurants. Please try again.'
+                            : controller.errorMessage,
+                    size: 14,
+                    fontWeight: FontWeight.w400,
+                    color: AppColor.black.withOpacity(0.6),
+                    textAlign: TextAlign.center,
+                  ),
+                  30.h,
+                  button(
+                    name: 'Retry',
+                    width: 120,
+                    height: 45,
+                    borderRadius: BorderRadius.circular(12),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    onTap: controller.retryFetchingRestaurants,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
-
-// Example of how to use specific updates in other parts of your app:
-// To update only carousel: Get.find<HomeController>().update([HomeController.carouselId]);
-// To update only restaurants: Get.find<HomeController>().update([HomeController.restaurantsId]);
-// To update only user greeting: Get.find<HomeController>().update([HomeController.userGreetingId]);
-// To update only order preference: Get.find<HomeController>().update([HomeController.orderPreferenceId]);
-
-// Don't forget to register the controller in your main.dart or binding
-// Get.put(HomeController());

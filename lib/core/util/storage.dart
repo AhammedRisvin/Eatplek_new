@@ -43,5 +43,8 @@ class Store {
   static String get showedOnBoarding => _preference.getString("showedOnBoarding") ?? 'false';
   static set showedOnBoarding(String value) => _preference.setString("showedOnBoarding", value);
 
+  static String get deliveryPreference => _preference.getString("deliveryPreference") ?? '';
+  static set deliveryPreference(String value) => _preference.setString("deliveryPreference", value);
+
   //status
 }

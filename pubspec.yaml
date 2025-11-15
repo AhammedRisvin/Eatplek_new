@@ -53,6 +53,7 @@ dependencies:
   device_info_plus:
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+  skeletonizer: ^2.1.0+1
 
 dev_dependencies:
   flutter_test:

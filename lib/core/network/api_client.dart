@@ -384,7 +384,7 @@ class FittorConnect {
   }
 
   void dispose() {
-    _client.close();
+    debugPrint('⚠️ FittorConnect.dispose() called but ignored (singleton)');
   }
 }
 

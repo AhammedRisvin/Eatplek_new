@@ -5,10 +5,10 @@ import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
-import '../../model/restaurant_model.dart';
+import '../../model/home_model.dart';
 
 class RestaurantCardWidget extends StatelessWidget {
-  final RestaurantModel restaurant;
+  final Vendor restaurant;
   final VoidCallback? onTap;
   final double? cardHeight;
   final bool showFullOverlay;
@@ -45,8 +45,8 @@ class RestaurantCardWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [_buildRestaurantImage(), 10.h, _buildRestaurantInfo(), 10.h, _buildRestaurantLocation(), 10.h],
             ),
-            if (!restaurant.isOpen && showFullOverlay) _buildClosedOverlay(),
-            if (restaurant.isOpen) _buildOpenBadge(),
+            if (!(restaurant.isOpen ?? true) && showFullOverlay) _buildClosedOverlay(),
+            if (restaurant.isOpen ?? true) _buildOpenBadge(),
           ],
         ),
       ),
@@ -58,11 +58,26 @@ class RestaurantCardWidget extends StatelessWidget {
       flex: 3,
       child: ClipRRect(
         borderRadius: const BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10)),
-        child: image(
-          url: restaurant.imageUrl,
+        child: Image.network(
+          restaurant.restaurantImage ?? '',
           height: double.infinity,
           width: double.infinity,
-          borderRadius: const BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10)),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[300],
+              child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              color: Colors.grey[300],
+              child: const Center(
+                child: SizedBox(width: 30, height: 30, child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -75,7 +90,7 @@ class RestaurantCardWidget extends StatelessWidget {
         children: [
           Expanded(
             child: text(
-              text: restaurant.name,
+              text: restaurant.restaurantName ?? 'Unknown Restaurant',
               size: 14,
               fontWeight: FontWeight.w500,
               color: AppColor.black,
@@ -85,13 +100,20 @@ class RestaurantCardWidget extends StatelessWidget {
           ),
           SvgPicture.string(starSvg),
           3.w,
-          text(text: restaurant.rating.toString(), size: 12, fontWeight: FontWeight.w600, color: AppColor.black),
+          text(
+            text: (restaurant.averageRating ?? 0).toString(),
+            size: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColor.black,
+          ),
         ],
       ),
     );
   }
 
   Widget _buildRestaurantLocation() {
+    String location = restaurant.address?.city ?? 'Unknown Location';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -100,7 +122,7 @@ class RestaurantCardWidget extends StatelessWidget {
           5.w,
           Expanded(
             child: text(
-              text: restaurant.location,
+              text: location,
               size: 12,
               fontWeight: FontWeight.w400,
               color: AppColor.black.withOpacity(0.6),
@@ -133,6 +155,8 @@ class RestaurantCardWidget extends StatelessWidget {
   }
 
   Widget _buildClosedOverlay() {
+    String openingTime = restaurant.operatingHours?.openTime ?? '10:00 AM';
+
     return Positioned.fill(
       child: Container(
         decoration: BoxDecoration(color: AppColor.black.withOpacity(0.6), borderRadius: BorderRadius.circular(10)),
@@ -143,7 +167,7 @@ class RestaurantCardWidget extends StatelessWidget {
               text(text: 'Closed', size: 16, fontWeight: FontWeight.w600, color: AppColor.redColor),
               4.h,
               text(
-                text: 'Opens tomorrow at ${restaurant.openingTime}',
+                text: 'Opens tomorrow at $openingTime',
                 size: 12,
                 fontWeight: FontWeight.w400,
                 color: AppColor.white,
