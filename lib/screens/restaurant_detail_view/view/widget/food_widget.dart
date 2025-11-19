@@ -50,7 +50,7 @@ class FoodWidget extends StatelessWidget {
                     size: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColor.black,
-                    maxLines: 2,
+                    maxLines: 1,
                     overFlow: TextOverflow.ellipsis,
                   ),
                 ),

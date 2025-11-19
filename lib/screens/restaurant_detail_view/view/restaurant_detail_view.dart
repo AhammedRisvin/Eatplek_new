@@ -8,7 +8,6 @@ import 'package:get/get.dart';
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import 'widget/food_widget.dart';
-import 'widget/multiple_branch_bottom_sheet.dart';
 
 class RestaurantDetailView extends StatefulWidget {
   const RestaurantDetailView({super.key});
@@ -62,7 +61,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
 
     return Container(
       width: context.wp(100),
-      height: 343,
+      height: 201,
       decoration: BoxDecoration(
         image: DecorationImage(image: NetworkImage('https://picsum.photos/250?image=30'), fit: BoxFit.cover),
       ),
@@ -72,12 +71,35 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
           padding: EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
-              20.h,
-              _buildBackButton(),
-              Spacer(),
-              _buildRestaurantInfo(),
-              Spacer(),
-              _buildRestaurantDetails(),
+              Row(
+                children: [
+                  _buildBackButton(),
+                  10.w,
+                  _buildRestaurantInfo(),
+                  Spacer(),
+                  Container(
+                    height: context.hp(5),
+                    width: context.hp(5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(100),
+                      color: AppColor.white.withOpacity(0.2),
+                      border: Border.all(color: AppColor.white.withOpacity(0.4)),
+                    ),
+                    child: IconButton(onPressed: () => Get.back(), icon: Image.asset(mapPng)),
+                  ),
+                  10.w,
+                  Container(
+                    height: context.hp(5),
+                    width: context.hp(5),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(100),
+                      color: AppColor.white.withOpacity(0.2),
+                      border: Border.all(color: AppColor.white.withOpacity(0.4)),
+                    ),
+                    child: IconButton(onPressed: () => Get.back(), icon: Image.asset(sharePng)),
+                  ),
+                ],
+              ),
               30.h,
             ],
           ),
@@ -90,8 +112,8 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        height: 50,
-        width: 50,
+        height: context.hp(5),
+        width: context.hp(5),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColor.white.withOpacity(0.4)),
@@ -103,72 +125,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
 
   Widget _buildRestaurantInfo() {
     return Column(
-      children: [
-        text(text: 'Nibraz Restaurant', color: AppColor.white, size: 30, fontWeight: FontWeight.w600),
-        5.h,
-        text(text: 'Caltext, Kannur, Kerala', color: AppColor.white, size: 18, fontWeight: FontWeight.w500),
-        5.h,
-        text(
-          text: 'Open: 10:00 AM – 11:00 PM',
-          color: AppColor.white.withOpacity(0.8),
-          size: 14,
-          fontWeight: FontWeight.w500,
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildRatingContainer(),
-            5.w,
-            GestureDetector(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  backgroundColor: AppColor.scaffoldColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30.0))),
-                  builder: (context) {
-                    return MultipleBranchBottomSheet();
-                  },
-                );
-              },
-              child: text(
-                text: 'View Branches',
-                size: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColor.white,
-                decoration: TextDecoration.underline,
-                decorationColor: AppColor.white,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRatingContainer() {
-    return Container(
-      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(50), color: Color(0Xffffc107).withOpacity(0.4)),
-      margin: EdgeInsets.only(top: 8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SvgPicture.string(starSvg, height: 15, width: 15),
-          10.w,
-          text(text: '4.5', size: 16, fontWeight: FontWeight.w600, color: AppColor.white),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRestaurantDetails() {
-    return Row(
-      children: [
-        text(text: 'Delivery Time : ', size: 14, fontWeight: FontWeight.w400, color: AppColor.white),
-        text(text: '40 Min', size: 14, fontWeight: FontWeight.w400, color: AppColor.appPrimary),
-        Spacer(),
-        text(text: 'Distance : 14 KM', size: 14, fontWeight: FontWeight.w400, color: AppColor.white),
-      ],
+      children: [text(text: 'Nibraz Restaurant', color: AppColor.white, size: 20, fontWeight: FontWeight.w600)],
     );
   }
 
@@ -216,7 +173,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
   Widget _buildMainContent() {
     return AnimatedPositioned(
       duration: Duration(milliseconds: 300),
-      top: _isScrolled ? 120 - 20 : 343 - 20, // 20px overlap
+      top: _isScrolled ? 120 - 20 : 120 - 20,
       left: 0,
       right: 0,
       bottom: 0,

@@ -9,5 +9,5 @@ mixin Urls {
   //addUserDetails
 
   //Home
-  static const String getHomeUrl = 'api/users/home';
+  static const String getHomeUrl = 'api/users/app/home';
 }

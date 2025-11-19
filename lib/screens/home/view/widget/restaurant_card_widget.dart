@@ -5,21 +5,15 @@ import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
-import '../../model/home_model.dart';
+import '../../model/new_home_model.dart';
 
-class RestaurantCardWidget extends StatelessWidget {
-  final Vendor restaurant;
+class VendorCardWidget extends StatelessWidget {
+  final Vendor vendor;
   final VoidCallback? onTap;
   final double? cardHeight;
   final bool showFullOverlay;
 
-  const RestaurantCardWidget({
-    super.key,
-    required this.restaurant,
-    this.onTap,
-    this.cardHeight,
-    this.showFullOverlay = true,
-  });
+  const VendorCardWidget({super.key, required this.vendor, this.onTap, this.cardHeight, this.showFullOverlay = true});
 
   @override
   Widget build(BuildContext context) {
@@ -43,23 +37,23 @@ class RestaurantCardWidget extends StatelessWidget {
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [_buildRestaurantImage(), 10.h, _buildRestaurantInfo(), 10.h, _buildRestaurantLocation(), 10.h],
+              children: [_buildVendorImage(), 10.h, _buildVendorInfo(), 10.h, _buildVendorLocation(), 10.h],
             ),
-            if (!(restaurant.isOpen ?? true) && showFullOverlay) _buildClosedOverlay(),
-            if (restaurant.isOpen ?? true) _buildOpenBadge(),
+            if (!(vendor.isOpenNow ?? true) && showFullOverlay) _buildClosedOverlay(),
+            if (vendor.isOpenNow ?? true) _buildOpenBadge(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRestaurantImage() {
+  Widget _buildVendorImage() {
     return Expanded(
       flex: 3,
       child: ClipRRect(
         borderRadius: const BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10)),
         child: Image.network(
-          restaurant.restaurantImage ?? '',
+          vendor.coverImage ?? '',
           height: double.infinity,
           width: double.infinity,
           fit: BoxFit.cover,
@@ -83,14 +77,14 @@ class RestaurantCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRestaurantInfo() {
+  Widget _buildVendorInfo() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: [
           Expanded(
             child: text(
-              text: restaurant.restaurantName ?? 'Unknown Restaurant',
+              text: vendor.hotelName ?? 'Unknown Vendor',
               size: 14,
               fontWeight: FontWeight.w500,
               color: AppColor.black,
@@ -101,7 +95,7 @@ class RestaurantCardWidget extends StatelessWidget {
           SvgPicture.string(starSvg),
           3.w,
           text(
-            text: (restaurant.averageRating ?? 0).toString(),
+            text: (vendor.averageRating ?? 0).toString(),
             size: 12,
             fontWeight: FontWeight.w600,
             color: AppColor.black,
@@ -111,8 +105,8 @@ class RestaurantCardWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRestaurantLocation() {
-    String location = restaurant.address?.city ?? 'Unknown Location';
+  Widget _buildVendorLocation() {
+    String location = vendor.place ?? 'Unknown Location';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -155,8 +149,6 @@ class RestaurantCardWidget extends StatelessWidget {
   }
 
   Widget _buildClosedOverlay() {
-    String openingTime = restaurant.operatingHours?.openTime ?? '10:00 AM';
-
     return Positioned.fill(
       child: Container(
         decoration: BoxDecoration(color: AppColor.black.withOpacity(0.6), borderRadius: BorderRadius.circular(10)),
@@ -167,7 +159,7 @@ class RestaurantCardWidget extends StatelessWidget {
               text(text: 'Closed', size: 16, fontWeight: FontWeight.w600, color: AppColor.redColor),
               4.h,
               text(
-                text: 'Opens tomorrow at $openingTime',
+                text: 'Check opening hours',
                 size: 12,
                 fontWeight: FontWeight.w400,
                 color: AppColor.white,

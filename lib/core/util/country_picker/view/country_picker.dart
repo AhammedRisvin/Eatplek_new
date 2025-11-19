@@ -33,12 +33,7 @@ class _CountryPickerState extends State<CountryPicker> {
       filteredCountryNames = countryNames;
     } else {
       filteredCountryNames =
-          countryNames
-              .where(
-                (country) =>
-                    country.toLowerCase().contains(query.toLowerCase()),
-              )
-              .toList();
+          countryNames.where((country) => country.toLowerCase().contains(query.toLowerCase())).toList();
     }
     setState(() {});
   }
@@ -48,20 +43,14 @@ class _CountryPickerState extends State<CountryPicker> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColor.white,
-        title: const Text(
-          'Choose Country',
-          style: TextStyle(color: AppColor.black),
-        ),
+        title: const Text('Choose Country', style: TextStyle(color: AppColor.black)),
       ),
       body: Column(
         children: [
           Container(
             height: 45,
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: AppColor.black.withOpacity(0.4),
-            ),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: AppColor.black.withOpacity(0.4)),
             padding: const EdgeInsets.only(bottom: 4.0),
             child: Center(
               child: TextField(
@@ -72,10 +61,7 @@ class _CountryPickerState extends State<CountryPicker> {
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search, color: AppColor.black),
                   hintText: 'Search country...',
-                  hintStyle: TextStyle(
-                    color: AppColor.black,
-                    fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
-                  ),
+                  hintStyle: TextStyle(color: AppColor.black, fontFamily: GoogleFonts.poppins().fontFamily),
                   border: InputBorder.none,
                 ),
               ),
@@ -94,10 +80,8 @@ class _CountryPickerState extends State<CountryPicker> {
                   },
                   leading: CachedNetworkImage(
                     imageUrl: "${data['flag']}",
-                    placeholder:
-                        (context, url) => const CircularProgressIndicator(),
-                    errorWidget:
-                        (context, url, error) => const Icon(Icons.error),
+                    placeholder: (context, url) => const CircularProgressIndicator(),
+                    errorWidget: (context, url, error) => const Icon(Icons.error),
                     height: 30,
                     width: 30,
                   ),

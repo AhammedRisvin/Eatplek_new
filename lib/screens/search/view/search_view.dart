@@ -6,8 +6,6 @@ import 'package:svg_flutter/svg.dart';
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
-import '../../home/controller/home_controller.dart';
-import '../../home/view/widget/restaurant_card_widget.dart';
 
 class SearchView extends StatefulWidget {
   const SearchView({super.key});
@@ -29,32 +27,33 @@ class _SearchViewState extends State<SearchView> {
   }
 
   Widget _buildRestaurantsGrid() {
-    return GetBuilder<HomeController>(
-      id: HomeController.restaurantsId,
-      init: HomeController(),
-      builder: (controller) {
-        if (controller.isLoadingRestaurants) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return Container();
+    //  GetBuilder<HomeController>(
+    //   id: HomeController.restaurantsId,
+    //   init: HomeController(),
+    //   builder: (controller) {
+    //     if (controller.isLoadingRestaurants) {
+    //       return const Center(child: CircularProgressIndicator());
+    //     }
 
-        return GridView.builder(
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 12,
-            childAspectRatio: Get.height * 0.001,
-          ),
-          itemCount: controller.restaurants.length,
-          itemBuilder: (context, index) {
-            final restaurant = controller.restaurants[index];
-            return RestaurantCardWidget(restaurant: restaurant, onTap: () => controller.onRestaurantTapped(restaurant));
-          },
-        );
-      },
-    );
+    //     return GridView.builder(
+    //       shrinkWrap: true,
+    //       padding: EdgeInsets.zero,
+    //       physics: const NeverScrollableScrollPhysics(),
+    //       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+    //         crossAxisCount: 2,
+    //         mainAxisSpacing: 16,
+    //         crossAxisSpacing: 12,
+    //         childAspectRatio: Get.height * 0.001,
+    //       ),
+    //       itemCount: controller.restaurants.length,
+    //       itemBuilder: (context, index) {
+    //         final restaurant = controller.restaurants[index];
+    //         return RestaurantCardWidget(restaurant: restaurant, onTap: () => controller.onRestaurantTapped(restaurant));
+    //       },
+    //     );
+    //   },
+    // );
   }
 
   Widget _buildSearchField() {

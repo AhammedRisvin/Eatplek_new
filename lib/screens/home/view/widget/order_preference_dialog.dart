@@ -1,6 +1,6 @@
-// order_preference_dialog.dart
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/screens/home/model/new_home_model.dart';
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -14,61 +14,46 @@ class OrderPreferenceModel {
   OrderPreferenceModel({required this.id, required this.title, required this.emoji, required this.value});
 }
 
-// 🆕 GetX Controller for dialog state
-class OrderPreferenceDialogController extends GetxController {
-  late String currentPreference;
-  final RxString selectedPreference = ''.obs;
-  final RxBool isLoading = false.obs;
-
-  OrderPreferenceDialogController({required String initial}) {
-    currentPreference = initial;
-    selectedPreference.value = initial;
-  }
-
-  void selectPreference(String value) {
-    selectedPreference.value = value;
-    debugPrint('🎯 Selected: $value');
-  }
-
-  bool isSelected(String value) {
-    return selectedPreference.value.contains(value);
-  }
-}
-
-class OrderPreferenceDialog extends StatelessWidget {
+class OrderPreferenceDialog extends StatefulWidget {
   final String currentPreference;
+  final List<String> availableServices;
   final Function(String) onPreferenceSelected;
+  final VoidCallback? onDialogDismissed;
   final String? title;
   final String? subtitle;
-  final bool isDismissible;
 
-  late final OrderPreferenceDialogController _controller;
-
-  OrderPreferenceDialog({
+  const OrderPreferenceDialog({
     super.key,
     required this.currentPreference,
+    required this.availableServices,
     required this.onPreferenceSelected,
+    this.onDialogDismissed,
     this.title,
     this.subtitle,
-    this.isDismissible = true,
-  }) {
-    _controller = OrderPreferenceDialogController(initial: currentPreference);
-  }
+  });
 
-  // Static method to show the dialog
-  static void show({
+  /// Static method to show the dialog
+  static Future<void> show({
     required String currentPreference,
+    required List<String> availableServices,
+    required List<BannerData> banners,
     required Function(String) onPreferenceSelected,
+    VoidCallback? onDialogDismissed,
     String? title,
     String? subtitle,
-  }) {
+  }) async {
+    debugPrint('🎯 OrderPreferenceDialog.show() called');
+
     showDialog(
       context: Get.context!,
-      barrierColor: Colors.black.withOpacity(0.5), // 🆕 Better visibility
+      barrierColor: Colors.black.withOpacity(0.5),
+      barrierDismissible: false, // ✅ Force user to select or explicitly close
       builder:
           (context) => OrderPreferenceDialog(
             currentPreference: currentPreference,
+            availableServices: availableServices,
             onPreferenceSelected: onPreferenceSelected,
+            onDialogDismissed: onDialogDismissed,
             title: title,
             subtitle: subtitle,
           ),
@@ -76,23 +61,26 @@ class OrderPreferenceDialog extends StatelessWidget {
   }
 
   @override
+  State<OrderPreferenceDialog> createState() => _OrderPreferenceDialogState();
+}
+
+class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
+  @override
   Widget build(BuildContext context) {
-    return GetBuilder<OrderPreferenceDialogController>(
-      init: _controller,
-      builder: (controller) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetAnimationDuration: const Duration(milliseconds: 300),
-          child: Container(
-            width: Get.width * 0.9,
-            decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(20)),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [_buildHeader(), _buildDivider(), _buildPreferenceOptions(controller), 20.h],
-            ),
+    return PopScope(
+      canPop: false, // ✅ Prevent back button from closing dialog
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        insetAnimationDuration: const Duration(milliseconds: 300),
+        child: Container(
+          width: Get.width * 0.9,
+          decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(20)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [_buildHeader(), _buildDivider(), _buildPreferenceOptions(), _buildCloseButton(), 20.h],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -102,14 +90,14 @@ class OrderPreferenceDialog extends StatelessWidget {
       child: Column(
         children: [
           text(
-            text: title ?? 'How Would You Like to Order?',
+            text: widget.title ?? 'How Would You Like to Order?',
             size: 20,
             fontWeight: FontWeight.w600,
             textAlign: TextAlign.center,
           ),
           4.h,
           text(
-            text: subtitle ?? 'Please choose your preferred service to continue.',
+            text: widget.subtitle ?? 'Please choose your preferred service to continue.',
             size: 14,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),
@@ -124,30 +112,49 @@ class OrderPreferenceDialog extends StatelessWidget {
     return Divider(color: AppColor.black.withOpacity(0.1), height: 1);
   }
 
-  Widget _buildPreferenceOptions(OrderPreferenceDialogController controller) {
+  Widget _buildPreferenceOptions() {
     final preferences = _getPreferenceOptions();
+
+    // Filter preferences based on available services
+    final filteredPreferences =
+        preferences
+            .where(
+              (pref) => widget.availableServices.any(
+                (service) => service.toLowerCase() == pref.value.toLowerCase().replaceAll('-', '').replaceAll(' ', ''),
+              ),
+            )
+            .toList();
+
+    debugPrint('📋 Filtered preferences: ${filteredPreferences.map((p) => p.value).toList()}');
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           20.h,
-          ...preferences.map((preference) {
-            return Obx(
-              () => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: OrderPreferenceOptionWidget(
-                  preference: preference,
-                  isSelected: controller.isSelected(preference.value),
-                  onTap: () {
-                    // 1️⃣ Update selection visually
-                    controller.selectPreference(preference.value);
+          ...filteredPreferences.map((preference) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: OrderPreferenceOptionWidget(
+                preference: preference,
+                isSelected: widget.currentPreference.contains(preference.value),
+                onTap: () {
+                  debugPrint('✅ Preference tapped: ${preference.value}');
 
-                    // 2️⃣ Call callback immediately
-                    String fullPreference = "${preference.emoji}  ${preference.value}";
-                    onPreferenceSelected(fullPreference);
-                  },
-                ),
+                  // Create full preference string with emoji
+                  String fullPreference = "${preference.emoji}  ${preference.value}";
+
+                  debugPrint('📤 Closing dialog and calling callback with: $fullPreference');
+
+                  // 1️⃣ Close dialog first
+                  Navigator.of(Get.context!).pop();
+
+                  // 2️⃣ Call callback after dialog closes
+                  Future.delayed(const Duration(milliseconds: 200), () {
+                    debugPrint('📞 Calling onPreferenceSelected callback');
+                    widget.onPreferenceSelected(fullPreference);
+                  });
+                },
               ),
             );
           }),
@@ -156,17 +163,42 @@ class OrderPreferenceDialog extends StatelessWidget {
     );
   }
 
+  Widget _buildCloseButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: button(
+        name: 'Cancel',
+        width: double.infinity,
+        height: 45,
+        borderRadius: BorderRadius.circular(12),
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        onTap: () {
+          debugPrint('❌ Dialog closed without selection');
+          Navigator.of(Get.context!).pop();
+
+          Future.delayed(const Duration(milliseconds: 200), () {
+            widget.onDialogDismissed?.call();
+          });
+        },
+        color: AppColor.scaffoldColor,
+        borderColor: AppColor.black.withOpacity(0.1),
+        textColor: AppColor.black,
+      ),
+    );
+  }
+
   List<OrderPreferenceModel> _getPreferenceOptions() {
     return [
       OrderPreferenceModel(id: 'delivery', title: 'Delivery', emoji: '🛵', value: 'Delivery'),
-      OrderPreferenceModel(id: 'takeaway', title: 'Take Away', emoji: '🥡', value: 'Take Away'),
-      OrderPreferenceModel(id: 'dining', title: 'Dining', emoji: '🍽️', value: 'Dine-in'),
-      OrderPreferenceModel(id: 'special', title: 'Special Day Pre-Booking', emoji: '🎉', value: 'Special Booking'),
+      OrderPreferenceModel(id: 'takeaway', title: 'Take Away', emoji: '🥡', value: 'Takeaway'),
+      OrderPreferenceModel(id: 'dining', title: 'Dine-in', emoji: '🍽️', value: 'Dine-in'),
+      OrderPreferenceModel(id: 'special', title: 'Special Booking', emoji: '🎉', value: 'SpecialBooking'),
     ];
   }
 }
 
-// order_preference_option_widget.dart
+/// Individual preference option widget
 class OrderPreferenceOptionWidget extends StatelessWidget {
   final OrderPreferenceModel preference;
   final bool isSelected;
@@ -184,7 +216,7 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300), // 🆕 Longer animation
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
@@ -202,7 +234,7 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 🆕 Animated emoji
+            // Animated emoji and title
             AnimatedScale(
               scale: isSelected ? 1.2 : 1.0,
               duration: const Duration(milliseconds: 300),
@@ -214,7 +246,7 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            // 🆕 Animated checkmark
+            // Animated checkmark
             AnimatedOpacity(
               opacity: isSelected ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),

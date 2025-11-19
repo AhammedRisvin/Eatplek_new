@@ -198,7 +198,7 @@ class _BottomNavViewState extends State<BottomNavView> {
             style: TextStyle(
               fontSize: labelFontSize,
               color: isActive ? AppColor.appPrimary : AppColor.lightBlue,
-              fontFamily: GoogleFonts.urbanist().fontFamily,
+              fontFamily: GoogleFonts.poppins().fontFamily,
               fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
