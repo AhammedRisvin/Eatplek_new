@@ -8,7 +8,9 @@ import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
 import '../controller/restaurant_detail_view_controller.dart';
-import 'widget/food_widget.dart';
+import 'widget/banner_section.dart';
+import 'widget/category_section.dart';
+import 'widget/food_grid_section.dart';
 
 class RestaurantDetailView extends StatefulWidget {
   const RestaurantDetailView({super.key});
@@ -193,7 +195,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
   Widget _buildMainContent(RestaurantDetailViewController controller) {
     return AnimatedPositioned(
       duration: Duration(milliseconds: 300),
-      top: _isScrolled ? 120 - 20 : 120 - 20,
+      top: _isScrolled ? 120 : 100,
       left: 0,
       right: 0,
       bottom: 0,
@@ -219,14 +221,16 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
                   // Empty state
                   _buildEmptyState()
                 else ...[
-                  // Banners carousel
-                  if (controller.banners.isNotEmpty) _buildBanners(controller),
+                  // Banner Section
+                  BannerSection(controller: controller),
                   20.h,
-                  _buildCategoryHeader(),
-                  14.h,
-                  _buildCategoryTabs(controller),
+
+                  // Category Section
+                  CategorySection(controller: controller),
                   20.h,
-                  _buildFoodGrid(controller),
+
+                  // Food Grid Section
+                  FoodGridSection(controller: controller),
                   SizedBox(height: 100),
                 ],
               ],
@@ -360,147 +364,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
               text: 'This restaurant has no food items available right now',
               size: 14,
               fontWeight: FontWeight.w400,
-              color: AppColor.black.withOpacity(0.6),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBanners(RestaurantDetailViewController controller) {
-    return Padding(
-      padding: EdgeInsets.only(left: 16, right: 16, top: 16),
-      child: SizedBox(
-        height: 180,
-        child: PageView.builder(
-          itemCount: controller.banners.length,
-          itemBuilder: (context, index) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: image(
-                url: controller.banners[index],
-                height: 180,
-                width: context.wp(100),
-                borderRadius: BorderRadius.circular(20),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryHeader() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.0),
-      child: text(text: 'What would you like?', fontWeight: FontWeight.w600, size: 18),
-    );
-  }
-
-  Widget _buildCategoryTabs(RestaurantDetailViewController controller) {
-    return GetBuilder<RestaurantDetailViewController>(
-      id: 'category_tabs',
-      builder: (controller) {
-        if (controller.categories.isEmpty) {
-          return SizedBox();
-        }
-
-        return SizedBox(
-          height: 50,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            itemBuilder: (context, index) {
-              final category = controller.categories[index];
-              final isSelected = controller.selectedCategoryIndex == index;
-
-              return _buildCategoryTab(category, isSelected, () => controller.onCategoryTapped(index));
-            },
-            separatorBuilder: (context, index) => 10.w,
-            itemCount: controller.categories.length,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildCategoryTab(String title, bool isSelected, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColor.appPrimary : Colors.grey[100],
-          borderRadius: BorderRadius.circular(40),
-          border: Border.all(color: isSelected ? AppColor.appPrimary : Colors.grey[300]!, width: 1),
-        ),
-        child: Row(
-          children: [
-            image(
-              url: 'https://picsum.photos/250?image=20',
-              height: 24,
-              width: 24,
-              borderRadius: BorderRadius.circular(100),
-            ),
-            10.w,
-            text(
-              text: title,
-              size: 14,
-              fontWeight: FontWeight.w500,
-              color: isSelected ? AppColor.white : Colors.grey[700]!,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFoodGrid(RestaurantDetailViewController controller) {
-    return GetBuilder<RestaurantDetailViewController>(
-      id: 'food_grid',
-      builder: (controller) {
-        final filteredFoodItems = controller.getFilteredFoodItems();
-
-        if (filteredFoodItems.isEmpty) {
-          return _buildEmptyCategoryState();
-        }
-
-        return Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: GridView.builder(
-            shrinkWrap: true,
-            padding: EdgeInsets.zero,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
-              childAspectRatio: Get.height * 0.00098,
-            ),
-            itemCount: filteredFoodItems.length,
-            itemBuilder: (context, index) {
-              return FoodWidget(foodItem: filteredFoodItems[index]);
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyCategoryState() {
-    return SizedBox(
-      height: 200,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant_menu, size: 48, color: AppColor.black.withOpacity(0.3)),
-            16.h,
-            text(
-              text: 'No items available in this category',
-              size: 16,
-              fontWeight: FontWeight.w500,
               color: AppColor.black.withOpacity(0.6),
             ),
           ],

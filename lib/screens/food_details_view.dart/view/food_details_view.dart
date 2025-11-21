@@ -173,7 +173,7 @@ class _FoodDetailsViewState extends State<FoodDetailsView> {
         ),
         child: IconButton(
           onPressed: () {
-            Get.find<RestaurantDetailViewController>().resetAllSelections();
+            // Get.find<RestaurantDetailViewController>().resetAllSelections();
             Get.back();
           },
           icon: SvgPicture.string(arrowBack),
@@ -383,25 +383,6 @@ class _FoodDetailsViewState extends State<FoodDetailsView> {
             ),
           ),
         ),
-        12.h,
-        // ✨ Indicator dots
-        if (banners.length > 1)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              banners.length,
-              (index) => AnimatedContainer(
-                duration: Duration(milliseconds: 300),
-                margin: EdgeInsets.symmetric(horizontal: 4),
-                height: 8,
-                width: _currentBannerIndex == index ? 24 : 8,
-                decoration: BoxDecoration(
-                  color: _currentBannerIndex == index ? AppColor.appPrimary : AppColor.appPrimary.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
