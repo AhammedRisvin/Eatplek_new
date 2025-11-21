@@ -171,7 +171,13 @@ class _FoodDetailsViewState extends State<FoodDetailsView> {
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColor.white.withOpacity(0.4)),
         ),
-        child: IconButton(onPressed: () => Get.back(), icon: SvgPicture.string(arrowBack)),
+        child: IconButton(
+          onPressed: () {
+            Get.find<RestaurantDetailViewController>().resetAllSelections();
+            Get.back();
+          },
+          icon: SvgPicture.string(arrowBack),
+        ),
       ),
     );
   }
