@@ -10,4 +10,8 @@ mixin Urls {
 
   //Home
   static const String getHomeUrl = 'api/users/app/home';
+
+  static const String getRestaurantDetailsUrl = 'api/vendors/';
+
+  //getRestaurantDetailsUrl
 }

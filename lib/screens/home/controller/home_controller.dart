@@ -203,8 +203,7 @@ class HomeController extends GetxController {
 
       String cleanDateTime = '${formattedDateTime.substring(0, formattedDateTime.indexOf('.'))}Z';
 
-      String endpoint =
-          "${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime&page=$currentPage&limit=$limit";
+      String endpoint = "${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime";
 
       if (serviceType != null && serviceType.isNotEmpty) {
         endpoint += "&serviceType=$serviceType";
@@ -248,9 +247,6 @@ class HomeController extends GetxController {
             }
 
             debugPrint('✅ Vendors loaded: ${vendors.length} items');
-
-            // TODO: Handle pagination if needed
-            // For now, assuming pagination comes with vendors response
           }
 
           isLoadingVendors = false;
@@ -422,15 +418,12 @@ class HomeController extends GetxController {
     debugPrint('📍 Branch count: ${branches.length}');
 
     if (branches.isEmpty) {
-      // No branches - navigate directly with vendor details
       debugPrint('✅ Single location - navigating directly');
       Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
     } else if (branches.length == 1) {
-      // Only one branch - navigate directly without showing bottom sheet
       debugPrint('✅ Only one branch - navigating directly');
-      Get.toNamed(Routes.restaurantDetail, arguments: branches.first);
+      Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
     } else {
-      // Multiple branches - show bottom sheet for selection
       debugPrint('🔀 Multiple branches detected - showing bottom sheet');
       _showMultipleBranchesBottomSheet(restaurant, branches);
     }

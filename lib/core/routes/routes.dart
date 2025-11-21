@@ -1,5 +1,4 @@
 import 'package:eatplek_app/core/bindings/auth_bindings.dart';
-import 'package:eatplek_app/core/bindings/food_details_bindings.dart';
 import 'package:eatplek_app/core/bindings/order_details_bindings.dart';
 import 'package:eatplek_app/core/bindings/restaurant_detail_view_bindings.dart';
 import 'package:eatplek_app/core/bindings/search_bindings.dart';
@@ -64,12 +63,7 @@ class Routes {
       transition: Transition.circularReveal,
       binding: HomeBindings(),
     ),
-    GetPage(
-      name: foodDetailsView,
-      page: () => const FoodDetailsView(),
-      transition: Transition.circularReveal,
-      binding: FoodDetailsBindings(),
-    ),
+    GetPage(name: foodDetailsView, page: () => const FoodDetailsView(), transition: Transition.circularReveal),
     GetPage(
       name: cartView,
       page: () => const CartView(),

@@ -1,182 +1,420 @@
+import 'dart:developer';
+
+import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
-import '../model/food_add_on_model.dart';
+import '../../../core/network/api_client.dart';
+import '../model/restaurent_details_model.dart';
 
 class RestaurantDetailViewController extends GetxController {
+  // API and loading states
+  final FittorConnect _apiClient = FittorConnect();
+  bool isLoading = false;
+  bool hasError = false;
+  String errorMessage = '';
+
+  // Restaurant data
+  RestuarantDetailsModel? restaurantDetailsModel;
+  List<RestuarantDetailsData> restaurantData = [];
+  List<String> banners = [];
+
   // Category management
   int selectedCategoryIndex = 0;
-  List<String> categories = ['Burger', 'Pizza', 'Pasta', 'Dessert', 'Drinks', 'Salad', 'Chicken', 'Seafood'];
+  List<String> categories = [];
 
-  // Food items and filtering
-  List<FoodItem> allFoodItems = [];
-  List<FoodItem> filteredFoodItems = [];
+  // Selected food item for bottom sheet
+  Food? selectedFoodItem;
+  Map<String, int> foodCustomizationCount = {}; // Track quantity/customization counts per food
+  Map<String, List<AddOn>> foodSelectedAddOns = {}; // Track selected add-ons per food
 
-  // Bottom sheet management
-  FoodItem? selectedFoodItem;
-  List<AddOn> availableAddOns = [];
-  int currentQuantity = 1;
+  String? restaurantId;
 
   @override
   void onInit() {
     super.onInit();
-    _initializeMockData();
-    filterFoodByCategory(categories[selectedCategoryIndex]);
+    _extractRestaurantIdAndFetch();
   }
 
-  // Initialize mock data
-  void _initializeMockData() {
-    allFoodItems = [
-      FoodItem(
-        id: '1',
-        name: 'Classic Chicken Burger',
-        price: 120,
-        originalPrice: 180,
-        imageUrl: 'https://picsum.photos/250?image=30',
-        category: 'Burger',
-        description: 'Juicy chicken patty with fresh lettuce, tomato, and our special sauce',
-      ),
-      FoodItem(
-        id: '2',
-        name: 'Margherita Pizza',
-        price: 200,
-        originalPrice: 250,
-        imageUrl: 'https://picsum.photos/250?image=31',
-        category: 'Pizza',
-        description: 'Classic Italian pizza with fresh mozzarella and basil',
-      ),
-      FoodItem(
-        id: '3',
-        name: 'Chicken Alfredo Pasta',
-        price: 180,
-        originalPrice: 220,
-        imageUrl: 'https://picsum.photos/250?image=32',
-        category: 'Pasta',
-        description: 'Creamy alfredo sauce with grilled chicken and pasta',
-      ),
-      FoodItem(
-        id: '4',
-        name: 'Chocolate Brownie',
-        price: 80,
-        originalPrice: 100,
-        imageUrl: 'https://picsum.photos/250?image=33',
-        category: 'Dessert',
-        description: 'Rich chocolate brownie with vanilla ice cream',
-      ),
-      FoodItem(
-        id: '5',
-        name: 'Fresh Orange Juice',
-        price: 60,
-        originalPrice: 80,
-        imageUrl: 'https://picsum.photos/250?image=34',
-        category: 'Drinks',
-        description: 'Freshly squeezed orange juice',
-      ),
-      // Add more items for other categories...
-    ];
+  void _extractRestaurantIdAndFetch() {
+    final args = Get.arguments;
+    if (args != null && args.hotelId != null) {
+      restaurantId = args.hotelId;
+      debugPrint('🏪 Restaurant ID: $restaurantId');
+      getRestaurantDetailsFn(restaurantId: restaurantId!);
+    } else {
+      hasError = true;
+      errorMessage = 'Restaurant ID not found';
+      update(['main_content']);
+    }
+  }
 
-    availableAddOns = [
-      AddOn(id: '1', name: 'Extra Cheese', price: 30, imageUrl: 'https://picsum.photos/250?image=40'),
-      AddOn(id: '2', name: 'Bacon', price: 50, imageUrl: 'https://picsum.photos/250?image=41'),
-      AddOn(id: '3', name: 'Mushrooms', price: 25, imageUrl: 'https://picsum.photos/250?image=42'),
-      AddOn(id: '4', name: 'Jalapenos', price: 20, imageUrl: 'https://picsum.photos/250?image=43'),
-      AddOn(id: '5', name: 'Onion Rings', price: 40, imageUrl: 'https://picsum.photos/250?image=44'),
-    ];
+  // API call to fetch restaurant details
+  Future<void> getRestaurantDetailsFn({required String restaurantId}) async {
+    try {
+      isLoading = true;
+      hasError = false;
+      errorMessage = '';
+
+      // RESET STATE WHEN FRESH API CALL
+      resetAllSelections();
+
+      update(['main_content']);
+
+      // Clean the service preference - remove emoji and get just the value
+      String serviceType = _getCleanServiceType(Store.deliveryPreference);
+
+      final response = await _apiClient.get(
+        endpoint: "${Urls.getRestaurantDetailsUrl}$restaurantId/foods?service=$serviceType",
+      );
+
+      log('Restaurant details response: $response');
+
+      if (response != null && response is Map<String, dynamic>) {
+        restaurantDetailsModel = RestuarantDetailsModel.fromJson(response);
+
+        if (restaurantDetailsModel?.status == true && restaurantDetailsModel?.data != null) {
+          restaurantData = restaurantDetailsModel!.data!;
+          banners = restaurantDetailsModel?.banners ?? [];
+
+          // Extract unique categories
+          _extractCategories();
+
+          // Initialize food tracking maps
+          _initializeFoodTrackingMaps();
+
+          // Filter by first category if available
+          if (categories.isNotEmpty) {
+            selectedCategoryIndex = 0;
+            filterFoodByCategory(categories[0]);
+          }
+
+          hasError = false;
+          isLoading = false;
+        } else {
+          hasError = true;
+          errorMessage = restaurantDetailsModel?.message ?? 'Failed to load restaurant details';
+          isLoading = false;
+        }
+      } else {
+        hasError = true;
+        errorMessage = 'Invalid response format';
+        isLoading = false;
+      }
+
+      update(['main_content']);
+    } catch (e) {
+      debugPrint('Error in getRestaurantDetailsFn: $e');
+      hasError = true;
+      errorMessage = 'Error loading restaurant details: $e';
+      isLoading = false;
+      update(['main_content']);
+    }
+  }
+
+  String _getCleanServiceType(String servicePreference) {
+    // Remove emoji and extra spaces, keep only the service type
+    String cleaned = servicePreference.toLowerCase().trim();
+
+    if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
+      return 'delivery';
+    } else if (cleaned.contains('dine-in') || cleaned.contains('dine in') || cleaned.contains('🍽')) {
+      return 'dine-in';
+    } else if (cleaned.contains('takeaway') || cleaned.contains('🎁')) {
+      return 'takeaway';
+    } else if (cleaned.contains('car-dine') || cleaned.contains('car dine') || cleaned.contains('🚗')) {
+      return 'car-dine-in';
+    }
+
+    // Default to delivery if unknown
+    return 'delivery';
+  }
+
+  void _extractCategories() {
+    Set<String> uniqueCategories = {};
+    for (var data in restaurantData) {
+      if (data.category != null && data.category!.isNotEmpty) {
+        uniqueCategories.add(data.category!);
+      }
+    }
+    categories = uniqueCategories.toList();
+    debugPrint('📂 Categories extracted: $categories');
+  }
+
+  void _initializeFoodTrackingMaps() {
+    // Clear existing maps
+    foodCustomizationCount.clear();
+    foodSelectedAddOns.clear();
+
+    for (var categoryData in restaurantData) {
+      if (categoryData.foods != null) {
+        for (var food in categoryData.foods!) {
+          if (food.foodId != null) {
+            // Initialize quantity count map for each food (starts at 0)
+            foodCustomizationCount[food.foodId!] = 0;
+            // Initialize selected add-ons list
+            foodSelectedAddOns[food.foodId!] = [];
+          }
+        }
+      }
+    }
   }
 
   // Category management
   void onCategoryTapped(int index) {
     if (selectedCategoryIndex != index) {
       selectedCategoryIndex = index;
-      update(['category_tabs']);
+      // Reset food selection when switching categories
+      selectedFoodItem = null;
+      update(['category_tabs', 'food_grid']);
       filterFoodByCategory(categories[index]);
     }
   }
 
+  List<Food> getFilteredFoodItems() {
+    if (selectedCategoryIndex < 0 || selectedCategoryIndex >= restaurantData.length) {
+      return [];
+    }
+
+    final selectedCategory = restaurantData[selectedCategoryIndex];
+    return selectedCategory.foods ?? [];
+  }
+
   void filterFoodByCategory(String category) {
-    filteredFoodItems = allFoodItems.where((food) => food.category.toLowerCase() == category.toLowerCase()).toList();
     update(['food_grid']);
   }
 
   // Food item selection for bottom sheet
-  void selectFoodItem(FoodItem foodItem) {
+  void selectFoodItem(Food foodItem) {
+    if (foodItem.foodId == null) return;
+
     selectedFoodItem = foodItem;
-    currentQuantity = 1;
-    // Reset add-ons selection
-    for (var addOn in availableAddOns) {
-      addOn.isSelected = false;
+
+    // If this food hasn't been initialized yet, initialize it
+    if (!foodCustomizationCount.containsKey(foodItem.foodId!)) {
+      foodCustomizationCount[foodItem.foodId!] = 0;
+      foodSelectedAddOns[foodItem.foodId!] = [];
     }
-    update(['bottom_sheet_content']);
+
+    // Start with quantity 1 when selecting a food
+    foodCustomizationCount[foodItem.foodId!] = 1;
+
+    // Keep existing add-ons if they exist, don't reset them
+    // This allows persistence across navigation
+
+    debugPrint('🍔 Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
+    update(['bottom_sheet_content', 'food_quantity_widget', 'total_price']);
   }
 
-  // Quantity management
-  void increaseQuantity() {
-    currentQuantity++;
-    update(['quantity_controls', 'total_price']);
+  // Customization management (now handles quantity for all food types)
+  void toggleCustomization(String customizationId) {
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final currentCount = foodCustomizationCount[foodId] ?? 1;
+
+    // Increment quantity
+    foodCustomizationCount[foodId] = currentCount + 1;
+
+    debugPrint('➕ Quantity increased: ${foodCustomizationCount[foodId]}');
+    update(['customization_widget', 'total_price', 'bottom_sheet_content', 'food_quantity_widget']);
   }
 
-  void decreaseQuantity() {
-    if (currentQuantity > 1) {
-      currentQuantity--;
-      update(['quantity_controls', 'total_price']);
-    } else {
-      // Close bottom sheet when quantity becomes 0
-      Get.back();
+  void decreaseCustomization() {
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final currentCount = foodCustomizationCount[foodId] ?? 1;
+
+    if (currentCount > 1) {
+      foodCustomizationCount[foodId] = currentCount - 1;
+      debugPrint('➖ Quantity decreased: ${foodCustomizationCount[foodId]}');
+      update(['customization_widget', 'total_price', 'bottom_sheet_content', 'food_quantity_widget']);
     }
   }
 
-  // Add-on management
+  int getCustomizationCount(String foodId) {
+    return foodCustomizationCount[foodId] ?? 0;
+  }
+
+  // Add-on management (global, doesn't multiply)
   void toggleAddOn(String addOnId) {
-    final addOn = availableAddOns.firstWhere((addon) => addon.id == addOnId);
-    addOn.isSelected = !addOn.isSelected;
-    update(['addon_$addOnId', 'total_price']);
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final selectedAddOns = foodSelectedAddOns[foodId] ?? [];
+
+    // Find the add-on in the current food
+    final addOn = selectedFoodItem!.addOns?.firstWhere((addon) => addon.addOnId == addOnId, orElse: () => AddOn());
+
+    if (addOn != null && addOn.addOnId != null) {
+      // Check if already selected
+      final alreadySelected = selectedAddOns.any((a) => a.addOnId == addOnId);
+
+      if (alreadySelected) {
+        selectedAddOns.removeWhere((a) => a.addOnId == addOnId);
+        debugPrint('❌ Removed add-on: ${addOn.name}');
+      } else {
+        selectedAddOns.add(addOn);
+        debugPrint('✅ Added add-on: ${addOn.name}');
+      }
+
+      foodSelectedAddOns[foodId] = selectedAddOns;
+      update(['addons_list', 'total_price', 'bottom_sheet_content']);
+    }
   }
 
-  // Price calculations
-  double get selectedAddOnsPrice {
-    return availableAddOns.where((addOn) => addOn.isSelected).fold(0, (sum, addOn) => sum + addOn.price);
+  List<AddOn> getSelectedAddOns(String foodId) {
+    return foodSelectedAddOns[foodId] ?? [];
   }
 
-  double get totalPrice {
+  bool isAddOnSelected(String addOnId) {
+    if (selectedFoodItem?.foodId == null) return false;
+
+    final selectedAddOns = getSelectedAddOns(selectedFoodItem!.foodId!);
+    return selectedAddOns.any((addon) => addon.addOnId == addOnId);
+  }
+
+  // Price calculations: (base price * quantity) + add-ons price
+  double getTotalPrice() {
+    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return 0;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final quantity = getCustomizationCount(foodId);
+    final selectedAddOns = getSelectedAddOns(foodId);
+
+    // Base food price (use discount price if available, otherwise use food price)
+    double basePrice = (selectedFoodItem!.discountPrice ?? selectedFoodItem!.foodPrice ?? 0).toDouble();
+
+    // Add-ons cost (global, doesn't multiply with quantity)
+    double addOnsPrice = 0;
+    for (var addOn in selectedAddOns) {
+      addOnsPrice += (addOn.price ?? 0).toDouble();
+    }
+
+    // Total: (base price * quantity) + add-ons price
+    return (basePrice * quantity) + addOnsPrice;
+  }
+
+  double getBasePrice() {
     if (selectedFoodItem == null) return 0;
-    return (selectedFoodItem!.price + selectedAddOnsPrice) * currentQuantity;
+    return (selectedFoodItem!.discountPrice ?? selectedFoodItem!.foodPrice ?? 0).toDouble();
   }
 
-  List<AddOn> get selectedAddOns {
-    return availableAddOns.where((addOn) => addOn.isSelected).toList();
+  double getAddOnsPrice() {
+    if (selectedFoodItem?.foodId == null) return 0;
+
+    final selectedAddOns = getSelectedAddOns(selectedFoodItem!.foodId!);
+    double totalAddOnsPrice = 0;
+    for (var addOn in selectedAddOns) {
+      totalAddOnsPrice += (addOn.price ?? 0).toDouble();
+    }
+    return totalAddOnsPrice;
   }
 
-  // Navigation methods
-  void navigateToFoodDetail(FoodItem foodItem) {
+  // Navigate to food detail page
+  void navigateToFoodDetail(Food foodItem) {
+    if (foodItem.foodId == null || foodItem.foodName == null || foodItem.foodImage == null) {
+      debugPrint('❌ Invalid food item for navigation');
+      return;
+    }
+
     Get.toNamed(
       Routes.foodDetailsView,
-      //  arguments: foodItem
+      arguments: {
+        'foodName': foodItem.foodName,
+        'foodImage': foodItem.foodImage,
+        'foodId': foodItem.foodId,
+        'foodPrice': foodItem.foodPrice,
+        'discountPrice': foodItem.discountPrice,
+        'actualPrice': foodItem.actualPrice,
+        'customizations': foodItem.customizations,
+        'addOns': foodItem.addOns,
+      },
     );
   }
 
-  void navigateToCart() {
-    Get.toNamed(Routes.cartView);
-    debugPrint('Navigate to cart screen');
-    Get.back();
+  // Log selected items when adding to cart (from bottom sheet)
+  void logAndAddToCartFromBottomSheet() {
+    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final quantity = getCustomizationCount(foodId);
+    final selectedAddOns = getSelectedAddOns(foodId);
+    final totalPrice = getTotalPrice();
+
+    debugPrint('''
+═══════════════════════════════════════════
+📦 ADD TO CART FROM BOTTOM SHEET
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Quantity: $quantity
+💰 Base Price: ₹${getBasePrice()}
+🎁 Add-ons: ${selectedAddOns.map((a) => '${a.name} (₹${a.price})').join(', ')}
+🆔 Add-on IDs: ${selectedAddOns.map((a) => a.addOnId).join(', ')}
+📈 Add-ons Total: ₹${getAddOnsPrice()}
+💵 Total Price: ₹$totalPrice
+═══════════════════════════════════════════
+    ''');
   }
 
-  // Add to cart functionality
-  void addToCart() {
-    if (selectedFoodItem != null) {
-      // Here you would typically add to cart controller
-      // For now, just print the selection
-      debugPrint('Adding to cart:');
-      debugPrint('Food: ${selectedFoodItem!.name}');
-      debugPrint('Quantity: $currentQuantity');
-      debugPrint('Selected Add-ons: ${selectedAddOns.map((e) => e.name).join(', ')}');
-      debugPrint('Total Price: ₹${totalPrice.toStringAsFixed(2)}');
+  // Log selected items when adding to cart (from food details page)
+  void logAndAddToCartFromFoodDetails() {
+    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return;
 
-      navigateToCart();
-    }
+    final foodId = selectedFoodItem!.foodId!;
+    final quantity = getCustomizationCount(foodId);
+    final selectedAddOns = getSelectedAddOns(foodId);
+    final totalPrice = getTotalPrice();
+
+    debugPrint('''
+═══════════════════════════════════════════
+📦 ADD TO CART FROM FOOD DETAILS
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Quantity: $quantity
+💰 Base Price: ₹${getBasePrice()}
+🎁 Add-ons: ${selectedAddOns.map((a) => '${a.name} (₹${a.price})').join(', ')}
+🆔 Add-on IDs: ${selectedAddOns.map((a) => a.addOnId).join(', ')}
+📈 Add-ons Total: ₹${getAddOnsPrice()}
+💵 Total Price: ₹$totalPrice
+═══════════════════════════════════════════
+    ''');
+  }
+
+  // Reset selections for a specific food
+  void resetFoodSelections(String foodId) {
+    foodCustomizationCount[foodId] = 0;
+    foodSelectedAddOns[foodId] = [];
+    debugPrint('🔄 Reset selections for food: $foodId');
+  }
+
+  // Reset all selections ONLY when:
+  // 1. Fresh API call (new restaurant)
+  // 2. Completely exiting the restaurant view
+  void resetAllSelections() {
+    selectedFoodItem = null;
+    foodCustomizationCount.clear();
+    foodSelectedAddOns.clear();
+    selectedCategoryIndex = 0;
+    debugPrint('🔄 Reset all selections');
+    update(['main_content', 'bottom_sheet_content']);
   }
 
   // Getters
-  String get selectedCategoryName => categories[selectedCategoryIndex];
-  int get foodItemsCount => filteredFoodItems.length;
+  String get selectedCategoryName => selectedCategoryIndex < categories.length ? categories[selectedCategoryIndex] : '';
+  int get foodItemsCount => getFilteredFoodItems().length;
+  bool get hasCustomizations =>
+      selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty;
+  bool get hasAddOns => selectedFoodItem?.addOns != null && selectedFoodItem!.addOns!.isNotEmpty;
+
+  @override
+  void onClose() {
+    resetAllSelections();
+    super.onClose();
+  }
 }
