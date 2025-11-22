@@ -43,7 +43,7 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
                 shrinkWrap: true,
                 itemBuilder: (context, index) {
                   final customization = customizations[index];
-                  return _buildCustomizationTile(controller, customization, foodItem.foodId!);
+                  return _buildCustomizationTile(controller, customization);
                 },
                 separatorBuilder: (context, index) => 16.h,
                 itemCount: customizations.length,
@@ -55,11 +55,7 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
     );
   }
 
-  Widget _buildCustomizationTile(
-    RestaurantDetailViewController controller,
-    Customization customization,
-    String foodId,
-  ) {
+  Widget _buildCustomizationTile(RestaurantDetailViewController controller, Customization customization) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
@@ -88,14 +84,14 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
           GetBuilder<RestaurantDetailViewController>(
             id: 'customization_widget',
             builder: (controller) {
-              final quantity = controller.getCustomizationCount(foodId);
+              final quantity = controller.getCustomizationCount(customization.customizationId ?? '');
               return QuantityControlWidget(
                 quantity: quantity,
                 onIncrease: () => controller.toggleCustomization(customization.customizationId ?? ''),
-                onDecrease: controller.decreaseCustomization,
+                onDecrease: () => controller.decreaseCustomization(customization.customizationId ?? ''),
                 showRemoveButton: quantity > 0,
-                buttonSize: 32,
-                iconSize: 14,
+                buttonSize: 28,
+                iconSize: 12,
               );
             },
           ),

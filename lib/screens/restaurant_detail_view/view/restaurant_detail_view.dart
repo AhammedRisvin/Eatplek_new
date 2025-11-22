@@ -9,6 +9,7 @@ import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
 import '../controller/restaurant_detail_view_controller.dart';
 import 'widget/banner_section.dart';
+import 'widget/bottom_cart_bar.dart';
 import 'widget/category_section.dart';
 import 'widget/food_grid_section.dart';
 
@@ -54,16 +55,22 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
       id: 'main_content',
       builder: (controller) {
         return Scaffold(
-          body: SizedBox(
-            height: MediaQuery.of(context).size.height,
-            width: MediaQuery.of(context).size.width,
-            child: Stack(
-              children: [
-                _buildBackgroundImage(controller),
-                _buildCollapsibleAppBar(controller),
-                _buildMainContent(controller),
-              ],
-            ),
+          body: Stack(
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height,
+                width: MediaQuery.of(context).size.width,
+                child: Stack(
+                  children: [
+                    _buildBackgroundImage(controller),
+                    _buildCollapsibleAppBar(controller),
+                    _buildMainContent(controller),
+                  ],
+                ),
+              ),
+              // Bottom cart bar overlay
+              Positioned(bottom: 0, left: 0, right: 0, child: BottomCartBar()),
+            ],
           ),
         );
       },
@@ -231,7 +238,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
 
                   // Food Grid Section
                   FoodGridSection(controller: controller),
-                  SizedBox(height: 100),
+                  SizedBox(height: 100), // Bottom padding for cart bar
                 ],
               ],
             ),

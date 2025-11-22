@@ -33,6 +33,7 @@ class QuantityControlWidget extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Decrease button - only show if quantity > 0
           if (showRemoveButton && quantity > 0)
             GestureDetector(
               onTap: onDecrease,
@@ -47,6 +48,7 @@ class QuantityControlWidget extends StatelessWidget {
               ),
             ),
 
+          // Quantity display
           if (showRemoveButton && quantity > 0) ...[
             5.w,
             Container(
@@ -60,13 +62,13 @@ class QuantityControlWidget extends StatelessWidget {
             5.w,
           ],
 
+          // Add/Increase button
           GestureDetector(
             onTap: onIncrease,
             child: Container(
               width: addButtonText != null && quantity == 0 ? null : buttonSize,
               height: addButtonText != null && quantity == 0 ? null : buttonSize,
-              padding:
-                  addButtonText != null && quantity == 0 ? EdgeInsets.symmetric(horizontal: 20, vertical: 10) : null,
+              padding: addButtonText != null && quantity == 0 ? EdgeInsets.symmetric(horizontal: 8, vertical: 6) : null,
               decoration: BoxDecoration(
                 color: AppColor.appPrimary,
                 borderRadius: BorderRadius.circular(
@@ -75,85 +77,11 @@ class QuantityControlWidget extends StatelessWidget {
               ),
               child:
                   addButtonText != null && quantity == 0
-                      ? text(text: addButtonText!, color: AppColor.white, size: 14, fontWeight: FontWeight.w600)
+                      ? text(text: addButtonText!, color: AppColor.white, size: 12, fontWeight: FontWeight.w600)
                       : Icon(Icons.add, color: AppColor.white, size: iconSize),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class AddOnSelectionWidget extends StatelessWidget {
-  final String id;
-  final String name;
-  final String price;
-  final String imageUrl;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final double margin;
-
-  const AddOnSelectionWidget({
-    super.key,
-    required this.id,
-    required this.name,
-    required this.price,
-    required this.imageUrl,
-    required this.isSelected,
-    required this.onTap,
-    this.margin = 20.0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: context.wp(100),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: AppColor.white,
-          border: Border.all(color: isSelected ? AppColor.transparent : Colors.transparent, width: 1),
-        ),
-        margin: EdgeInsets.symmetric(horizontal: margin),
-        padding: EdgeInsets.only(left: 10, top: 10, bottom: 10, right: 17),
-        child: Row(
-          children: [
-            image(url: imageUrl, height: 40, width: 40, borderRadius: BorderRadius.circular(4)),
-            20.w,
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  text(
-                    text: name,
-                    size: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColor.black,
-                    maxLines: 1,
-                    overFlow: TextOverflow.ellipsis,
-                  ),
-                  4.h,
-                  text(text: price, size: 12, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.6)),
-                ],
-              ),
-            ),
-            Container(
-              height: 26,
-              width: 26,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColor.appPrimary : AppColor.white,
-                border: Border.all(color: isSelected ? AppColor.appPrimary : AppColor.appPrimary.withOpacity(0.2)),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child:
-                  isSelected
-                      ? Icon(Icons.done, color: isSelected ? AppColor.white : AppColor.black.withOpacity(0.4), size: 13)
-                      : null,
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
-import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -25,10 +25,20 @@ class RestaurantDetailViewController extends GetxController {
   int selectedCategoryIndex = 0;
   List<String> categories = [];
 
-  // Selected food item for bottom sheet
+  // Cart state - persists across bottom sheet sessions
+  Map<String, int> cartFoodQuantity = {}; // foodId -> quantity
+  Map<String, Map<String, int>> cartCustomizationQuantity = {}; // foodId -> customizationId -> quantity
+  Map<String, Map<String, int>> cartAddOnQuantity = {}; // foodId -> addOnId -> quantity
+
+  // Bottom sheet temporary state - resets on close
   Food? selectedFoodItem;
-  Map<String, int> foodCustomizationCount = {}; // Track quantity/customization counts per food
-  Map<String, List<AddOn>> foodSelectedAddOns = {}; // Track selected add-ons per food
+  Map<String, int> bsCustomizationQuantity = {}; // Temporary customization quantities
+  Map<String, int> bsAddOnQuantity = {}; // Temporary add-on quantities
+  Map<String, int> bsItemQuantity = {}; // Bottom sheet item quantity for Scenario A (no customizations)
+
+  // Edit mode tracking
+  bool isEditMode = false;
+  String? editingFoodId;
 
   String? restaurantId;
 
@@ -58,9 +68,6 @@ class RestaurantDetailViewController extends GetxController {
       hasError = false;
       errorMessage = '';
 
-      // RESET STATE WHEN FRESH API CALL
-      resetAllSelections();
-
       update(['main_content']);
 
       // Clean the service preference - remove emoji and get just the value
@@ -81,9 +88,6 @@ class RestaurantDetailViewController extends GetxController {
 
           // Extract unique categories
           _extractCategories();
-
-          // Initialize food tracking maps
-          _initializeFoodTrackingMaps();
 
           // Filter by first category if available
           if (categories.isNotEmpty) {
@@ -115,7 +119,6 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   String _getCleanServiceType(String servicePreference) {
-    // Remove emoji and extra spaces, keep only the service type
     String cleaned = servicePreference.toLowerCase().trim();
 
     if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
@@ -128,7 +131,6 @@ class RestaurantDetailViewController extends GetxController {
       return 'car-dine-in';
     }
 
-    // Default to delivery if unknown
     return 'delivery';
   }
 
@@ -143,31 +145,11 @@ class RestaurantDetailViewController extends GetxController {
     debugPrint('📂 Categories extracted: $categories');
   }
 
-  void _initializeFoodTrackingMaps() {
-    // Clear existing maps
-    foodCustomizationCount.clear();
-    foodSelectedAddOns.clear();
+  // ==================== CATEGORY MANAGEMENT ====================
 
-    for (var categoryData in restaurantData) {
-      if (categoryData.foods != null) {
-        for (var food in categoryData.foods!) {
-          if (food.foodId != null) {
-            // Initialize quantity count map for each food (starts at 0)
-            foodCustomizationCount[food.foodId!] = 0;
-            // Initialize selected add-ons list
-            foodSelectedAddOns[food.foodId!] = [];
-          }
-        }
-      }
-    }
-  }
-
-  // Category management
   void onCategoryTapped(int index) {
     if (selectedCategoryIndex != index) {
       selectedCategoryIndex = index;
-      // Reset food selection when switching categories
-      selectedFoodItem = null;
       update(['category_tabs', 'food_grid']);
       filterFoodByCategory(categories[index]);
     }
@@ -186,117 +168,239 @@ class RestaurantDetailViewController extends GetxController {
     update(['food_grid']);
   }
 
-  // Food item selection for bottom sheet
-  void selectFoodItem(Food foodItem) {
+  // ==================== BOTTOM SHEET MANAGEMENT ====================
+
+  /// Open bottom sheet for a food item - NEW VERSION (Add or Edit)
+  void selectFoodItem(Food foodItem, {bool isEdit = false}) {
     if (foodItem.foodId == null) return;
 
     selectedFoodItem = foodItem;
+    editingFoodId = foodItem.foodId!;
+    isEditMode = isEdit;
 
-    // If this food hasn't been initialized yet, initialize it
-    if (!foodCustomizationCount.containsKey(foodItem.foodId!)) {
-      foodCustomizationCount[foodItem.foodId!] = 0;
-      foodSelectedAddOns[foodItem.foodId!] = [];
+    // Reset temporary bottom sheet state
+    bsCustomizationQuantity.clear();
+    bsAddOnQuantity.clear();
+    bsItemQuantity.clear();
+
+    if (isEdit) {
+      // Initialize with existing cart data for editing
+      _initializeBottomSheetStateForEdit(foodItem.foodId!);
+      debugPrint('✏️ Edit mode - Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
+    } else {
+      // Fresh state for adding
+      _initializeBottomSheetStateForAdd(foodItem.foodId!);
+      debugPrint('➕ Add mode - Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
     }
 
-    // Start with quantity 1 when selecting a food
-    foodCustomizationCount[foodItem.foodId!] = 1;
-
-    // Keep existing add-ons if they exist, don't reset them
-    // This allows persistence across navigation
-
-    debugPrint('🍔 Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
-    update(['bottom_sheet_content', 'food_quantity_widget', 'total_price']);
+    update(['bottom_sheet_content', 'bottom_sheet_header']);
   }
 
-  // Customization management (now handles quantity for all food types)
+  /// Initialize bottom sheet state for ADD mode (fresh state)
+  void _initializeBottomSheetStateForAdd(String foodId) {
+    // Always start with quantity 1 for add mode
+    bsItemQuantity[foodId] = 1;
+    // Clear add-ons and customizations for fresh add
+    bsCustomizationQuantity.clear();
+    bsAddOnQuantity.clear();
+  }
+
+  /// Initialize bottom sheet state for EDIT mode (load existing data)
+  void _initializeBottomSheetStateForEdit(String foodId) {
+    // Check if item has customizations in cart
+    if (cartCustomizationQuantity.containsKey(foodId)) {
+      bsCustomizationQuantity = Map.from(cartCustomizationQuantity[foodId]!);
+    }
+
+    // Load existing add-ons
+    if (cartAddOnQuantity.containsKey(foodId)) {
+      bsAddOnQuantity = Map.from(cartAddOnQuantity[foodId]!);
+    }
+
+    // For edit mode, load existing quantity (for items without customizations)
+    if (cartFoodQuantity.containsKey(foodId)) {
+      bsItemQuantity[foodId] = cartFoodQuantity[foodId]!;
+    } else {
+      bsItemQuantity[foodId] = 1;
+    }
+  }
+
+  /// Reset bottom sheet state when closing
+  void resetBottomSheetState() {
+    selectedFoodItem = null;
+    bsCustomizationQuantity.clear();
+    bsAddOnQuantity.clear();
+    bsItemQuantity.clear();
+    isEditMode = false;
+    editingFoodId = null;
+    debugPrint('🔄 Reset bottom sheet state');
+  }
+
+  // ==================== SCENARIO A - BOTTOM SHEET ITEM QUANTITY ====================
+
+  /// Get bottom sheet item quantity for Scenario A
+  int getBottomSheetItemQuantity() {
+    if (selectedFoodItem?.foodId == null) return 1;
+    return bsItemQuantity[selectedFoodItem!.foodId!] ?? 1;
+  }
+
+  /// Increase bottom sheet item quantity for Scenario A
+  void increaseBottomSheetItemQuantity() {
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final currentQty = getBottomSheetItemQuantity();
+    bsItemQuantity[foodId] = currentQty + 1;
+
+    debugPrint('🟢 Bottom sheet qty increased to: ${bsItemQuantity[foodId]}');
+    update(['total_price']);
+  }
+
+  /// Decrease bottom sheet item quantity for Scenario A
+  void decreaseBottomSheetItemQuantity() {
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final currentQty = getBottomSheetItemQuantity();
+
+    if (currentQty > 1) {
+      bsItemQuantity[foodId] = currentQty - 1;
+      debugPrint('🟢 Bottom sheet qty decreased to: ${bsItemQuantity[foodId]}');
+    } else {
+      bsItemQuantity[foodId] = 1;
+    }
+
+    update(['total_price']);
+  }
+
+  // ==================== CUSTOMIZATION MANAGEMENT (BOTTOM SHEET) ====================
+
   void toggleCustomization(String customizationId) {
     if (selectedFoodItem?.foodId == null) return;
 
-    final foodId = selectedFoodItem!.foodId!;
-    final currentCount = foodCustomizationCount[foodId] ?? 1;
+    final currentQty = bsCustomizationQuantity[customizationId] ?? 0;
+    bsCustomizationQuantity[customizationId] = currentQty + 1;
 
-    // Increment quantity
-    foodCustomizationCount[foodId] = currentCount + 1;
-
-    debugPrint('➕ Quantity increased: ${foodCustomizationCount[foodId]}');
-    update(['customization_widget', 'total_price', 'bottom_sheet_content', 'food_quantity_widget']);
+    debugPrint('➕ Customization increased: $customizationId = ${bsCustomizationQuantity[customizationId]}');
+    update(['customization_widget', 'bottom_sheet_content', 'total_price']);
   }
 
-  void decreaseCustomization() {
+  void decreaseCustomization(String customizationId) {
     if (selectedFoodItem?.foodId == null) return;
 
-    final foodId = selectedFoodItem!.foodId!;
-    final currentCount = foodCustomizationCount[foodId] ?? 1;
+    final currentQty = bsCustomizationQuantity[customizationId] ?? 0;
 
-    if (currentCount > 1) {
-      foodCustomizationCount[foodId] = currentCount - 1;
-      debugPrint('➖ Quantity decreased: ${foodCustomizationCount[foodId]}');
-      update(['customization_widget', 'total_price', 'bottom_sheet_content', 'food_quantity_widget']);
+    if (currentQty > 0) {
+      bsCustomizationQuantity[customizationId] = currentQty - 1;
+
+      if (bsCustomizationQuantity[customizationId] == 0) {
+        bsCustomizationQuantity.remove(customizationId);
+      }
+
+      debugPrint('➖ Customization decreased: $customizationId = ${bsCustomizationQuantity[customizationId] ?? 0}');
+
+      // Auto-close if last customization removed (Scenario C with edit mode)
+      if (bsCustomizationQuantity.isEmpty) {
+        debugPrint('🔴 Last customization removed in edit mode, removing from cart and closing sheet');
+
+        final foodId = selectedFoodItem!.foodId!;
+
+        // Remove from cart if in edit mode
+        if (isEditMode) {
+          cartCustomizationQuantity.remove(foodId);
+          cartAddOnQuantity.remove(foodId);
+          debugPrint('🗑️ Removed item ${selectedFoodItem!.foodName} from cart');
+        }
+
+        Get.back();
+        resetBottomSheetState();
+
+        // Trigger UI update for food grid (to change edit icon back to add button)
+        // and bottom cart bar (to update or hide if no items)
+        update(['food_grid', 'bottom_cart_bar']);
+
+        return;
+      }
+
+      update(['customization_widget', 'bottom_sheet_content', 'total_price']);
     }
   }
 
-  int getCustomizationCount(String foodId) {
-    return foodCustomizationCount[foodId] ?? 0;
+  int getCustomizationCount(String customizationId) {
+    return bsCustomizationQuantity[customizationId] ?? 0;
   }
 
-  // Add-on management (global, doesn't multiply)
+  int getTotalCustomizationQuantity() {
+    int total = 0;
+    bsCustomizationQuantity.forEach((_, qty) {
+      total += qty;
+    });
+    return total;
+  }
+
+  // ==================== ADD-ON MANAGEMENT (BOTTOM SHEET) ====================
+
   void toggleAddOn(String addOnId) {
     if (selectedFoodItem?.foodId == null) return;
 
-    final foodId = selectedFoodItem!.foodId!;
-    final selectedAddOns = foodSelectedAddOns[foodId] ?? [];
+    final currentQty = bsAddOnQuantity[addOnId] ?? 0;
+    bsAddOnQuantity[addOnId] = currentQty + 1;
 
-    // Find the add-on in the current food
-    final addOn = selectedFoodItem!.addOns?.firstWhere((addon) => addon.addOnId == addOnId, orElse: () => AddOn());
+    debugPrint('➕ Add-on increased: $addOnId = ${bsAddOnQuantity[addOnId]}');
+    update(['addons_list', 'bottom_sheet_content', 'total_price']);
+  }
 
-    if (addOn != null && addOn.addOnId != null) {
-      // Check if already selected
-      final alreadySelected = selectedAddOns.any((a) => a.addOnId == addOnId);
+  void decreaseAddOn(String addOnId) {
+    if (selectedFoodItem?.foodId == null) return;
 
-      if (alreadySelected) {
-        selectedAddOns.removeWhere((a) => a.addOnId == addOnId);
-        debugPrint('❌ Removed add-on: ${addOn.name}');
-      } else {
-        selectedAddOns.add(addOn);
-        debugPrint('✅ Added add-on: ${addOn.name}');
+    final currentQty = bsAddOnQuantity[addOnId] ?? 0;
+
+    if (currentQty > 0) {
+      bsAddOnQuantity[addOnId] = currentQty - 1;
+
+      if (bsAddOnQuantity[addOnId] == 0) {
+        bsAddOnQuantity.remove(addOnId);
       }
 
-      foodSelectedAddOns[foodId] = selectedAddOns;
-      update(['addons_list', 'total_price', 'bottom_sheet_content']);
+      debugPrint('➖ Add-on decreased: $addOnId = ${bsAddOnQuantity[addOnId] ?? 0}');
+      update(['addons_list', 'bottom_sheet_content', 'total_price']);
     }
   }
 
-  List<AddOn> getSelectedAddOns(String foodId) {
-    return foodSelectedAddOns[foodId] ?? [];
+  int getAddOnCount(String addOnId) {
+    return bsAddOnQuantity[addOnId] ?? 0;
   }
 
-  bool isAddOnSelected(String addOnId) {
-    if (selectedFoodItem?.foodId == null) return false;
+  // ==================== FOOD WIDGET QUANTITY (NO CUSTOMIZATIONS) ====================
 
-    final selectedAddOns = getSelectedAddOns(selectedFoodItem!.foodId!);
-    return selectedAddOns.any((addon) => addon.addOnId == addOnId);
+  void increaseFoodQuantity(String foodId) {
+    final currentQty = cartFoodQuantity[foodId] ?? 0;
+    cartFoodQuantity[foodId] = currentQty + 1;
+
+    debugPrint('➕ Food quantity increased: $foodId = ${cartFoodQuantity[foodId]}');
+    update(['food_grid', 'bottom_cart_bar']);
   }
 
-  // Price calculations: (base price * quantity) + add-ons price
-  double getTotalPrice() {
-    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return 0;
+  void decreaseFoodQuantity(String foodId) {
+    final currentQty = cartFoodQuantity[foodId] ?? 0;
 
-    final foodId = selectedFoodItem!.foodId!;
-    final quantity = getCustomizationCount(foodId);
-    final selectedAddOns = getSelectedAddOns(foodId);
+    if (currentQty > 0) {
+      cartFoodQuantity[foodId] = currentQty - 1;
 
-    // Base food price (use discount price if available, otherwise use food price)
-    double basePrice = (selectedFoodItem!.discountPrice ?? selectedFoodItem!.foodPrice ?? 0).toDouble();
+      if (cartFoodQuantity[foodId] == 0) {
+        cartFoodQuantity.remove(foodId);
+      }
 
-    // Add-ons cost (global, doesn't multiply with quantity)
-    double addOnsPrice = 0;
-    for (var addOn in selectedAddOns) {
-      addOnsPrice += (addOn.price ?? 0).toDouble();
+      debugPrint('➖ Food quantity decreased: $foodId = ${cartFoodQuantity[foodId] ?? 0}');
+      update(['food_grid', 'bottom_cart_bar']);
     }
-
-    // Total: (base price * quantity) + add-ons price
-    return (basePrice * quantity) + addOnsPrice;
   }
+
+  int getFoodQuantity(String foodId) {
+    return cartFoodQuantity[foodId] ?? 0;
+  }
+
+  // ==================== PRICE CALCULATIONS ====================
 
   double getBasePrice() {
     if (selectedFoodItem == null) return 0;
@@ -304,117 +408,446 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   double getAddOnsPrice() {
-    if (selectedFoodItem?.foodId == null) return 0;
-
-    final selectedAddOns = getSelectedAddOns(selectedFoodItem!.foodId!);
-    double totalAddOnsPrice = 0;
-    for (var addOn in selectedAddOns) {
-      totalAddOnsPrice += (addOn.price ?? 0).toDouble();
-    }
-    return totalAddOnsPrice;
+    double total = 0;
+    bsAddOnQuantity.forEach((addOnId, qty) {
+      final addOn = selectedFoodItem?.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+      if (addOn != null && addOn.addOnId != null) {
+        total += (addOn.price ?? 0).toDouble() * qty;
+      }
+    });
+    return total;
   }
 
-  // Navigate to food detail page
-  void navigateToFoodDetail(Food foodItem) {
-    if (foodItem.foodId == null || foodItem.foodName == null || foodItem.foodImage == null) {
-      debugPrint('❌ Invalid food item for navigation');
-      return;
+  double getCustomizationPrice() {
+    double total = 0;
+    bsCustomizationQuantity.forEach((customId, qty) {
+      final customization = selectedFoodItem?.customizations?.firstWhere(
+        (c) => c.customizationId == customId,
+        orElse: () => Customization(),
+      );
+      if (customization != null && customization.customizationId != null) {
+        total += (customization.price ?? 0).toDouble() * qty;
+      }
+    });
+    return total;
+  }
+
+  /// Calculate total price for bottom sheet button
+  double getTotalBottomSheetPrice() {
+    final basePrice = getBasePrice();
+    final addOnsPrice = getAddOnsPrice();
+    final customizationPrice = getCustomizationPrice();
+
+    // If has customizations, use total customization quantity as multiplier
+    if (selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty) {
+      int customQtyTotal = getTotalCustomizationQuantity();
+      if (customQtyTotal == 0) return 0;
+      return (basePrice * customQtyTotal) + addOnsPrice;
     }
 
-    Get.toNamed(
-      Routes.foodDetailsView,
-      arguments: {
-        'foodName': foodItem.foodName,
-        'foodImage': foodItem.foodImage,
-        'foodId': foodItem.foodId,
-        'foodPrice': foodItem.foodPrice,
-        'discountPrice': foodItem.discountPrice,
-        'actualPrice': foodItem.actualPrice,
-        'customizations': foodItem.customizations,
-        'addOns': foodItem.addOns,
-      },
+    // For items without customizations (Scenario A), multiply by item quantity
+    final itemQty = getBottomSheetItemQuantity();
+    return (basePrice * itemQty) + addOnsPrice;
+  }
+
+  // ==================== ADD TO CART / UPDATE CART (FROM BOTTOM SHEET) ====================
+
+  void addItemToCart() {
+    if (selectedFoodItem?.foodId == null) return;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final hasCustomizations = selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty;
+
+    if (hasCustomizations) {
+      // For items with customizations: store customization and add-on quantities
+      int customQtyTotal = getTotalCustomizationQuantity();
+      if (customQtyTotal == 0) return; // Don't add if no customization selected
+
+      if (isEditMode) {
+        // EDIT MODE: Replace existing customizations and add-ons
+        cartCustomizationQuantity[foodId] = Map.from(bsCustomizationQuantity);
+        if (bsAddOnQuantity.isNotEmpty) {
+          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
+        } else {
+          cartAddOnQuantity.remove(foodId);
+        }
+
+        debugPrint('''
+═══════════════════════════════════════════
+✏️ UPDATE CART (WITH CUSTOMIZATIONS)
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Customizations: $bsCustomizationQuantity
+🎁 Add-ons: $bsAddOnQuantity
+💵 Total Price: ₹${getTotalBottomSheetPrice()}
+═══════════════════════════════════════════
+        ''');
+      } else {
+        // ADD MODE: Add new item with customizations
+        cartCustomizationQuantity[foodId] = Map.from(bsCustomizationQuantity);
+        if (bsAddOnQuantity.isNotEmpty) {
+          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
+        }
+
+        debugPrint('''
+═══════════════════════════════════════════
+📦 ADD TO CART (WITH CUSTOMIZATIONS)
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Customizations: $bsCustomizationQuantity
+🎁 Add-ons: $bsAddOnQuantity
+💵 Total Price: ₹${getTotalBottomSheetPrice()}
+═══════════════════════════════════════════
+        ''');
+      }
+    } else {
+      // For items without customizations (Scenario A)
+      final itemQty = getBottomSheetItemQuantity();
+
+      if (isEditMode) {
+        // EDIT MODE: Replace quantity and add-ons
+        cartFoodQuantity[foodId] = itemQty;
+        if (bsAddOnQuantity.isNotEmpty) {
+          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
+        } else {
+          cartAddOnQuantity.remove(foodId);
+        }
+
+        debugPrint('''
+═══════════════════════════════════════════
+✏️ UPDATE CART (WITHOUT CUSTOMIZATIONS)
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Quantity: ${cartFoodQuantity[foodId]}
+🎁 Add-ons: $bsAddOnQuantity
+💵 Total Price: ₹${getTotalBottomSheetPrice()}
+═══════════════════════════════════════════
+        ''');
+      } else {
+        // ADD MODE: Add to existing quantity
+        final currentQty = cartFoodQuantity[foodId] ?? 0;
+        cartFoodQuantity[foodId] = currentQty + itemQty;
+
+        if (bsAddOnQuantity.isNotEmpty) {
+          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
+        }
+
+        debugPrint('''
+═══════════════════════════════════════════
+📦 ADD TO CART (WITHOUT CUSTOMIZATIONS)
+═══════════════════════════════════════════
+🍔 Food: ${selectedFoodItem!.foodName}
+🆔 Food ID: $foodId
+📊 Quantity: ${cartFoodQuantity[foodId]}
+🎁 Add-ons: $bsAddOnQuantity
+💵 Total Price: ₹${getTotalBottomSheetPrice()}
+═══════════════════════════════════════════
+        ''');
+      }
+    }
+
+    // Close bottom sheet and reset state
+    Get.back();
+    resetBottomSheetState();
+
+    // Update UI
+    update(['food_grid', 'bottom_cart_bar']);
+  }
+
+  // ==================== CART SUMMARY ====================
+
+  int getTotalCartItemCount() {
+    int total = 0;
+
+    // Count food items without customizations
+    cartFoodQuantity.forEach((_, qty) {
+      total += qty;
+    });
+
+    // Count customization items
+    cartCustomizationQuantity.forEach((_, customMap) {
+      customMap.forEach((_, qty) {
+        total += qty;
+      });
+    });
+
+    return total;
+  }
+
+  double getTotalCartPrice() {
+    double total = 0;
+
+    // Price from food without customizations + their add-ons
+    cartFoodQuantity.forEach((foodId, qty) {
+      final food = _getFoodById(foodId);
+      if (food != null) {
+        final basePrice = (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
+        total += basePrice * qty;
+
+        // Add add-on prices for this food
+        if (cartAddOnQuantity.containsKey(foodId)) {
+          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
+            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+            if (addOn != null && addOn.addOnId != null) {
+              total += (addOn.price ?? 0).toDouble() * addOnQty;
+            }
+          });
+        }
+      }
+    });
+
+    // Price from customized items
+    cartCustomizationQuantity.forEach((foodId, customMap) {
+      final food = _getFoodById(foodId);
+      if (food != null) {
+        final basePrice = (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
+
+        customMap.forEach((customId, customQty) {
+          total += basePrice * customQty;
+        });
+
+        // Add add-on prices for this customized food
+        if (cartAddOnQuantity.containsKey(foodId)) {
+          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
+            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+            if (addOn != null && addOn.addOnId != null) {
+              total += (addOn.price ?? 0).toDouble() * addOnQty;
+            }
+          });
+        }
+      }
+    });
+
+    return total;
+  }
+
+  Food? _getFoodById(String foodId) {
+    for (var categoryData in restaurantData) {
+      if (categoryData.foods != null) {
+        final food = categoryData.foods!.firstWhere((f) => f.foodId == foodId, orElse: () => Food());
+        if (food.foodId != null) return food;
+      }
+    }
+    return null;
+  }
+
+  bool get hasCartItems => getTotalCartItemCount() > 0;
+
+  // ==================== GETTERS ====================
+
+  String get selectedCategoryName => selectedCategoryIndex < categories.length ? categories[selectedCategoryIndex] : '';
+  int get foodItemsCount => getFilteredFoodItems().length;
+
+  bool get hasCustomizations =>
+      selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty;
+
+  bool get hasAddOns => selectedFoodItem?.addOns != null && selectedFoodItem!.addOns!.isNotEmpty;
+
+  bool get isBottomSheetReady {
+    if (hasCustomizations) {
+      return getTotalCustomizationQuantity() > 0;
+    }
+    return true;
+  }
+
+  /// Check if food item is in cart
+  bool isFoodInCart(String foodId) {
+    return cartFoodQuantity.containsKey(foodId) || cartCustomizationQuantity.containsKey(foodId);
+  }
+
+  /// Get button text based on edit mode
+  String getBottomSheetButtonText() {
+    return isEditMode ? 'Edit Item' : 'Add Item';
+  }
+
+  // ==================== CART LOGGING METHODS ====================
+
+  /// Get complete cart details with food items, customizations, and add-ons
+  Map<String, dynamic> getCartDetails() {
+    final cartDetails = <String, dynamic>{};
+
+    // Items without customizations
+    cartDetails['items_without_customizations'] = [];
+    cartFoodQuantity.forEach((foodId, qty) {
+      final food = _getFoodById(foodId);
+      if (food != null) {
+        final addOnsList = <Map<String, dynamic>>[];
+
+        final itemData = {
+          'foodId': foodId,
+          'foodName': food.foodName,
+          'quantity': qty,
+          'basePrice': (food.discountPrice ?? food.foodPrice ?? 0),
+          'totalPrice': (food.discountPrice ?? food.foodPrice ?? 0) * qty,
+          'addOns': addOnsList,
+        };
+
+        // Add add-ons for this food if any
+        if (cartAddOnQuantity.containsKey(foodId)) {
+          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
+            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+            if (addOn != null && addOn.addOnId != null) {
+              addOnsList.add({
+                'addOnId': addOnId,
+                'addOnName': addOn.name,
+                'quantity': addOnQty,
+                'price': addOn.price,
+                'totalPrice': (addOn.price ?? 0) * addOnQty,
+              });
+            }
+          });
+        }
+
+        (cartDetails['items_without_customizations'] as List).add(itemData);
+      }
+    });
+
+    // Items with customizations
+    cartDetails['items_with_customizations'] = [];
+    cartCustomizationQuantity.forEach((foodId, customMap) {
+      final food = _getFoodById(foodId);
+      if (food != null) {
+        final customizationsList = <Map<String, dynamic>>[];
+        final addOnsList = <Map<String, dynamic>>[];
+
+        customMap.forEach((customId, customQty) {
+          final customization = food.customizations?.firstWhere(
+            (c) => c.customizationId == customId,
+            orElse: () => Customization(),
+          );
+          if (customization != null && customization.customizationId != null) {
+            customizationsList.add({
+              'customizationId': customId,
+              'customizationName': customization.name,
+              'quantity': customQty,
+              'price': customization.price,
+              'totalPrice': (customization.price ?? 0) * customQty,
+            });
+          }
+        });
+
+        final itemData = {
+          'foodId': foodId,
+          'foodName': food.foodName,
+          'basePrice': (food.discountPrice ?? food.foodPrice ?? 0),
+          'customizations': customizationsList,
+          'addOns': addOnsList,
+        };
+
+        // Calculate total price for customized items
+        double totalCustomizationQuantity = 0;
+        customMap.forEach((_, customQty) {
+          totalCustomizationQuantity += customQty;
+        });
+        itemData['totalCustomizationQuantity'] = totalCustomizationQuantity.toInt();
+        itemData['totalPrice'] = ((food.discountPrice ?? food.foodPrice ?? 0) * totalCustomizationQuantity);
+
+        // Add add-ons for this customized food if any
+        if (cartAddOnQuantity.containsKey(foodId)) {
+          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
+            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+            if (addOn != null && addOn.addOnId != null) {
+              addOnsList.add({
+                'addOnId': addOnId,
+                'addOnName': addOn.name,
+                'quantity': addOnQty,
+                'price': addOn.price,
+                'totalPrice': (addOn.price ?? 0) * addOnQty,
+              });
+            }
+          });
+        }
+
+        (cartDetails['items_with_customizations'] as List).add(itemData);
+      }
+    });
+
+    cartDetails['total_items'] = getTotalCartItemCount();
+    cartDetails['total_price'] = getTotalCartPrice();
+
+    return cartDetails;
+  }
+
+  /// Log cart details in a formatted way
+  void logCartDetails() {
+    final cartData = getCartDetails();
+
+    debugPrint('''
+╔════════════════════════════════════════════════════════════════════════════╗
+║                          🛒 COMPLETE CART DETAILS                          ║
+╚════════════════════════════════════════════════════════════════════════════╝
+    ''');
+
+    // Log items without customizations
+    if ((cartData['items_without_customizations'] as List).isNotEmpty) {
+      debugPrint('📦 ITEMS WITHOUT CUSTOMIZATIONS:');
+      debugPrint('─────────────────────────────────────────────────────────────────────────────');
+      for (var item in cartData['items_without_customizations'] as List) {
+        debugPrint('  🍔 ${item['foodName']}');
+        debugPrint('     └─ Food ID: ${item['foodId']}');
+        debugPrint('     └─ Quantity: ${item['quantity']}');
+        debugPrint('     └─ Base Price: ₹${item['basePrice']}');
+        debugPrint('     └─ Item Total: ₹${item['totalPrice']}');
+
+        if ((item['addOns'] as List).isNotEmpty) {
+          debugPrint('     └─ Add-ons:');
+          for (var addOn in item['addOns'] as List) {
+            debugPrint('        ├─ ${addOn['addOnName']} (Qty: ${addOn['quantity']}) - ₹${addOn['totalPrice']}');
+          }
+        }
+        debugPrint('');
+      }
+    }
+
+    // Log items with customizations
+    if ((cartData['items_with_customizations'] as List).isNotEmpty) {
+      debugPrint('🎨 ITEMS WITH CUSTOMIZATIONS:');
+      debugPrint('─────────────────────────────────────────────────────────────────────────────');
+      for (var item in cartData['items_with_customizations'] as List) {
+        debugPrint('  🍔 ${item['foodName']}');
+        debugPrint('     └─ Food ID: ${item['foodId']}');
+        debugPrint('     └─ Base Price: ₹${item['basePrice']}');
+        debugPrint('     └─ Total Customization Quantity: ${item['totalCustomizationQuantity']}');
+        debugPrint('     └─ Customizations:');
+
+        for (var custom in item['customizations'] as List) {
+          debugPrint(
+            '        ├─ ${custom['customizationName']} (Qty: ${custom['quantity']}) - ₹${custom['totalPrice']}',
+          );
+        }
+
+        if ((item['addOns'] as List).isNotEmpty) {
+          debugPrint('     └─ Add-ons:');
+          for (var addOn in item['addOns'] as List) {
+            debugPrint('        ├─ ${addOn['addOnName']} (Qty: ${addOn['quantity']}) - ₹${addOn['totalPrice']}');
+          }
+        }
+
+        debugPrint('     └─ Item Total: ₹${item['totalPrice']}');
+        debugPrint('');
+      }
+    }
+
+    debugPrint('╔════════════════════════════════════════════════════════════════════════════╗');
+    debugPrint('║ 📊 CART SUMMARY                                                            ║');
+    debugPrint('╠════════════════════════════════════════════════════════════════════════════╣');
+    debugPrint(
+      '║ Total Items: ${cartData['total_items']}                                                              ║',
+    );
+    debugPrint(
+      '║ Total Price: ₹${cartData['total_price']}                                                            ║',
+    );
+    debugPrint(
+      '╚════════════════════════════════════════════════════════════════════════════╝'
+      '',
     );
   }
 
-  // Log selected items when adding to cart (from bottom sheet)
-  void logAndAddToCartFromBottomSheet() {
-    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return;
-
-    final foodId = selectedFoodItem!.foodId!;
-    final quantity = getCustomizationCount(foodId);
-    final selectedAddOns = getSelectedAddOns(foodId);
-    final totalPrice = getTotalPrice();
-
-    debugPrint('''
-═══════════════════════════════════════════
-📦 ADD TO CART FROM BOTTOM SHEET
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Quantity: $quantity
-💰 Base Price: ₹${getBasePrice()}
-🎁 Add-ons: ${selectedAddOns.map((a) => '${a.name} (₹${a.price})').join(', ')}
-🆔 Add-on IDs: ${selectedAddOns.map((a) => a.addOnId).join(', ')}
-📈 Add-ons Total: ₹${getAddOnsPrice()}
-💵 Total Price: ₹$totalPrice
-═══════════════════════════════════════════
-    ''');
-  }
-
-  // Log selected items when adding to cart (from food details page)
-  void logAndAddToCartFromFoodDetails() {
-    if (selectedFoodItem == null || selectedFoodItem!.foodId == null) return;
-
-    final foodId = selectedFoodItem!.foodId!;
-    final quantity = getCustomizationCount(foodId);
-    final selectedAddOns = getSelectedAddOns(foodId);
-    final totalPrice = getTotalPrice();
-
-    debugPrint('''
-═══════════════════════════════════════════
-📦 ADD TO CART FROM FOOD DETAILS
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Quantity: $quantity
-💰 Base Price: ₹${getBasePrice()}
-🎁 Add-ons: ${selectedAddOns.map((a) => '${a.name} (₹${a.price})').join(', ')}
-🆔 Add-on IDs: ${selectedAddOns.map((a) => a.addOnId).join(', ')}
-📈 Add-ons Total: ₹${getAddOnsPrice()}
-💵 Total Price: ₹$totalPrice
-═══════════════════════════════════════════
-    ''');
-  }
-
-  // Reset selections for a specific food
-  void resetFoodSelections(String foodId) {
-    foodCustomizationCount[foodId] = 0;
-    foodSelectedAddOns[foodId] = [];
-    debugPrint('🔄 Reset selections for food: $foodId');
-  }
-
-  // Reset all selections ONLY when:
-  // 1. Fresh API call (new restaurant)
-  // 2. Completely exiting the restaurant view
-  void resetAllSelections() {
-    selectedFoodItem = null;
-    foodCustomizationCount.clear();
-    foodSelectedAddOns.clear();
-    selectedCategoryIndex = 0;
-    debugPrint('🔄 Reset all selections');
-    update(['main_content', 'bottom_sheet_content']);
-  }
-
-  // Getters
-  String get selectedCategoryName => selectedCategoryIndex < categories.length ? categories[selectedCategoryIndex] : '';
-  int get foodItemsCount => getFilteredFoodItems().length;
-  bool get hasCustomizations =>
-      selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty;
-  bool get hasAddOns => selectedFoodItem?.addOns != null && selectedFoodItem!.addOns!.isNotEmpty;
-
-  @override
-  void onClose() {
-    resetAllSelections();
-    super.onClose();
+  /// Alternative: Get cart as JSON (for API calls)
+  String getCartDetailsAsJson() {
+    return jsonEncode(getCartDetails());
   }
 }

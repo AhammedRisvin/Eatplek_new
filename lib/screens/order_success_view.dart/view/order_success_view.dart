@@ -6,7 +6,7 @@ import 'package:svg_flutter/svg.dart';
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
-import '../../food_details_view.dart/view/widget/dotted_line_painter.dart';
+import '../../cart/view/widget/dotted_line_painter.dart';
 
 class OrderSuccessView extends StatefulWidget {
   const OrderSuccessView({super.key});

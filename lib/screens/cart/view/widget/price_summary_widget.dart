@@ -3,7 +3,7 @@ import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 
-import '../../../food_details_view.dart/view/widget/dotted_line_painter.dart';
+import 'dotted_line_painter.dart';
 
 class PriceSummaryWidget extends StatelessWidget {
   final double subtotal;

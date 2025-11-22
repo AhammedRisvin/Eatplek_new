@@ -15,7 +15,6 @@ import 'package:get/get.dart';
 
 import '../../screens/auth/view/login_view.dart';
 import '../../screens/bottom_nav/view/bottom_nav_view.dart';
-import '../../screens/food_details_view.dart/view/food_details_view.dart';
 import '../../screens/on_boarding_view/view/on_boarding_view.dart';
 import '../../screens/splash_view/view/splash_screen.dart';
 import '../bindings/cart_bindings.dart';
@@ -63,7 +62,6 @@ class Routes {
       transition: Transition.circularReveal,
       binding: HomeBindings(),
     ),
-    GetPage(name: foodDetailsView, page: () => const FoodDetailsView(), transition: Transition.circularReveal),
     GetPage(
       name: cartView,
       page: () => const CartView(),

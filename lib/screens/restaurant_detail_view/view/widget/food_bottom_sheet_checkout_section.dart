@@ -1,9 +1,11 @@
+import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../../core/util/app_color.dart';
 import '../../../../../core/util/common_widgets.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
+import 'quantity_control_widget.dart';
 
 class FoodBottomSheetCheckoutSection extends StatelessWidget {
   const FoodBottomSheetCheckoutSection({super.key});
@@ -13,6 +15,28 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
     return GetBuilder<RestaurantDetailViewController>(
       id: 'total_price',
       builder: (controller) {
+        final totalPrice = controller.getTotalBottomSheetPrice();
+        final basePrice = controller.getBasePrice();
+        final hasCustomizations = controller.hasCustomizations;
+        final isEditMode = controller.isEditMode;
+        final buttonText = controller.getBottomSheetButtonText();
+
+        // Get the quantity for Scenario A
+        final scenarioAQuantity = controller.getBottomSheetItemQuantity();
+
+        // Determine if button should be enabled
+        bool isButtonEnabled = true;
+        if (hasCustomizations) {
+          isButtonEnabled = controller.getTotalCustomizationQuantity() > 0;
+        } else {
+          // For Scenario A, button is enabled if quantity > 0
+          isButtonEnabled = scenarioAQuantity > 0;
+        }
+
+        debugPrint(
+          '🟢 Checkout section rebuild - price: $totalPrice, enabled: $isButtonEnabled, mode: ${isEditMode ? 'EDIT' : 'ADD'}',
+        );
+
         return Container(
           width: Get.width,
           decoration: BoxDecoration(
@@ -23,9 +47,33 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
           padding: EdgeInsets.only(top: 11, left: 16, right: 16, bottom: 16),
           child: Row(
             children: [
-              Expanded(
-                child: Column(
+              // SCENARIO A ONLY: Quantity control on left
+              if (!hasCustomizations)
+                GetBuilder<RestaurantDetailViewController>(
+                  id: 'total_price',
+                  builder: (controller) {
+                    final quantity = controller.getBottomSheetItemQuantity();
+                    return QuantityControlWidget(
+                      quantity: quantity,
+                      onIncrease: () {
+                        debugPrint('🟢 Increase quantity in bottom sheet - old: $quantity');
+                        controller.increaseBottomSheetItemQuantity();
+                      },
+                      onDecrease: () {
+                        debugPrint('🟢 Decrease quantity in bottom sheet - old: $quantity');
+                        controller.decreaseBottomSheetItemQuantity();
+                      },
+                      showRemoveButton: true,
+                      buttonSize: 28,
+                      iconSize: 14,
+                    );
+                  },
+                )
+              else
+                // SCENARIO B & C: Show total items on left
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     text(
                       text: 'Total Amount',
@@ -34,27 +82,53 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                       color: AppColor.black.withOpacity(0.6),
                     ),
                     text(
-                      text: '₹${controller.getTotalPrice().toStringAsFixed(0)}',
+                      text: '₹${totalPrice.toStringAsFixed(0)}',
                       size: 22,
                       fontWeight: FontWeight.w600,
                       color: AppColor.black,
                     ),
                   ],
                 ),
-              ),
-              button(
-                name: 'Add to Cart',
-                onTap: () {
-                  controller.logAndAddToCartFromBottomSheet();
-                  Get.back();
-                },
-                width: 125,
-                height: 50,
-                color: AppColor.appPrimary,
-                textColor: AppColor.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-                borderRadius: BorderRadius.circular(100),
+
+              Spacer(),
+
+              // Add/Edit item button with price inside
+              GestureDetector(
+                onTap:
+                    isButtonEnabled
+                        ? () {
+                          debugPrint('🟢 $buttonText button tapped');
+                          controller.addItemToCart();
+                        }
+                        : null,
+                child: Container(
+                  height: 50,
+                  constraints: BoxConstraints(maxWidth: 160),
+                  decoration: BoxDecoration(
+                    color: isButtonEnabled ? AppColor.appPrimary : AppColor.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        text(
+                          text: buttonText,
+                          size: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isButtonEnabled ? AppColor.white : AppColor.black.withOpacity(0.5),
+                        ),
+                        2.h,
+                        text(
+                          text: '₹${totalPrice.toStringAsFixed(0)}',
+                          size: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isButtonEnabled ? AppColor.white : AppColor.black.withOpacity(0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

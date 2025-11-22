@@ -5,9 +5,9 @@ import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../food_details_view.dart/view/widget/dotted_line_painter.dart';
 import '../../../restaurant_detail_view/view/widget/quantity_control_widget.dart';
 import '../../controller/cart_controller.dart';
+import 'dotted_line_painter.dart';
 
 class CartFoodListWidget extends StatelessWidget {
   const CartFoodListWidget({super.key});
@@ -160,20 +160,21 @@ class CartFoodListWidget extends StatelessWidget {
   }
 
   Widget _buildAddOnItem(CartItem cartItem, int index) {
-    final addOn = cartItem.selectedAddOns[index];
-    return GetBuilder<CartController>(
-      id: 'cart_items',
-      builder: (controller) {
-        return AddOnSelectionWidget(
-          id: addOn.id,
-          name: addOn.name,
-          price: '₹${addOn.price.toInt()}',
-          imageUrl: addOn.imageUrl,
-          isSelected: addOn.isSelected,
-          onTap: () => controller.toggleAddOn(cartItem.id, addOn.id),
-          margin: 0,
-        );
-      },
-    );
+    // final addOn = cartItem.selectedAddOns[index];
+    return Container();
+    //  GetBuilder<CartController>(
+    //   id: 'cart_items',
+    //   builder: (controller) {
+    //     return AddOnSelectionWidget(
+    //       id: addOn.id,
+    //       name: addOn.name,
+    //       price: '₹${addOn.price.toInt()}',
+    //       imageUrl: addOn.imageUrl,
+    //       isSelected: addOn.isSelected,
+    //       onTap: () => controller.toggleAddOn(cartItem.id, addOn.id),
+    //       margin: 0,
+    //     );
+    //   },
+    // );
   }
 }
