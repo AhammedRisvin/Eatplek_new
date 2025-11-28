@@ -144,7 +144,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColor.white.withOpacity(0.4)),
         ),
-        child: IconButton(onPressed: () => Get.back(), icon: SvgPicture.string(arrowBack)),
+        child: IconButton(onPressed: () => Navigator.of(context).pop(), icon: SvgPicture.string(arrowBack)),
       ),
     );
   }
@@ -322,9 +322,9 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: 5,
-              separatorBuilder: (_, __) => 10.w,
+              separatorBuilder: (_, _) => 10.w,
               itemBuilder:
-                  (_, __) => Container(
+                  (_, _) => Container(
                     width: 100,
                     decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(40)),
                   ),
@@ -346,7 +346,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
             ),
             itemCount: 6,
             itemBuilder:
-                (_, __) => Container(
+                (_, _) => Container(
                   decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(20)),
                 ),
           ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -169,6 +170,7 @@ class FittorConnect {
     Map<String, String>? headers,
   }) async {
     try {
+      log('data $data');
       final response = await _client.post(
         _buildUrl(endpoint),
         body: data is Map ? jsonEncode(data) : data,

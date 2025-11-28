@@ -23,7 +23,7 @@ class OrderPreferenceSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             color: AppColor.appPrimary.withOpacity(0.06),
           ),
-          margin: const EdgeInsets.only(bottom: 20, top: 30),
+          margin: const EdgeInsets.only(top: 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

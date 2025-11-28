@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/util/storage.dart';
 import '../model/new_home_model.dart';
-import '../view/widget/multiple_branch_bottom_sheet.dart'; // Add this import
+import '../view/widget/multiple_branch_bottom_sheet.dart';
 import '../view/widget/order_preference_dialog.dart';
 
 class HomeController extends GetxController {
@@ -25,6 +25,9 @@ class HomeController extends GetxController {
 
   // Service data from API
   List<String> availableServices = [];
+
+  // Prebook data from API [NEW]
+  List<PrebookList> prebookList = [];
 
   // Vendor data from API
   List<Vendor> vendors = [];
@@ -168,9 +171,9 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Unified API call to fetch home data (services and vendors)
+  /// Unified API call to fetch home data (services, vendors, and prebooks)
   /// If serviceType is null: Returns only services (for preference selection)
-  /// If serviceType is provided: Returns services + vendors
+  /// If serviceType is provided: Returns services + vendors + prebooks
   ///
   /// ServiceType values: 'delivery', 'takeaway', 'dine-in', 'car-dine-in'
   Future<bool> _fetchHomeData({String? serviceType, required bool isRefresh}) async {
@@ -236,17 +239,31 @@ class HomeController extends GetxController {
           debugPrint('✅ Services loaded: ${availableServices.length} services, ${banners.length} banners');
           debugPrint('📋 Available Services: $availableServices');
 
-          // Extract vendors if serviceType was provided
+          // Extract vendors and prebooks if serviceType was provided
           if (serviceType != null) {
             final newVendors = newHomeModel.data!.vendors ?? [];
+            final newPrebooks = newHomeModel.data!.prebookList ?? [];
 
             if (isRefresh) {
               vendors = newVendors;
+              prebookList = newPrebooks;
             } else {
               vendors.addAll(newVendors);
+              prebookList.addAll(newPrebooks);
             }
 
             debugPrint('✅ Vendors loaded: ${vendors.length} items');
+            debugPrint('✅ Prebooks loaded: ${prebookList.length} items');
+
+            // Log prebook details
+            if (prebookList.isNotEmpty) {
+              debugPrint('📚 Prebook List Details:');
+              for (var prebook in prebookList) {
+                debugPrint(
+                  '  - ${prebook.foodName} (ID: ${prebook.foodId}) | Start: ${prebook.prebookStartDate} | End: ${prebook.prebookEndDate}',
+                );
+              }
+            }
           }
 
           isLoadingVendors = false;
@@ -373,6 +390,7 @@ class HomeController extends GetxController {
     // Reset pagination
     currentPage = 1;
     vendors.clear();
+    prebookList.clear();
 
     debugPrint('🚀 Fetching vendors for service type: $serviceType');
     await _fetchHomeData(serviceType: serviceType, isRefresh: true);
@@ -502,6 +520,7 @@ class HomeController extends GetxController {
     debugPrint('🔄 RETRY: Resetting pagination and fetching');
     currentPage = 1;
     vendors.clear();
+    prebookList.clear();
 
     String serviceType = _extractServiceType(orderPreference);
     await _fetchHomeData(serviceType: serviceType, isRefresh: true);
@@ -512,6 +531,7 @@ class HomeController extends GetxController {
     debugPrint('🔄 REFRESH: Fetching vendors');
     currentPage = 1;
     vendors.clear();
+    prebookList.clear();
 
     String serviceType = _extractServiceType(orderPreference);
     await _fetchHomeData(serviceType: serviceType, isRefresh: true);

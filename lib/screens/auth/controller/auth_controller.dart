@@ -251,7 +251,6 @@ class AuthController extends GetxController {
 
       await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.login, data: body);
 
-      Get.snackbar('Success', 'OTP sent successfully!');
       _goToOtpStep();
     } catch (e) {
       _showErrorSnackbar('Error', e.toString());

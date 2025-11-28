@@ -16,7 +16,7 @@ class Data {
   List<String>? availableServices;
   List<BannerData>? banners;
   List<Vendor>? vendors;
-  List<dynamic>? prebookList;
+  List<PrebookList>? prebookList;
   List<dynamic>? todayOfferFoods;
 
   Data({this.availableServices, this.banners, this.vendors, this.prebookList, this.todayOfferFoods});
@@ -26,7 +26,10 @@ class Data {
         json["availableServices"] == null ? [] : List<String>.from(json["availableServices"]!.map((x) => x)),
     banners: json["banners"] == null ? [] : List<BannerData>.from(json["banners"]!.map((x) => BannerData.fromJson(x))),
     vendors: json["vendors"] == null ? [] : List<Vendor>.from(json["vendors"]!.map((x) => Vendor.fromJson(x))),
-    prebookList: json["prebookList"] == null ? [] : List<dynamic>.from(json["prebookList"]!.map((x) => x)),
+    prebookList:
+        json["prebookList"] == null
+            ? []
+            : List<PrebookList>.from(json["prebookList"]!.map((x) => PrebookList.fromJson(x))),
     todayOfferFoods: json["todayOfferFoods"] == null ? [] : List<dynamic>.from(json["todayOfferFoods"]!.map((x) => x)),
   );
 }
@@ -133,5 +136,47 @@ class Vendor {
     averageRating: json["averageRating"],
     reviewCount: json["reviewCount"],
     branchList: json["branchList"] == null ? [] : List<Vendor>.from(json["branchList"]!.map((x) => Vendor.fromJson(x))),
+  );
+}
+
+class PrebookList {
+  String? foodId;
+  String? foodName;
+  String? foodImage;
+  String? description;
+  double? basePrice;
+  double? discountPrice;
+  double? effectivePrice;
+  DateTime? prebookStartDate;
+  DateTime? prebookEndDate;
+  String? category;
+  Vendor? vendor;
+
+  PrebookList({
+    this.foodId,
+    this.foodName,
+    this.foodImage,
+    this.description,
+    this.basePrice,
+    this.discountPrice,
+    this.effectivePrice,
+    this.prebookStartDate,
+    this.prebookEndDate,
+    this.category,
+    this.vendor,
+  });
+
+  factory PrebookList.fromJson(Map<String, dynamic> json) => PrebookList(
+    foodId: json["foodId"],
+    foodName: json["foodName"],
+    foodImage: json["foodImage"],
+    description: json["description"],
+    basePrice: json["basePrice"]?.toDouble(),
+    discountPrice: json["discountPrice"]?.toDouble(),
+    effectivePrice: json["effectivePrice"]?.toDouble(),
+    prebookStartDate: json["prebookStartDate"] == null ? null : DateTime.parse(json["prebookStartDate"]),
+    prebookEndDate: json["prebookEndDate"] == null ? null : DateTime.parse(json["prebookEndDate"]),
+    category: json["category"],
+    vendor: json["vendor"] == null ? null : Vendor.fromJson(json["vendor"]),
   );
 }

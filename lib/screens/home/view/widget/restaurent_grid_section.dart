@@ -15,7 +15,7 @@ class VendorGridSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [_buildSectionHeader(), 23.h, _buildVendorsGrid()]);
+    return Column(children: [20.h, _buildSectionHeader(), 20.h, _buildVendorsGrid()]);
   }
 
   /// Builds section header with title and view all button

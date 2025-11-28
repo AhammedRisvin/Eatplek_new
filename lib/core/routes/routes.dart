@@ -8,6 +8,7 @@ import 'package:eatplek_app/screens/order_confirmation_view/view/order_confirmat
 import 'package:eatplek_app/screens/order_details_view/view/order_details_view.dart';
 import 'package:eatplek_app/screens/order_success_view.dart/view/order_success_view.dart';
 import 'package:eatplek_app/screens/orders/view/orders_view.dart';
+import 'package:eatplek_app/screens/pre_book_details_view/view/pre_book_details_view.dart';
 import 'package:eatplek_app/screens/profile/view/profile_view.dart';
 import 'package:eatplek_app/screens/restaurant_detail_view/view/restaurant_detail_view.dart';
 import 'package:eatplek_app/screens/search/view/search_view.dart';
@@ -21,6 +22,7 @@ import '../bindings/cart_bindings.dart';
 import '../bindings/home_bindings.dart';
 import '../bindings/order_confirmation_bindings.dart';
 import '../bindings/orders_bindings.dart';
+import '../bindings/pre_book_details_bindings.dart';
 
 class Routes {
   static const splash = '/';
@@ -32,7 +34,7 @@ class Routes {
   static const bottomNav = '/bottomNav';
 
   static const restaurantDetail = '/restaurantDetail';
-  static const foodDetailsView = '/foodDetailsView';
+  static const preBookDetailView = '/preBookDetailView';
   static const cartView = '/cartView';
   static const orderConfirmationView = '/orderConfirmationView';
   static const orderSuccessView = '/orderSuccessView';
@@ -98,6 +100,12 @@ class Routes {
       page: () => const SearchView(),
       transition: Transition.circularReveal,
       binding: SearchBindings(),
+    ),
+    GetPage(
+      name: preBookDetailView,
+      page: () => const PrebookDetailView(),
+      transition: Transition.circularReveal,
+      binding: PreBookDetailsBindings(),
     ),
 
     //OrderDetailsBindings

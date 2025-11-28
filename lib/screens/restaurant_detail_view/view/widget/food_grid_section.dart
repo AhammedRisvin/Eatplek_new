@@ -33,7 +33,7 @@ class FoodGridSection extends StatelessWidget {
               crossAxisCount: 2,
               mainAxisSpacing: 16,
               crossAxisSpacing: 12,
-              childAspectRatio: Get.height * 0.00085,
+              childAspectRatio: Get.height * 0.00079,
             ),
             itemCount: filteredFoodItems.length,
             itemBuilder: (context, index) {

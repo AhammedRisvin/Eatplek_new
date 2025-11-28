@@ -14,17 +14,29 @@ class BottomCartBar extends StatelessWidget {
     return GetBuilder<RestaurantDetailViewController>(
       id: 'bottom_cart_bar',
       builder: (controller) {
-        if (!controller.hasCartItems) {
+        // Get cart info from API response
+        final cartDisplayInfo = controller.getCartDisplayInfo();
+
+        if (cartDisplayInfo == null) {
+          debugPrint('🛒 BottomCartBar: No cart data, hiding bar');
           return SizedBox.shrink();
         }
 
-        final totalItems = controller.getTotalCartItemCount();
-        final totalPrice = controller.getTotalCartPrice();
+        final totalItems = cartDisplayInfo['itemCount'] as int? ?? 0;
+        final totalPrice = cartDisplayInfo['totalPrice'] as double? ?? 0.0;
+
+        if (totalItems == 0) {
+          debugPrint('🛒 BottomCartBar: Cart empty, hiding bar');
+          return SizedBox.shrink();
+        }
+
         final itemText = totalItems == 1 ? 'item' : 'items';
+
+        debugPrint('🛒 BottomCartBar: Showing - $totalItems $itemText, ₹$totalPrice');
 
         return AnimatedSlide(
           duration: Duration(milliseconds: 300),
-          offset: controller.hasCartItems ? Offset.zero : Offset(0, 2),
+          offset: totalItems > 0 ? Offset.zero : Offset(0, 2),
           child: Container(
             width: Get.width,
             decoration: BoxDecoration(
@@ -65,9 +77,8 @@ class BottomCartBar extends StatelessWidget {
                 ),
                 GestureDetector(
                   onTap: () {
-                    debugPrint('📋 Logging cart details before navigation...');
-                    controller.logCartDetails();
-                    debugPrint('🛒 Navigate to cart');
+                    debugPrint('📋 View Cart button tapped');
+                    debugPrint('🛒 Cart Items: ${cartDisplayInfo['items']}');
                   },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),

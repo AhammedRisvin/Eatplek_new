@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/util/storage.dart';
@@ -10,37 +10,41 @@ import '../../../core/network/api_client.dart';
 import '../model/restaurent_details_model.dart';
 
 class RestaurantDetailViewController extends GetxController {
-  // API and loading states
   final FittorConnect _apiClient = FittorConnect();
+
   bool isLoading = false;
   bool hasError = false;
   String errorMessage = '';
 
-  // Restaurant data
   RestuarantDetailsModel? restaurantDetailsModel;
   List<RestuarantDetailsData> restaurantData = [];
   List<String> banners = [];
 
-  // Category management
   int selectedCategoryIndex = 0;
   List<String> categories = [];
 
-  // Cart state - persists across bottom sheet sessions
-  Map<String, int> cartFoodQuantity = {}; // foodId -> quantity
-  Map<String, Map<String, int>> cartCustomizationQuantity = {}; // foodId -> customizationId -> quantity
-  Map<String, Map<String, int>> cartAddOnQuantity = {}; // foodId -> addOnId -> quantity
+  // Cart state
+  Map<String, int> cartFoodQuantity = {};
+  Map<String, Map<String, int>> cartCustomizationQuantity = {};
+  Map<String, Map<String, int>> cartAddOnQuantity = {};
 
-  // Bottom sheet temporary state - resets on close
+  // API response storage (Source of truth)
+  Map<String, dynamic>? lastCartItemResponse;
+  List<Map<String, dynamic>> cartItems = [];
+
+  // Bottom sheet state
   Food? selectedFoodItem;
-  Map<String, int> bsCustomizationQuantity = {}; // Temporary customization quantities
-  Map<String, int> bsAddOnQuantity = {}; // Temporary add-on quantities
-  Map<String, int> bsItemQuantity = {}; // Bottom sheet item quantity for Scenario A (no customizations)
+  Map<String, int> bsCustomizationQuantity = {};
+  Map<String, int> bsAddOnQuantity = {};
+  Map<String, int> bsItemQuantity = {};
 
-  // Edit mode tracking
   bool isEditMode = false;
   String? editingFoodId;
-
   String? restaurantId;
+
+  // Debouncer for Scenario 1
+  Timer? _quantityDebounceTimer;
+  static const Duration _debounceDuration = Duration(milliseconds: 500);
 
   @override
   void onInit() {
@@ -48,11 +52,16 @@ class RestaurantDetailViewController extends GetxController {
     _extractRestaurantIdAndFetch();
   }
 
+  @override
+  void onClose() {
+    _quantityDebounceTimer?.cancel();
+    super.onClose();
+  }
+
   void _extractRestaurantIdAndFetch() {
     final args = Get.arguments;
     if (args != null && args.hotelId != null) {
       restaurantId = args.hotelId;
-      debugPrint('🏪 Restaurant ID: $restaurantId');
       getRestaurantDetailsFn(restaurantId: restaurantId!);
     } else {
       hasError = true;
@@ -61,7 +70,6 @@ class RestaurantDetailViewController extends GetxController {
     }
   }
 
-  // API call to fetch restaurant details
   Future<void> getRestaurantDetailsFn({required String restaurantId}) async {
     try {
       isLoading = true;
@@ -70,14 +78,11 @@ class RestaurantDetailViewController extends GetxController {
 
       update(['main_content']);
 
-      // Clean the service preference - remove emoji and get just the value
       String serviceType = _getCleanServiceType(Store.deliveryPreference);
 
       final response = await _apiClient.get(
         endpoint: "${Urls.getRestaurantDetailsUrl}$restaurantId/foods?service=$serviceType",
       );
-
-      log('Restaurant details response: $response');
 
       if (response != null && response is Map<String, dynamic>) {
         restaurantDetailsModel = RestuarantDetailsModel.fromJson(response);
@@ -86,10 +91,11 @@ class RestaurantDetailViewController extends GetxController {
           restaurantData = restaurantDetailsModel!.data!;
           banners = restaurantDetailsModel?.banners ?? [];
 
-          // Extract unique categories
+          // ✅ Initialize cart from foods with cartCount > 0
+          _initializeCartFromRestaurantData();
+
           _extractCategories();
 
-          // Filter by first category if available
           if (categories.isNotEmpty) {
             selectedCategoryIndex = 0;
             filterFoodByCategory(categories[0]);
@@ -108,13 +114,145 @@ class RestaurantDetailViewController extends GetxController {
         isLoading = false;
       }
 
-      update(['main_content']);
+      // ✅ Include 'bottom_cart_bar' to refresh cart display
+      update(['main_content', 'bottom_cart_bar']);
     } catch (e) {
-      debugPrint('Error in getRestaurantDetailsFn: $e');
       hasError = true;
       errorMessage = 'Error loading restaurant details: $e';
       isLoading = false;
       update(['main_content']);
+    }
+  }
+
+  // ✅ Initialize cart from restaurant data
+  void _initializeCartFromRestaurantData() {
+    try {
+      debugPrint('🔄 Initializing cart from restaurant data...');
+
+      cartItems.clear();
+      cartFoodQuantity.clear();
+      cartCustomizationQuantity.clear();
+      cartAddOnQuantity.clear();
+
+      int totalItems = 0;
+      double totalPrice = 0;
+
+      for (var categoryData in restaurantData) {
+        if (categoryData.foods != null) {
+          for (var food in categoryData.foods!) {
+            final foodId = food.foodId;
+            if (foodId == null) continue;
+
+            // Check if food has cartCount > 0
+            if (food.cartCount != null && food.cartCount! > 0) {
+              debugPrint('📦 Found item in cart: ${food.foodName} (qty: ${food.cartCount})');
+
+              // Build cart item structure
+              final basePrice = (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
+              final hasCustomizations = food.customizations != null && food.customizations!.isNotEmpty;
+
+              Map<String, dynamic> cartItem = {
+                'foodId': foodId,
+                'foodName': food.foodName,
+                'foodImage': food.foodImage,
+                'quantity': hasCustomizations ? 1 : (food.cartCount?.toInt() ?? 1),
+                'basePrice': basePrice,
+                'effectivePrice': basePrice,
+                'customizations': [],
+                'addOns': [],
+                'itemTotal': basePrice * (hasCustomizations ? 1 : (food.cartCount?.toInt() ?? 1)),
+              };
+
+              // Add customizations with cartCount
+              if (hasCustomizations) {
+                List<Map<String, dynamic>> customizationsList = [];
+
+                for (var customization in food.customizations!) {
+                  if (customization.cartCount != null && customization.cartCount! > 0) {
+                    debugPrint('   📌 Customization: ${customization.name} (qty: ${customization.cartCount})');
+
+                    customizationsList.add({
+                      'customizationId': customization.customizationId,
+                      'name': customization.name,
+                      'price': customization.price,
+                      'quantity': customization.cartCount,
+                    });
+
+                    cartCustomizationQuantity[foodId] ??= {};
+                    cartCustomizationQuantity[foodId]![customization.customizationId!] =
+                        customization.cartCount!.toInt();
+                  }
+                }
+
+                cartItem['customizations'] = customizationsList;
+
+                // Calculate total price for customizations
+                int totalCustomizationQty = 0;
+                for (var custom in customizationsList) {
+                  totalCustomizationQty += (custom['quantity'] as int);
+                }
+                cartItem['itemTotal'] = basePrice * totalCustomizationQty;
+              } else {
+                cartFoodQuantity[foodId] = food.cartCount!.toInt();
+              }
+
+              // Add add-ons with cartCount
+              if (food.addOns != null) {
+                List<Map<String, dynamic>> addOnsList = [];
+
+                for (var addOn in food.addOns!) {
+                  if (addOn.cartCount != null && addOn.cartCount! > 0) {
+                    debugPrint('   🧂 Add-on: ${addOn.name} (qty: ${addOn.cartCount})');
+
+                    addOnsList.add({
+                      'addOnId': addOn.addOnId,
+                      'name': addOn.name,
+                      'price': addOn.price,
+                      'quantity': addOn.cartCount,
+                    });
+
+                    cartAddOnQuantity[foodId] ??= {};
+                    cartAddOnQuantity[foodId]![addOn.addOnId!] = addOn.cartCount!.toInt();
+
+                    // Add add-on price to total
+                    totalPrice += (addOn.price ?? 0).toDouble() * addOn.cartCount!;
+                  }
+                }
+
+                cartItem['addOns'] = addOnsList;
+              }
+
+              cartItems.add(cartItem);
+
+              // Calculate total items and price
+              if (hasCustomizations) {
+                int customQtyTotal = (cartItem['customizations'] as List).fold(
+                  0,
+                  (sum, c) => sum + (c['quantity'] as int),
+                );
+                totalItems += customQtyTotal;
+              } else {
+                totalItems += (food.cartCount!.toInt());
+              }
+
+              totalPrice += cartItem['itemTotal'];
+            }
+          }
+        }
+      }
+
+      // Create a mock lastCartItemResponse for BottomCartBar
+      if (cartItems.isNotEmpty) {
+        lastCartItemResponse = {
+          'items': cartItems,
+          'totals': {'itemCount': totalItems, 'grandTotal': totalPrice},
+        };
+        debugPrint('✅ Cart initialized from page load: $totalItems items, ₹${totalPrice.toStringAsFixed(2)} total');
+      } else {
+        debugPrint('ℹ️ No items in cart on page load');
+      }
+    } catch (e) {
+      debugPrint('❌ Error initializing cart from restaurant data: $e');
     }
   }
 
@@ -142,10 +280,7 @@ class RestaurantDetailViewController extends GetxController {
       }
     }
     categories = uniqueCategories.toList();
-    debugPrint('📂 Categories extracted: $categories');
   }
-
-  // ==================== CATEGORY MANAGEMENT ====================
 
   void onCategoryTapped(int index) {
     if (selectedCategoryIndex != index) {
@@ -168,9 +303,38 @@ class RestaurantDetailViewController extends GetxController {
     update(['food_grid']);
   }
 
-  // ==================== BOTTOM SHEET MANAGEMENT ====================
+  // SCENARIO DETECTION
+  bool _isScenario1(Food foodItem) {
+    final hasCustomizations = foodItem.customizations != null && foodItem.customizations!.isNotEmpty;
+    final hasAddOns = foodItem.addOns != null && foodItem.addOns!.isNotEmpty;
+    return !hasCustomizations && !hasAddOns;
+  }
 
-  /// Open bottom sheet for a food item - NEW VERSION (Add or Edit)
+  bool _isScenario2(Food foodItem) {
+    final hasCustomizations = foodItem.customizations != null && foodItem.customizations!.isNotEmpty;
+    final hasAddOns = foodItem.addOns != null && foodItem.addOns!.isNotEmpty;
+    return !hasCustomizations && hasAddOns;
+  }
+
+  bool _isScenario3And4(Food foodItem) {
+    final hasCustomizations = foodItem.customizations != null && foodItem.customizations!.isNotEmpty;
+    return hasCustomizations;
+  }
+
+  // CHECK IF ITEM IS IN CART
+  bool _isItemInCart(String foodId) {
+    return cartItems.any((item) => item['foodId'] == foodId);
+  }
+
+  // GET CURRENT CART ITEM FROM API RESPONSE
+  Map<String, dynamic>? _getCartItemFromResponse(String foodId) {
+    try {
+      return cartItems.firstWhere((item) => item['foodId'] == foodId);
+    } catch (e) {
+      return null;
+    }
+  }
+
   void selectFoodItem(Food foodItem, {bool isEdit = false}) {
     if (foodItem.foodId == null) return;
 
@@ -178,54 +342,109 @@ class RestaurantDetailViewController extends GetxController {
     editingFoodId = foodItem.foodId!;
     isEditMode = isEdit;
 
-    // Reset temporary bottom sheet state
     bsCustomizationQuantity.clear();
     bsAddOnQuantity.clear();
     bsItemQuantity.clear();
 
     if (isEdit) {
-      // Initialize with existing cart data for editing
-      _initializeBottomSheetStateForEdit(foodItem.foodId!);
-      debugPrint('✏️ Edit mode - Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
+      _initializeBottomSheetStateForEdit(foodItem);
     } else {
-      // Fresh state for adding
-      _initializeBottomSheetStateForAdd(foodItem.foodId!);
-      debugPrint('➕ Add mode - Selected food: ${foodItem.foodName} (ID: ${foodItem.foodId})');
+      _initializeBottomSheetStateForAdd(foodItem);
     }
 
     update(['bottom_sheet_content', 'bottom_sheet_header']);
   }
 
-  /// Initialize bottom sheet state for ADD mode (fresh state)
-  void _initializeBottomSheetStateForAdd(String foodId) {
-    // Always start with quantity 1 for add mode
-    bsItemQuantity[foodId] = 1;
-    // Clear add-ons and customizations for fresh add
+  void _initializeBottomSheetStateForAdd(Food foodItem) {
+    final foodId = foodItem.foodId!;
+    final hasCustomizations = _isScenario3And4(foodItem);
+    final hasAddOns = foodItem.addOns != null && foodItem.addOns!.isNotEmpty;
+
+    if (!hasCustomizations && !hasAddOns) {
+      // Scenario 1: Food only
+      bsItemQuantity[foodId] = 1;
+    } else if (!hasCustomizations && hasAddOns) {
+      // Scenario 2: Food + Add-ons
+      bsItemQuantity[foodId] = 1;
+      // ❌ NO: Don't initialize all add-ons with 0 in ADD mode
+      // Only user-selected add-ons will be in bsAddOnQuantity
+    } else {
+      // Scenario 3 & 4: Customizations (food qty always 1)
+      bsItemQuantity[foodId] = 1;
+      // ❌ NO: Don't initialize all customizations/add-ons with 0 in ADD mode
+      // Only user-selected items will be in the maps
+    }
+
+    debugPrint('📝 ADD MODE: Scenario initialized empty for ${foodItem.foodName}');
+  }
+
+  void _initializeBottomSheetStateForEdit(Food foodItem) {
+    final foodId = foodItem.foodId!;
+    final hasCustomizations = _isScenario3And4(foodItem);
+
+    // Clear existing data
     bsCustomizationQuantity.clear();
     bsAddOnQuantity.clear();
-  }
+    bsItemQuantity.clear();
 
-  /// Initialize bottom sheet state for EDIT mode (load existing data)
-  void _initializeBottomSheetStateForEdit(String foodId) {
-    // Check if item has customizations in cart
-    if (cartCustomizationQuantity.containsKey(foodId)) {
-      bsCustomizationQuantity = Map.from(cartCustomizationQuantity[foodId]!);
+    // Get the current cart item from API response
+    final currentCartItem = _getCartItemFromResponse(foodId);
+
+    if (currentCartItem == null) {
+      debugPrint('⚠️ EDIT MODE: No current cart item found for $foodId');
+      return;
     }
 
-    // Load existing add-ons
-    if (cartAddOnQuantity.containsKey(foodId)) {
-      bsAddOnQuantity = Map.from(cartAddOnQuantity[foodId]!);
-    }
+    debugPrint('📖 EDIT MODE: Pre-filling from API response for ${foodItem.foodName}');
 
-    // For edit mode, load existing quantity (for items without customizations)
-    if (cartFoodQuantity.containsKey(foodId)) {
-      bsItemQuantity[foodId] = cartFoodQuantity[foodId]!;
+    if (!hasCustomizations) {
+      // Scenario 1 & 2: Get food quantity from API response
+      final quantity = currentCartItem['quantity'] ?? 1;
+      bsItemQuantity[foodId] = quantity;
+      debugPrint('📖 Scenario 1/2: Food qty = $quantity');
+
+      // ✅ FIXED: Only pre-fill add-ons that were ALREADY in the cart
+      if (currentCartItem['addOns'] != null) {
+        final addOns = currentCartItem['addOns'] as List;
+        for (var addOn in addOns) {
+          final addOnId = addOn['addOnId'] ?? '';
+          final addOnQty = addOn['quantity'] ?? 0;
+          if (addOnId.isNotEmpty) {
+            bsAddOnQuantity[addOnId] = addOnQty;
+            debugPrint('📖 Add-on ${addOn['name']}: qty = $addOnQty');
+          }
+        }
+      }
     } else {
-      bsItemQuantity[foodId] = 1;
+      // Scenario 3 & 4: Pre-fill customizations from API response
+      // ✅ FIXED: Only pre-fill customizations that were ALREADY in the cart
+      if (currentCartItem['customizations'] != null) {
+        final customizations = currentCartItem['customizations'] as List;
+        for (var customization in customizations) {
+          final customId = customization['customizationId'] ?? '';
+          final customQty = customization['quantity'] ?? 0;
+          if (customId.isNotEmpty) {
+            bsCustomizationQuantity[customId] = customQty;
+            debugPrint('📖 Customization ${customization['name']}: qty = $customQty');
+          }
+        }
+      }
+
+      // ✅ FIXED: Only pre-fill add-ons that were ALREADY in the cart
+      if (currentCartItem['addOns'] != null) {
+        final addOns = currentCartItem['addOns'] as List;
+        for (var addOn in addOns) {
+          final addOnId = addOn['addOnId'] ?? '';
+          final addOnQty = addOn['quantity'] ?? 0;
+          if (addOnId.isNotEmpty) {
+            bsAddOnQuantity[addOnId] = addOnQty;
+            debugPrint('📖 Add-on ${addOn['name']}: qty = $addOnQty');
+          }
+        }
+      }
     }
   }
 
-  /// Reset bottom sheet state when closing
   void resetBottomSheetState() {
     selectedFoodItem = null;
     bsCustomizationQuantity.clear();
@@ -233,18 +452,13 @@ class RestaurantDetailViewController extends GetxController {
     bsItemQuantity.clear();
     isEditMode = false;
     editingFoodId = null;
-    debugPrint('🔄 Reset bottom sheet state');
   }
 
-  // ==================== SCENARIO A - BOTTOM SHEET ITEM QUANTITY ====================
-
-  /// Get bottom sheet item quantity for Scenario A
   int getBottomSheetItemQuantity() {
     if (selectedFoodItem?.foodId == null) return 1;
     return bsItemQuantity[selectedFoodItem!.foodId!] ?? 1;
   }
 
-  /// Increase bottom sheet item quantity for Scenario A
   void increaseBottomSheetItemQuantity() {
     if (selectedFoodItem?.foodId == null) return;
 
@@ -252,28 +466,38 @@ class RestaurantDetailViewController extends GetxController {
     final currentQty = getBottomSheetItemQuantity();
     bsItemQuantity[foodId] = currentQty + 1;
 
-    debugPrint('🟢 Bottom sheet qty increased to: ${bsItemQuantity[foodId]}');
     update(['total_price']);
   }
 
-  /// Decrease bottom sheet item quantity for Scenario A
+  // ✅ SCENARIO 2: Allow decrease to 0 in EDIT mode, block in ADD mode
   void decreaseBottomSheetItemQuantity() {
     if (selectedFoodItem?.foodId == null) return;
 
     final foodId = selectedFoodItem!.foodId!;
     final currentQty = getBottomSheetItemQuantity();
 
-    if (currentQty > 1) {
-      bsItemQuantity[foodId] = currentQty - 1;
-      debugPrint('🟢 Bottom sheet qty decreased to: ${bsItemQuantity[foodId]}');
+    if (isEditMode) {
+      // ✅ EDIT MODE: Allow quantity to go to 0
+      if (currentQty > 0) {
+        bsItemQuantity[foodId] = currentQty - 1;
+        debugPrint('🍔 Scenario 2 EDIT: Food qty decreased to ${bsItemQuantity[foodId]}');
+
+        // ❌ DON'T clear add-ons here - we need them for the API request!
+        // They will be sent to backend with quantity 0 when removing item
+        // The backend needs the complete structure including add-ons
+
+        update(['total_price']);
+      }
     } else {
-      bsItemQuantity[foodId] = 1;
+      // ✅ ADD MODE: Block quantity from going below 1
+      if (currentQty > 1) {
+        bsItemQuantity[foodId] = currentQty - 1;
+        debugPrint('🍔 Scenario 2 ADD: Food qty decreased to ${bsItemQuantity[foodId]}');
+        update(['total_price']);
+      }
+      // Do nothing if currentQty == 1 (block from going to 0)
     }
-
-    update(['total_price']);
   }
-
-  // ==================== CUSTOMIZATION MANAGEMENT (BOTTOM SHEET) ====================
 
   void toggleCustomization(String customizationId) {
     if (selectedFoodItem?.foodId == null) return;
@@ -281,10 +505,12 @@ class RestaurantDetailViewController extends GetxController {
     final currentQty = bsCustomizationQuantity[customizationId] ?? 0;
     bsCustomizationQuantity[customizationId] = currentQty + 1;
 
-    debugPrint('➕ Customization increased: $customizationId = ${bsCustomizationQuantity[customizationId]}');
+    debugPrint('📌 Customization qty increased to ${bsCustomizationQuantity[customizationId]}');
+
     update(['customization_widget', 'bottom_sheet_content', 'total_price']);
   }
 
+  // ✅ SCENARIO 3 & 4: Decrease customization
   void decreaseCustomization(String customizationId) {
     if (selectedFoodItem?.foodId == null) return;
 
@@ -293,36 +519,14 @@ class RestaurantDetailViewController extends GetxController {
     if (currentQty > 0) {
       bsCustomizationQuantity[customizationId] = currentQty - 1;
 
-      if (bsCustomizationQuantity[customizationId] == 0) {
-        bsCustomizationQuantity.remove(customizationId);
-      }
+      debugPrint('📌 Customization qty decreased to ${bsCustomizationQuantity[customizationId]}');
 
-      debugPrint('➖ Customization decreased: $customizationId = ${bsCustomizationQuantity[customizationId] ?? 0}');
+      // ❌ DON'T clear add-ons when customizations reach 0
+      // We need them for the API request when removing the item
+      // The backend needs the complete structure including add-ons
+      // Only clear after API response succeeds
 
-      // Auto-close if last customization removed (Scenario C with edit mode)
-      if (bsCustomizationQuantity.isEmpty) {
-        debugPrint('🔴 Last customization removed in edit mode, removing from cart and closing sheet');
-
-        final foodId = selectedFoodItem!.foodId!;
-
-        // Remove from cart if in edit mode
-        if (isEditMode) {
-          cartCustomizationQuantity.remove(foodId);
-          cartAddOnQuantity.remove(foodId);
-          debugPrint('🗑️ Removed item ${selectedFoodItem!.foodName} from cart');
-        }
-
-        Get.back();
-        resetBottomSheetState();
-
-        // Trigger UI update for food grid (to change edit icon back to add button)
-        // and bottom cart bar (to update or hide if no items)
-        update(['food_grid', 'bottom_cart_bar']);
-
-        return;
-      }
-
-      update(['customization_widget', 'bottom_sheet_content', 'total_price']);
+      update(['customization_widget', 'addons_list', 'bottom_sheet_content', 'total_price']);
     }
   }
 
@@ -330,15 +534,16 @@ class RestaurantDetailViewController extends GetxController {
     return bsCustomizationQuantity[customizationId] ?? 0;
   }
 
+  // ✅ UPDATED: Only count non-zero quantities
   int getTotalCustomizationQuantity() {
     int total = 0;
     bsCustomizationQuantity.forEach((_, qty) {
-      total += qty;
+      if (qty > 0) {
+        total += qty;
+      }
     });
     return total;
   }
-
-  // ==================== ADD-ON MANAGEMENT (BOTTOM SHEET) ====================
 
   void toggleAddOn(String addOnId) {
     if (selectedFoodItem?.foodId == null) return;
@@ -346,7 +551,8 @@ class RestaurantDetailViewController extends GetxController {
     final currentQty = bsAddOnQuantity[addOnId] ?? 0;
     bsAddOnQuantity[addOnId] = currentQty + 1;
 
-    debugPrint('➕ Add-on increased: $addOnId = ${bsAddOnQuantity[addOnId]}');
+    debugPrint('🧂 Add-on qty increased to ${bsAddOnQuantity[addOnId]}');
+
     update(['addons_list', 'bottom_sheet_content', 'total_price']);
   }
 
@@ -358,11 +564,8 @@ class RestaurantDetailViewController extends GetxController {
     if (currentQty > 0) {
       bsAddOnQuantity[addOnId] = currentQty - 1;
 
-      if (bsAddOnQuantity[addOnId] == 0) {
-        bsAddOnQuantity.remove(addOnId);
-      }
+      debugPrint('🧂 Add-on qty decreased to ${bsAddOnQuantity[addOnId]}');
 
-      debugPrint('➖ Add-on decreased: $addOnId = ${bsAddOnQuantity[addOnId] ?? 0}');
       update(['addons_list', 'bottom_sheet_content', 'total_price']);
     }
   }
@@ -371,36 +574,386 @@ class RestaurantDetailViewController extends GetxController {
     return bsAddOnQuantity[addOnId] ?? 0;
   }
 
-  // ==================== FOOD WIDGET QUANTITY (NO CUSTOMIZATIONS) ====================
-
-  void increaseFoodQuantity(String foodId) {
+  // SCENARIO 1: Quantity change with debouncer
+  void increaseScenario1Quantity(String foodId) {
     final currentQty = cartFoodQuantity[foodId] ?? 0;
     cartFoodQuantity[foodId] = currentQty + 1;
 
-    debugPrint('➕ Food quantity increased: $foodId = ${cartFoodQuantity[foodId]}');
     update(['food_grid', 'bottom_cart_bar']);
+
+    _debouncedUpdateQuantity(foodId, cartFoodQuantity[foodId]!);
   }
 
-  void decreaseFoodQuantity(String foodId) {
+  void decreaseScenario1Quantity(String foodId) {
     final currentQty = cartFoodQuantity[foodId] ?? 0;
 
-    if (currentQty > 0) {
+    if (currentQty > 1) {
       cartFoodQuantity[foodId] = currentQty - 1;
-
-      if (cartFoodQuantity[foodId] == 0) {
-        cartFoodQuantity.remove(foodId);
-      }
-
-      debugPrint('➖ Food quantity decreased: $foodId = ${cartFoodQuantity[foodId] ?? 0}');
       update(['food_grid', 'bottom_cart_bar']);
+      _debouncedUpdateQuantity(foodId, cartFoodQuantity[foodId]!);
+    } else if (currentQty == 1) {
+      // ✅ IMMEDIATE: API call when reaching 0
+      debugPrint('🍕 Scenario 1: Quantity reached 0 - making immediate API call for removal');
+      cartFoodQuantity.remove(foodId);
+      update(['food_grid', 'bottom_cart_bar']);
+      _callScenario1UpdateQuantityApi(foodId, 0);
     }
   }
 
-  int getFoodQuantity(String foodId) {
-    return cartFoodQuantity[foodId] ?? 0;
+  void _debouncedUpdateQuantity(String foodId, int quantity) {
+    _quantityDebounceTimer?.cancel();
+    _quantityDebounceTimer = Timer(_debounceDuration, () {
+      _callScenario1UpdateQuantityApi(foodId, quantity);
+    });
   }
 
-  // ==================== PRICE CALCULATIONS ====================
+  // SCENARIO 1: API call for quantity update
+  Future<void> _callScenario1UpdateQuantityApi(String foodId, int quantity) async {
+    try {
+      debugPrint('🔄 Scenario 1: Updating quantity via API - foodId: $foodId, qty: $quantity');
+
+      final requestBody = {
+        'foodId': foodId,
+        'quantity': quantity,
+        'serviceType': _getCleanServiceType(Store.deliveryPreference),
+      };
+
+      final response = await _apiClient.post(endpoint: Urls.addOrUpdateCartUrl, data: requestBody);
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true && response['data'] != null) {
+          final cartData = response['data'];
+          _updateCartFromApiResponse(cartData);
+          debugPrint('✅ Scenario 1: Quantity updated successfully');
+          update(['food_grid', 'bottom_cart_bar']);
+        } else {
+          // ✅ ERROR: Revert UI change
+          debugPrint('❌ Scenario 1: API Error - ${response['message']}');
+          _revertScenario1Change(foodId);
+          Get.snackbar('Error', response['message'] ?? 'Failed to update quantity');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Scenario 1: Exception while updating quantity: $e');
+      _revertScenario1Change(foodId);
+      Get.snackbar('Error', 'Failed to update quantity');
+    }
+  }
+
+  // ✅ NEW: Revert Scenario 1 UI changes on API failure
+  void _revertScenario1Change(String foodId) {
+    // Revert from API response (source of truth)
+    cartFoodQuantity.clear();
+    cartAddOnQuantity.clear();
+
+    for (var item in cartItems) {
+      final id = item['foodId'] ?? '';
+      if (id.isNotEmpty) {
+        cartFoodQuantity[id] = item['quantity'] ?? 0;
+
+        if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
+          cartAddOnQuantity[id] = {};
+          for (var addOn in item['addOns'] as List) {
+            cartAddOnQuantity[id]![addOn['addOnId']] = addOn['quantity'] ?? 0;
+          }
+        }
+      }
+    }
+
+    update(['food_grid', 'bottom_cart_bar']);
+  }
+
+  // SCENARIO 2-4: Add/Update item to cart via API
+  Future<void> addOrUpdateItemToCart() async {
+    if (selectedFoodItem?.foodId == null) return;
+
+    try {
+      final foodId = selectedFoodItem!.foodId!;
+      final hasCustomizations = _isScenario3And4(selectedFoodItem!);
+
+      debugPrint('🚀 Adding/Updating item to cart - Mode: ${isEditMode ? "EDIT" : "ADD"}');
+
+      // ✅ NEW: For EDIT mode with qty 0 in Scenario 2
+      if (isEditMode && !hasCustomizations && getBottomSheetItemQuantity() == 0) {
+        debugPrint('🍔 Scenario 2 EDIT: Food qty is 0 - calling remove API');
+        await _callRemoveItemWithQtyZero(foodId);
+        return;
+      }
+
+      // ✅ NEW: For EDIT mode with customization qty 0 in Scenario 3 & 4
+      if (isEditMode && hasCustomizations && getTotalCustomizationQuantity() == 0) {
+        debugPrint('📌 Scenario 3/4 EDIT: Customization qty is 0 - calling remove API');
+        await _callRemoveItemWithQtyZero(foodId);
+        return;
+      }
+
+      // Build request body based on scenario
+      final requestBody = _buildAddToCartRequestBody();
+
+      if (requestBody == null) {
+        debugPrint('❌ Error: Could not build request body');
+        return;
+      }
+
+      debugPrint('📤 API Request: ${jsonEncode(requestBody)}');
+
+      final response = await _apiClient.post(endpoint: Urls.addOrUpdateCartUrl, data: requestBody);
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true && response['data'] != null) {
+          final cartData = response['data'];
+          _updateCartFromApiResponse(cartData);
+
+          debugPrint('✅ Item ${isEditMode ? "updated" : "added"} successfully');
+
+          // ✅ FIXED: Use Navigator.pop instead of Get.back to avoid snackbar controller issues
+          resetBottomSheetState();
+          Navigator.pop(Get.context!);
+
+          update(['food_grid', 'bottom_cart_bar']);
+        } else {
+          // ✅ FIXED: Show error BEFORE closing sheet to avoid overlay error
+          debugPrint('❌ API Error: ${response['message']}');
+          Get.snackbar('Error', response['message'] ?? 'Failed to add item to cart');
+          // Don't close sheet on error - let user retry or dismiss manually
+        }
+      }
+    } catch (e) {
+      // ✅ FIXED: Show error BEFORE closing sheet to avoid overlay error
+      debugPrint('❌ Exception while adding item: $e');
+      Get.snackbar('Error', 'Failed to add item to cart');
+      // Don't close sheet on error - let user retry or dismiss manually
+    }
+  }
+
+  // ✅ NEW: Remove item API call when quantity is 0
+  Future<void> _callRemoveItemWithQtyZero(String foodId) async {
+    try {
+      debugPrint('🗑️ Removing item (qty=0) - foodId: $foodId');
+
+      final requestBody = _buildRemoveItemRequestBody(foodId);
+
+      debugPrint('📤 Remove API Request: ${jsonEncode(requestBody)}');
+
+      final response = await _apiClient.post(endpoint: Urls.addOrUpdateCartUrl, data: requestBody);
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true && response['data'] != null) {
+          final cartData = response['data'];
+          _updateCartFromApiResponse(cartData);
+
+          debugPrint('✅ Item removed successfully (qty=0)');
+
+          // ✅ FIXED: Use Navigator.pop instead of Get.back
+          resetBottomSheetState();
+          Navigator.pop(Get.context!);
+
+          update(['food_grid', 'bottom_cart_bar']);
+        } else {
+          // ✅ FIXED: Show error using safe method that checks context
+          debugPrint('❌ API Error: ${response['message']}');
+          _showSafeSnackbar('Error', response['message'] ?? 'Failed to remove item');
+          // Don't close sheet on error - let user retry
+        }
+      }
+    } catch (e) {
+      // ✅ FIXED: Show error using safe method
+      debugPrint('❌ Exception while removing item: $e');
+      _showSafeSnackbar('Error', 'Failed to remove item');
+      // Don't close sheet on error - let user retry
+    }
+  }
+
+  // ✅ NEW: Safe snackbar method that avoids overlay errors
+  void _showSafeSnackbar(String title, String message) {
+    try {
+      // Try using GetX snackbar first (works when context is valid)
+      if (Get.context != null && ModalRoute.of(Get.context!) != null) {
+        Get.snackbar(title, message);
+      } else {
+        // Fallback: Use debugPrint if context is invalid
+        debugPrint('⚠️ Snackbar skipped (invalid context): $title - $message');
+      }
+    } catch (e) {
+      // Final fallback: Just log the error
+      debugPrint('⚠️ Snackbar error (fallback): $title - $message');
+      debugPrint('Error details: $e');
+    }
+  }
+
+  // ✅ NEW: Build request body for removing item with all associated customizations/add-ons
+  Map<String, dynamic> _buildRemoveItemRequestBody(String foodId) {
+    final serviceType = _getCleanServiceType(Store.deliveryPreference);
+
+    // ✅ FIXED: For customization scenarios, ALWAYS send quantity=1
+    // For food-only scenarios, send quantity=0
+    final hasCustomizations = bsCustomizationQuantity.isNotEmpty;
+    final foodQuantity = hasCustomizations ? 1 : 0;
+
+    final requestBody = {'foodId': foodId, 'quantity': foodQuantity, 'serviceType': serviceType};
+
+    if (!hasCustomizations) {
+      // Scenario 2: Include all add-ons (even with 0 quantity)
+      if (bsAddOnQuantity.isNotEmpty) {
+        final addOnsToSend = bsAddOnQuantity.entries.map((e) => {'addOnId': e.key, 'quantity': e.value}).toList();
+
+        if (addOnsToSend.isNotEmpty) {
+          requestBody['addOns'] = addOnsToSend;
+          debugPrint('📤 Remove (Scenario 2): Including ${addOnsToSend.length} add-ons');
+        }
+      }
+    } else {
+      // Scenario 3 & 4: Include all customizations and add-ons (even with 0 quantity)
+      if (bsCustomizationQuantity.isNotEmpty) {
+        final customizationsToSend =
+            bsCustomizationQuantity.entries.map((e) => {'customizationId': e.key, 'quantity': e.value}).toList();
+
+        if (customizationsToSend.isNotEmpty) {
+          requestBody['customizations'] = customizationsToSend;
+          debugPrint('📤 Remove (Scenario 3/4): Including ${customizationsToSend.length} customizations');
+        }
+      }
+
+      if (bsAddOnQuantity.isNotEmpty) {
+        final addOnsToSend = bsAddOnQuantity.entries.map((e) => {'addOnId': e.key, 'quantity': e.value}).toList();
+
+        if (addOnsToSend.isNotEmpty) {
+          requestBody['addOns'] = addOnsToSend;
+          debugPrint('📤 Remove (Scenario 3/4): Including ${addOnsToSend.length} add-ons');
+        }
+      }
+    }
+
+    return requestBody;
+  }
+
+  // Update cart state from API response
+  void _updateCartFromApiResponse(Map<String, dynamic> cartData) {
+    try {
+      // Store the API response as source of truth
+      lastCartItemResponse = cartData;
+
+      // Extract items from response
+      if (cartData['items'] != null) {
+        cartItems = List<Map<String, dynamic>>.from(cartData['items']);
+        debugPrint('📊 Cart updated: ${cartItems.length} items');
+      }
+
+      // Update local maps from API response (for consistency)
+      cartFoodQuantity.clear();
+      cartCustomizationQuantity.clear();
+      cartAddOnQuantity.clear();
+
+      for (var item in cartItems) {
+        final foodId = item['foodId'] ?? '';
+        if (foodId.isEmpty) continue;
+
+        // Check if item has customizations
+        final hasCustomizations = item['customizations'] != null && (item['customizations'] as List).isNotEmpty;
+
+        if (!hasCustomizations) {
+          // Scenario 1 & 2
+          cartFoodQuantity[foodId] = item['quantity'] ?? 1;
+
+          if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
+            cartAddOnQuantity[foodId] = {};
+            for (var addOn in item['addOns'] as List) {
+              cartAddOnQuantity[foodId]![addOn['addOnId']] = addOn['quantity'] ?? 0;
+            }
+          }
+        } else {
+          // Scenario 3 & 4
+          cartCustomizationQuantity[foodId] = {};
+          for (var custom in item['customizations'] as List) {
+            cartCustomizationQuantity[foodId]![custom['customizationId']] = custom['quantity'] ?? 0;
+          }
+
+          if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
+            cartAddOnQuantity[foodId] = {};
+            for (var addOn in item['addOns'] as List) {
+              cartAddOnQuantity[foodId]![addOn['addOnId']] = addOn['quantity'] ?? 0;
+            }
+          }
+        }
+      }
+
+      debugPrint('✅ Local maps synchronized with API response');
+    } catch (e) {
+      debugPrint('❌ Error updating cart from API response: $e');
+    }
+  }
+
+  // ✅ UPDATED: Build request body for add/update cart API
+  // In ADD mode: Only send items with quantity > 0
+  // In EDIT mode: Send ALL items (including zeros) to maintain backend consistency
+  Map<String, dynamic>? _buildAddToCartRequestBody() {
+    if (selectedFoodItem?.foodId == null) return null;
+
+    final foodId = selectedFoodItem!.foodId!;
+    final serviceType = _getCleanServiceType(Store.deliveryPreference);
+    final hasCustomizations = _isScenario3And4(selectedFoodItem!);
+
+    if (!hasCustomizations) {
+      // Scenario 1 & 2: Food + optional add-ons
+      final quantity = getBottomSheetItemQuantity();
+      final requestBody = {'foodId': foodId, 'quantity': quantity, 'serviceType': serviceType};
+
+      // ✅ UPDATED: In EDIT mode, send ALL add-ons (including those with 0 quantity)
+      // In ADD mode, send only add-ons with quantity > 0
+      if (bsAddOnQuantity.isNotEmpty) {
+        final addOnsToSend =
+            isEditMode
+                ? bsAddOnQuantity.entries.map((e) => {'addOnId': e.key, 'quantity': e.value}).toList()
+                : bsAddOnQuantity.entries
+                    .where((e) => e.value > 0)
+                    .map((e) => {'addOnId': e.key, 'quantity': e.value})
+                    .toList();
+
+        if (addOnsToSend.isNotEmpty) {
+          requestBody['addOns'] = addOnsToSend;
+        }
+      }
+
+      return requestBody;
+    } else {
+      // Scenario 3 & 4: Customizations + optional add-ons
+      final requestBody = {'foodId': foodId, 'quantity': 1, 'serviceType': serviceType};
+
+      // ✅ UPDATED: In EDIT mode, send ALL customizations (including those with 0 quantity)
+      // In ADD mode, send only customizations with quantity > 0
+      if (bsCustomizationQuantity.isNotEmpty) {
+        final customizationsToSend =
+            isEditMode
+                ? bsCustomizationQuantity.entries.map((e) => {'customizationId': e.key, 'quantity': e.value}).toList()
+                : bsCustomizationQuantity.entries
+                    .where((e) => e.value > 0)
+                    .map((e) => {'customizationId': e.key, 'quantity': e.value})
+                    .toList();
+
+        if (customizationsToSend.isNotEmpty) {
+          requestBody['customizations'] = customizationsToSend;
+        }
+      }
+
+      // ✅ UPDATED: In EDIT mode, send ALL add-ons (including those with 0 quantity)
+      // In ADD mode, send only add-ons with quantity > 0
+      if (bsAddOnQuantity.isNotEmpty) {
+        final addOnsToSend =
+            isEditMode
+                ? bsAddOnQuantity.entries.map((e) => {'addOnId': e.key, 'quantity': e.value}).toList()
+                : bsAddOnQuantity.entries
+                    .where((e) => e.value > 0)
+                    .map((e) => {'addOnId': e.key, 'quantity': e.value})
+                    .toList();
+
+        if (addOnsToSend.isNotEmpty) {
+          requestBody['addOns'] = addOnsToSend;
+        }
+      }
+
+      return requestBody;
+    }
+  }
 
   double getBasePrice() {
     if (selectedFoodItem == null) return 0;
@@ -410,9 +963,11 @@ class RestaurantDetailViewController extends GetxController {
   double getAddOnsPrice() {
     double total = 0;
     bsAddOnQuantity.forEach((addOnId, qty) {
-      final addOn = selectedFoodItem?.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
-      if (addOn != null && addOn.addOnId != null) {
-        total += (addOn.price ?? 0).toDouble() * qty;
+      if (qty > 0) {
+        final addOn = selectedFoodItem?.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
+        if (addOn != null && addOn.addOnId != null) {
+          total += (addOn.price ?? 0).toDouble() * qty;
+        }
       }
     });
     return total;
@@ -421,207 +976,60 @@ class RestaurantDetailViewController extends GetxController {
   double getCustomizationPrice() {
     double total = 0;
     bsCustomizationQuantity.forEach((customId, qty) {
-      final customization = selectedFoodItem?.customizations?.firstWhere(
-        (c) => c.customizationId == customId,
-        orElse: () => Customization(),
-      );
-      if (customization != null && customization.customizationId != null) {
-        total += (customization.price ?? 0).toDouble() * qty;
+      if (qty > 0) {
+        final customization = selectedFoodItem?.customizations?.firstWhere(
+          (c) => c.customizationId == customId,
+          orElse: () => Customization(),
+        );
+        if (customization != null && customization.customizationId != null) {
+          total += (customization.price ?? 0).toDouble() * qty;
+        }
       }
     });
     return total;
   }
 
-  /// Calculate total price for bottom sheet button
+  // ✅ FIXED: Calculate total price for bottom sheet
+  // Customization scenario: customizationPrice + addOnsPrice (NO base price multiplication)
+  // Food scenario: (basePrice * qty) + addOnsPrice
   double getTotalBottomSheetPrice() {
     final basePrice = getBasePrice();
     final addOnsPrice = getAddOnsPrice();
     final customizationPrice = getCustomizationPrice();
 
-    // If has customizations, use total customization quantity as multiplier
     if (selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty) {
+      // ✅ CUSTOMIZATION SCENARIO: Only customizations + addOns
+      // DO NOT multiply basePrice - customization prices already include base food
       int customQtyTotal = getTotalCustomizationQuantity();
       if (customQtyTotal == 0) return 0;
-      return (basePrice * customQtyTotal) + addOnsPrice;
+      return customizationPrice + addOnsPrice;
     }
 
-    // For items without customizations (Scenario A), multiply by item quantity
+    // ✅ FOOD SCENARIO (1 & 2): Food + optional add-ons
     final itemQty = getBottomSheetItemQuantity();
     return (basePrice * itemQty) + addOnsPrice;
   }
 
-  // ==================== ADD TO CART / UPDATE CART (FROM BOTTOM SHEET) ====================
-
-  void addItemToCart() {
-    if (selectedFoodItem?.foodId == null) return;
-
-    final foodId = selectedFoodItem!.foodId!;
-    final hasCustomizations = selectedFoodItem?.customizations != null && selectedFoodItem!.customizations!.isNotEmpty;
-
-    if (hasCustomizations) {
-      // For items with customizations: store customization and add-on quantities
-      int customQtyTotal = getTotalCustomizationQuantity();
-      if (customQtyTotal == 0) return; // Don't add if no customization selected
-
-      if (isEditMode) {
-        // EDIT MODE: Replace existing customizations and add-ons
-        cartCustomizationQuantity[foodId] = Map.from(bsCustomizationQuantity);
-        if (bsAddOnQuantity.isNotEmpty) {
-          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
-        } else {
-          cartAddOnQuantity.remove(foodId);
-        }
-
-        debugPrint('''
-═══════════════════════════════════════════
-✏️ UPDATE CART (WITH CUSTOMIZATIONS)
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Customizations: $bsCustomizationQuantity
-🎁 Add-ons: $bsAddOnQuantity
-💵 Total Price: ₹${getTotalBottomSheetPrice()}
-═══════════════════════════════════════════
-        ''');
-      } else {
-        // ADD MODE: Add new item with customizations
-        cartCustomizationQuantity[foodId] = Map.from(bsCustomizationQuantity);
-        if (bsAddOnQuantity.isNotEmpty) {
-          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
-        }
-
-        debugPrint('''
-═══════════════════════════════════════════
-📦 ADD TO CART (WITH CUSTOMIZATIONS)
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Customizations: $bsCustomizationQuantity
-🎁 Add-ons: $bsAddOnQuantity
-💵 Total Price: ₹${getTotalBottomSheetPrice()}
-═══════════════════════════════════════════
-        ''');
-      }
-    } else {
-      // For items without customizations (Scenario A)
-      final itemQty = getBottomSheetItemQuantity();
-
-      if (isEditMode) {
-        // EDIT MODE: Replace quantity and add-ons
-        cartFoodQuantity[foodId] = itemQty;
-        if (bsAddOnQuantity.isNotEmpty) {
-          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
-        } else {
-          cartAddOnQuantity.remove(foodId);
-        }
-
-        debugPrint('''
-═══════════════════════════════════════════
-✏️ UPDATE CART (WITHOUT CUSTOMIZATIONS)
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Quantity: ${cartFoodQuantity[foodId]}
-🎁 Add-ons: $bsAddOnQuantity
-💵 Total Price: ₹${getTotalBottomSheetPrice()}
-═══════════════════════════════════════════
-        ''');
-      } else {
-        // ADD MODE: Add to existing quantity
-        final currentQty = cartFoodQuantity[foodId] ?? 0;
-        cartFoodQuantity[foodId] = currentQty + itemQty;
-
-        if (bsAddOnQuantity.isNotEmpty) {
-          cartAddOnQuantity[foodId] = Map.from(bsAddOnQuantity);
-        }
-
-        debugPrint('''
-═══════════════════════════════════════════
-📦 ADD TO CART (WITHOUT CUSTOMIZATIONS)
-═══════════════════════════════════════════
-🍔 Food: ${selectedFoodItem!.foodName}
-🆔 Food ID: $foodId
-📊 Quantity: ${cartFoodQuantity[foodId]}
-🎁 Add-ons: $bsAddOnQuantity
-💵 Total Price: ₹${getTotalBottomSheetPrice()}
-═══════════════════════════════════════════
-        ''');
-      }
-    }
-
-    // Close bottom sheet and reset state
-    Get.back();
-    resetBottomSheetState();
-
-    // Update UI
-    update(['food_grid', 'bottom_cart_bar']);
-  }
-
-  // ==================== CART SUMMARY ====================
-
   int getTotalCartItemCount() {
-    int total = 0;
-
-    // Count food items without customizations
-    cartFoodQuantity.forEach((_, qty) {
-      total += qty;
-    });
-
-    // Count customization items
-    cartCustomizationQuantity.forEach((_, customMap) {
-      customMap.forEach((_, qty) {
-        total += qty;
-      });
-    });
-
-    return total;
+    try {
+      if (lastCartItemResponse != null && lastCartItemResponse!['totals'] != null) {
+        return lastCartItemResponse!['totals']['itemCount'] ?? 0;
+      }
+    } catch (e) {
+      debugPrint('Error getting item count: $e');
+    }
+    return 0;
   }
 
   double getTotalCartPrice() {
-    double total = 0;
-
-    // Price from food without customizations + their add-ons
-    cartFoodQuantity.forEach((foodId, qty) {
-      final food = _getFoodById(foodId);
-      if (food != null) {
-        final basePrice = (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
-        total += basePrice * qty;
-
-        // Add add-on prices for this food
-        if (cartAddOnQuantity.containsKey(foodId)) {
-          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
-            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
-            if (addOn != null && addOn.addOnId != null) {
-              total += (addOn.price ?? 0).toDouble() * addOnQty;
-            }
-          });
-        }
+    try {
+      if (lastCartItemResponse != null && lastCartItemResponse!['totals'] != null) {
+        return (lastCartItemResponse!['totals']['grandTotal'] ?? 0).toDouble();
       }
-    });
-
-    // Price from customized items
-    cartCustomizationQuantity.forEach((foodId, customMap) {
-      final food = _getFoodById(foodId);
-      if (food != null) {
-        final basePrice = (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
-
-        customMap.forEach((customId, customQty) {
-          total += basePrice * customQty;
-        });
-
-        // Add add-on prices for this customized food
-        if (cartAddOnQuantity.containsKey(foodId)) {
-          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
-            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
-            if (addOn != null && addOn.addOnId != null) {
-              total += (addOn.price ?? 0).toDouble() * addOnQty;
-            }
-          });
-        }
-      }
-    });
-
-    return total;
+    } catch (e) {
+      debugPrint('Error getting total price: $e');
+    }
+    return 0;
   }
 
   Food? _getFoodById(String foodId) {
@@ -636,9 +1044,8 @@ class RestaurantDetailViewController extends GetxController {
 
   bool get hasCartItems => getTotalCartItemCount() > 0;
 
-  // ==================== GETTERS ====================
-
   String get selectedCategoryName => selectedCategoryIndex < categories.length ? categories[selectedCategoryIndex] : '';
+
   int get foodItemsCount => getFilteredFoodItems().length;
 
   bool get hasCustomizations =>
@@ -653,201 +1060,23 @@ class RestaurantDetailViewController extends GetxController {
     return true;
   }
 
-  /// Check if food item is in cart
   bool isFoodInCart(String foodId) {
-    return cartFoodQuantity.containsKey(foodId) || cartCustomizationQuantity.containsKey(foodId);
+    return _isItemInCart(foodId);
   }
 
-  /// Get button text based on edit mode
   String getBottomSheetButtonText() {
     return isEditMode ? 'Edit Item' : 'Add Item';
   }
 
-  // ==================== CART LOGGING METHODS ====================
+  // Get cart display info for BottomCartBar
+  Map<String, dynamic>? getCartDisplayInfo() {
+    if (lastCartItemResponse == null) return null;
 
-  /// Get complete cart details with food items, customizations, and add-ons
-  Map<String, dynamic> getCartDetails() {
-    final cartDetails = <String, dynamic>{};
-
-    // Items without customizations
-    cartDetails['items_without_customizations'] = [];
-    cartFoodQuantity.forEach((foodId, qty) {
-      final food = _getFoodById(foodId);
-      if (food != null) {
-        final addOnsList = <Map<String, dynamic>>[];
-
-        final itemData = {
-          'foodId': foodId,
-          'foodName': food.foodName,
-          'quantity': qty,
-          'basePrice': (food.discountPrice ?? food.foodPrice ?? 0),
-          'totalPrice': (food.discountPrice ?? food.foodPrice ?? 0) * qty,
-          'addOns': addOnsList,
-        };
-
-        // Add add-ons for this food if any
-        if (cartAddOnQuantity.containsKey(foodId)) {
-          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
-            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
-            if (addOn != null && addOn.addOnId != null) {
-              addOnsList.add({
-                'addOnId': addOnId,
-                'addOnName': addOn.name,
-                'quantity': addOnQty,
-                'price': addOn.price,
-                'totalPrice': (addOn.price ?? 0) * addOnQty,
-              });
-            }
-          });
-        }
-
-        (cartDetails['items_without_customizations'] as List).add(itemData);
-      }
-    });
-
-    // Items with customizations
-    cartDetails['items_with_customizations'] = [];
-    cartCustomizationQuantity.forEach((foodId, customMap) {
-      final food = _getFoodById(foodId);
-      if (food != null) {
-        final customizationsList = <Map<String, dynamic>>[];
-        final addOnsList = <Map<String, dynamic>>[];
-
-        customMap.forEach((customId, customQty) {
-          final customization = food.customizations?.firstWhere(
-            (c) => c.customizationId == customId,
-            orElse: () => Customization(),
-          );
-          if (customization != null && customization.customizationId != null) {
-            customizationsList.add({
-              'customizationId': customId,
-              'customizationName': customization.name,
-              'quantity': customQty,
-              'price': customization.price,
-              'totalPrice': (customization.price ?? 0) * customQty,
-            });
-          }
-        });
-
-        final itemData = {
-          'foodId': foodId,
-          'foodName': food.foodName,
-          'basePrice': (food.discountPrice ?? food.foodPrice ?? 0),
-          'customizations': customizationsList,
-          'addOns': addOnsList,
-        };
-
-        // Calculate total price for customized items
-        double totalCustomizationQuantity = 0;
-        customMap.forEach((_, customQty) {
-          totalCustomizationQuantity += customQty;
-        });
-        itemData['totalCustomizationQuantity'] = totalCustomizationQuantity.toInt();
-        itemData['totalPrice'] = ((food.discountPrice ?? food.foodPrice ?? 0) * totalCustomizationQuantity);
-
-        // Add add-ons for this customized food if any
-        if (cartAddOnQuantity.containsKey(foodId)) {
-          cartAddOnQuantity[foodId]!.forEach((addOnId, addOnQty) {
-            final addOn = food.addOns?.firstWhere((a) => a.addOnId == addOnId, orElse: () => AddOn());
-            if (addOn != null && addOn.addOnId != null) {
-              addOnsList.add({
-                'addOnId': addOnId,
-                'addOnName': addOn.name,
-                'quantity': addOnQty,
-                'price': addOn.price,
-                'totalPrice': (addOn.price ?? 0) * addOnQty,
-              });
-            }
-          });
-        }
-
-        (cartDetails['items_with_customizations'] as List).add(itemData);
-      }
-    });
-
-    cartDetails['total_items'] = getTotalCartItemCount();
-    cartDetails['total_price'] = getTotalCartPrice();
-
-    return cartDetails;
-  }
-
-  /// Log cart details in a formatted way
-  void logCartDetails() {
-    final cartData = getCartDetails();
-
-    debugPrint('''
-╔════════════════════════════════════════════════════════════════════════════╗
-║                          🛒 COMPLETE CART DETAILS                          ║
-╚════════════════════════════════════════════════════════════════════════════╝
-    ''');
-
-    // Log items without customizations
-    if ((cartData['items_without_customizations'] as List).isNotEmpty) {
-      debugPrint('📦 ITEMS WITHOUT CUSTOMIZATIONS:');
-      debugPrint('─────────────────────────────────────────────────────────────────────────────');
-      for (var item in cartData['items_without_customizations'] as List) {
-        debugPrint('  🍔 ${item['foodName']}');
-        debugPrint('     └─ Food ID: ${item['foodId']}');
-        debugPrint('     └─ Quantity: ${item['quantity']}');
-        debugPrint('     └─ Base Price: ₹${item['basePrice']}');
-        debugPrint('     └─ Item Total: ₹${item['totalPrice']}');
-
-        if ((item['addOns'] as List).isNotEmpty) {
-          debugPrint('     └─ Add-ons:');
-          for (var addOn in item['addOns'] as List) {
-            debugPrint('        ├─ ${addOn['addOnName']} (Qty: ${addOn['quantity']}) - ₹${addOn['totalPrice']}');
-          }
-        }
-        debugPrint('');
-      }
-    }
-
-    // Log items with customizations
-    if ((cartData['items_with_customizations'] as List).isNotEmpty) {
-      debugPrint('🎨 ITEMS WITH CUSTOMIZATIONS:');
-      debugPrint('─────────────────────────────────────────────────────────────────────────────');
-      for (var item in cartData['items_with_customizations'] as List) {
-        debugPrint('  🍔 ${item['foodName']}');
-        debugPrint('     └─ Food ID: ${item['foodId']}');
-        debugPrint('     └─ Base Price: ₹${item['basePrice']}');
-        debugPrint('     └─ Total Customization Quantity: ${item['totalCustomizationQuantity']}');
-        debugPrint('     └─ Customizations:');
-
-        for (var custom in item['customizations'] as List) {
-          debugPrint(
-            '        ├─ ${custom['customizationName']} (Qty: ${custom['quantity']}) - ₹${custom['totalPrice']}',
-          );
-        }
-
-        if ((item['addOns'] as List).isNotEmpty) {
-          debugPrint('     └─ Add-ons:');
-          for (var addOn in item['addOns'] as List) {
-            debugPrint('        ├─ ${addOn['addOnName']} (Qty: ${addOn['quantity']}) - ₹${addOn['totalPrice']}');
-          }
-        }
-
-        debugPrint('     └─ Item Total: ₹${item['totalPrice']}');
-        debugPrint('');
-      }
-    }
-
-    debugPrint('╔════════════════════════════════════════════════════════════════════════════╗');
-    debugPrint('║ 📊 CART SUMMARY                                                            ║');
-    debugPrint('╠════════════════════════════════════════════════════════════════════════════╣');
-    debugPrint(
-      '║ Total Items: ${cartData['total_items']}                                                              ║',
-    );
-    debugPrint(
-      '║ Total Price: ₹${cartData['total_price']}                                                            ║',
-    );
-    debugPrint(
-      '╚════════════════════════════════════════════════════════════════════════════╝'
-      '',
-    );
-  }
-
-  /// Alternative: Get cart as JSON (for API calls)
-  String getCartDetailsAsJson() {
-    return jsonEncode(getCartDetails());
+    return {
+      'itemCount': getTotalCartItemCount(),
+      'totalPrice': getTotalCartPrice(),
+      'items': cartItems,
+      'totals': lastCartItemResponse!['totals'],
+    };
   }
 }

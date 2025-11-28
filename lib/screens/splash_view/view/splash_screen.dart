@@ -1,5 +1,3 @@
-import 'dart:developer';
-
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -25,7 +23,6 @@ class _SplashScreenState extends State<SplashScreen> {
   void _navigateToLoginScreen() {
     Future.delayed(const Duration(seconds: 2), () {
       final showedOnboarding = Store.showedOnBoarding == 'true';
-      log('showedOnboarding $showedOnboarding');
       final hasToken = Store.userToken.isNotEmpty;
       final isRegistered = Store.status == 'registered';
 

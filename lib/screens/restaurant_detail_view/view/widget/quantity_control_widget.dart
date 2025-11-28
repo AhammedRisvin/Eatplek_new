@@ -28,6 +28,28 @@ class QuantityControlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAddMode = addButtonText != null && quantity == 0;
+
+    // ✅ When showing "Add" button, expand to full width
+    if (isAddMode) {
+      return Container(
+        margin: margin,
+        width: double.infinity,
+        child: GestureDetector(
+          onTap: onIncrease,
+          child: Container(
+            width: double.infinity,
+            height: buttonSize + 8, // Slightly taller for full button appearance
+            decoration: BoxDecoration(color: AppColor.appPrimary, borderRadius: BorderRadius.circular(100)),
+            child: Center(
+              child: text(text: addButtonText!, color: AppColor.white, size: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ✅ When showing quantity control, use compact size (min width)
     return Container(
       margin: margin,
       child: Row(
@@ -62,25 +84,17 @@ class QuantityControlWidget extends StatelessWidget {
             5.w,
           ],
 
-          // Add/Increase button
-          GestureDetector(
-            onTap: onIncrease,
-            child: Container(
-              width: addButtonText != null && quantity == 0 ? null : buttonSize,
-              height: addButtonText != null && quantity == 0 ? null : buttonSize,
-              padding: addButtonText != null && quantity == 0 ? EdgeInsets.symmetric(horizontal: 8, vertical: 6) : null,
-              decoration: BoxDecoration(
-                color: AppColor.appPrimary,
-                borderRadius: BorderRadius.circular(
-                  addButtonText != null && quantity == 0 ? 20 : (showRemoveButton ? 100 : 6),
-                ),
+          // Add/Increase button (small icon when quantity > 0)
+          if (quantity > 0)
+            GestureDetector(
+              onTap: onIncrease,
+              child: Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(color: AppColor.appPrimary, borderRadius: BorderRadius.circular(100)),
+                child: Icon(Icons.add, color: AppColor.white, size: iconSize),
               ),
-              child:
-                  addButtonText != null && quantity == 0
-                      ? text(text: addButtonText!, color: AppColor.white, size: 12, fontWeight: FontWeight.w600)
-                      : Icon(Icons.add, color: AppColor.white, size: iconSize),
             ),
-          ),
         ],
       ),
     );

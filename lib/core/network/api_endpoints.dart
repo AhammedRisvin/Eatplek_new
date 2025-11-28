@@ -6,12 +6,16 @@ mixin Urls {
   static const String verifyOtp = 'api/users/verify-otp';
   static const String addUserDetails = 'api/users/profile';
 
-  //addUserDetails
-
   //Home
   static const String getHomeUrl = 'api/users/app/home';
-
   static const String getRestaurantDetailsUrl = 'api/vendors/';
 
-  //getRestaurantDetailsUrl
+  //Cart
+  static const String getCartUrl = 'api/cart';
+  static const String addOrUpdateCartUrl = 'api/cart/items';
+  static const String deleteCartItemUrl = 'api/cart/items/';
+
+  //removeFromCartUrl
+
+  //
 }

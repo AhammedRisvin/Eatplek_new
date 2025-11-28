@@ -50,84 +50,100 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
 
         final hasCustomizations = controller.hasCustomizations;
         final hasAddOns = controller.hasAddOns;
+        final isScenario1 = !hasCustomizations && !hasAddOns;
 
-        debugPrint('🟢 hasCustomizations: $hasCustomizations, hasAddOns: $hasAddOns');
+        debugPrint('🟢 isScenario1: $isScenario1, hasCustomizations: $hasCustomizations, hasAddOns: $hasAddOns');
 
         return Stack(
           children: [
-            // Dismissible background
-            GestureDetector(
-              onTap: () {
-                debugPrint('🟢 Tapped outside bottom sheet, closing');
-                controller.resetBottomSheetState();
-                Get.back();
-              },
-              child: Container(color: Colors.black.withOpacity(0.3)),
-            ),
-            // Bottom sheet - Positioned at bottom
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
               top: 0,
-              child: DraggableScrollableSheet(
-                initialChildSize: 0.7,
-                minChildSize: 0.5,
-                maxChildSize: 0.95,
-                expand: false,
-                builder: (context, scrollController) {
-                  debugPrint('🟢 DraggableScrollableSheet builder called');
-
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: AppColor.scaffoldColor,
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Handle bar + Close button
-                        _buildHandleBar(controller),
-
-                        // Scrollable content
-                        Expanded(
-                          child: SingleChildScrollView(
-                            controller: scrollController,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildFoodDetailsSection(controller, foodItem),
-                                if (!hasCustomizations && !hasAddOns) ...[
-                                  40.h,
-                                  Center(
-                                    child: text(
-                                      text: 'No customizations or add-ons available',
-                                      size: 16,
-                                      color: AppColor.black.withOpacity(0.5),
-                                    ),
-                                  ),
-                                  40.h,
-                                ] else if (!hasCustomizations && hasAddOns) ...[
-                                  20.h,
-                                  FoodBottomSheetAddOnsSection(foodItem: foodItem),
-                                  100.h,
-                                ] else if (hasCustomizations) ...[
-                                  20.h,
-                                  FoodBottomSheetCustomizationSection(foodItem: foodItem),
-                                  20.h,
-                                  if (hasAddOns) ...[FoodBottomSheetAddOnsSection(foodItem: foodItem)],
-                                  100.h,
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                        FoodBottomSheetCheckoutSection(),
-                      ],
-                    ),
-                  );
+              child: GestureDetector(
+                // ✅ FIXED: Use Navigator.pop instead of Get.back to avoid snackbar controller error
+                onTap: () {
+                  debugPrint('🔵 Tapped outside bottom sheet - dismissing without saving');
+                  controller.resetBottomSheetState();
+                  Navigator.pop(Get.context!);
                 },
+                child: Container(
+                  color: Colors.transparent,
+                  child: GestureDetector(
+                    // ✅ Prevent propagation when tapping inside bottom sheet
+                    onTap: () {},
+                    child: DraggableScrollableSheet(
+                      initialChildSize: isScenario1 ? 0.5 : 0.7,
+                      minChildSize: 0.3,
+                      maxChildSize: isScenario1 ? 0.75 : 0.95,
+                      expand: false,
+                      builder: (context, scrollController) {
+                        debugPrint('🟢 DraggableScrollableSheet builder called');
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: AppColor.scaffoldColor,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                          ),
+                          // ✅ KEY FIX: Use Column with proper layout strategy
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Handle bar
+                              _buildHandleBar(controller),
+
+                              // ✅ FIXED: Scrollable content with only content height
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  controller: scrollController,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _buildFoodDetailsSection(controller, foodItem),
+
+                                      // ✅ SCENARIO 1: View-only message (NO extra space)
+                                      if (isScenario1) ...[
+                                        20.h,
+                                        Padding(
+                                          padding: EdgeInsets.symmetric(horizontal: 20),
+                                          child: text(
+                                            text: 'Adjust quantity from the food card',
+                                            size: 14,
+                                            color: AppColor.black.withOpacity(0.6),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                        20.h,
+                                      ]
+                                      // ✅ SCENARIOS 2-4: Show sections with content
+                                      else if (!hasCustomizations && hasAddOns) ...[
+                                        20.h,
+                                        FoodBottomSheetAddOnsSection(foodItem: foodItem),
+                                        30.h, // ✅ REDUCED: Bottom padding for checkout
+                                      ] else if (hasCustomizations) ...[
+                                        20.h,
+                                        FoodBottomSheetCustomizationSection(foodItem: foodItem),
+                                        20.h,
+                                        if (hasAddOns) ...[FoodBottomSheetAddOnsSection(foodItem: foodItem)],
+                                        30.h, // ✅ REDUCED: Bottom padding for checkout
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // ✅ CHECKOUT SECTION: Only for Scenarios 2-4
+                              if (!isScenario1) FoodBottomSheetCheckoutSection(),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -160,6 +176,7 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
   Widget _buildFoodDetailsSection(RestaurantDetailViewController controller, Food foodItem) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 20),
@@ -178,6 +195,7 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
           padding: EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               text(text: foodItem.foodName ?? '', size: 20, fontWeight: FontWeight.w600, color: AppColor.black),
               8.h,

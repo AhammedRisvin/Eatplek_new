@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -87,7 +89,10 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
               final quantity = controller.getCustomizationCount(customization.customizationId ?? '');
               return QuantityControlWidget(
                 quantity: quantity,
-                onIncrease: () => controller.toggleCustomization(customization.customizationId ?? ''),
+                onIncrease: () {
+                  log('price ${customization.price}');
+                  controller.toggleCustomization(customization.customizationId ?? '');
+                },
                 onDecrease: () => controller.decreaseCustomization(customization.customizationId ?? ''),
                 showRemoveButton: quantity > 0,
                 buttonSize: 28,

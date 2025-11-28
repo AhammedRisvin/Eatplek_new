@@ -35,10 +35,11 @@ class Food {
   String? foodName;
   String? foodId;
   String? foodImage;
-  num? actualPrice;
-  num? discountPrice;
+  String? shareLink;
+  double? actualPrice;
+  double? discountPrice;
   dynamic specialOfferPrice;
-  num? foodPrice;
+  double? foodPrice;
   num? cartCount;
   List<Customization>? customizations;
   List<AddOn>? addOns;
@@ -47,6 +48,7 @@ class Food {
     this.foodName,
     this.foodId,
     this.foodImage,
+    this.shareLink,
     this.actualPrice,
     this.discountPrice,
     this.specialOfferPrice,
@@ -60,10 +62,11 @@ class Food {
     foodName: json["foodName"],
     foodId: json["foodId"],
     foodImage: json["foodImage"],
-    actualPrice: json["actualPrice"],
-    discountPrice: json["discountPrice"],
+    shareLink: json['shareLink'],
+    actualPrice: json["actualPrice"]?.toDouble(),
+    discountPrice: json["discountPrice"]?.toDouble(),
     specialOfferPrice: json["specialOfferPrice"],
-    foodPrice: json["foodPrice"],
+    foodPrice: json["foodPrice"]?.toDouble(),
     cartCount: json["cartCount"],
     customizations:
         json["customizations"] == null
@@ -80,8 +83,9 @@ class AddOn {
   num? price;
   String? image;
   dynamic imageKitFileId;
+  num? cartCount;
 
-  AddOn({this.addOnId, this.id, this.name, this.price, this.image, this.imageKitFileId});
+  AddOn({this.addOnId, this.id, this.name, this.price, this.image, this.imageKitFileId, this.cartCount});
 
   factory AddOn.fromJson(Map<String, dynamic> json) => AddOn(
     addOnId: json["addOnId"],
@@ -90,6 +94,7 @@ class AddOn {
     price: json["price"],
     image: json["image"],
     imageKitFileId: json["imageKitFileId"],
+    cartCount: json["cartCount"],
   );
 }
 
@@ -98,9 +103,15 @@ class Customization {
   String? id;
   String? name;
   num? price;
+  num? cartCount;
 
-  Customization({this.customizationId, this.id, this.name, this.price});
+  Customization({this.customizationId, this.id, this.name, this.price, this.cartCount});
 
-  factory Customization.fromJson(Map<String, dynamic> json) =>
-      Customization(customizationId: json["customizationId"], id: json["id"], name: json["name"], price: json["price"]);
+  factory Customization.fromJson(Map<String, dynamic> json) => Customization(
+    customizationId: json["customizationId"],
+    id: json["id"],
+    name: json["name"],
+    price: json["price"],
+    cartCount: json["cartCount"],
+  );
 }

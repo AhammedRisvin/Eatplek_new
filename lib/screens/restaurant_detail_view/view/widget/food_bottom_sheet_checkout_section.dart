@@ -21,20 +21,35 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
         final isEditMode = controller.isEditMode;
         final buttonText = controller.getBottomSheetButtonText();
 
-        // Get the quantity for Scenario A
+        // Get the quantity for Scenario A (Food only / Food + add-ons)
         final scenarioAQuantity = controller.getBottomSheetItemQuantity();
+        final totalCustomizationQty = controller.getTotalCustomizationQuantity();
 
-        // Determine if button should be enabled
+        // ✅ UPDATED: Determine if button should be enabled
         bool isButtonEnabled = true;
+
         if (hasCustomizations) {
-          isButtonEnabled = controller.getTotalCustomizationQuantity() > 0;
+          // Scenario 3 & 4: Customizations
+          if (isEditMode) {
+            // ✅ EDIT: Allow button even if qty = 0 (for removal)
+            isButtonEnabled = true;
+          } else {
+            // ✅ ADD: Block if no customizations selected
+            isButtonEnabled = totalCustomizationQty > 0;
+          }
         } else {
-          // For Scenario A, button is enabled if quantity > 0
-          isButtonEnabled = scenarioAQuantity > 0;
+          // Scenario 1 & 2: Food + optional add-ons
+          if (isEditMode) {
+            // ✅ EDIT: Always allow (even if qty = 0 for removal)
+            isButtonEnabled = true;
+          } else {
+            // ✅ ADD: Block if food qty < 1
+            isButtonEnabled = scenarioAQuantity >= 1;
+          }
         }
 
         debugPrint(
-          '🟢 Checkout section rebuild - price: $totalPrice, enabled: $isButtonEnabled, mode: ${isEditMode ? 'EDIT' : 'ADD'}',
+          '🟢 Checkout section rebuild - price: $totalPrice, enabled: $isButtonEnabled, mode: ${isEditMode ? "EDIT" : "ADD"}, customizations: $totalCustomizationQty, qty: $scenarioAQuantity',
         );
 
         return Container(
@@ -70,7 +85,7 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                   },
                 )
               else
-                // SCENARIO B & C: Show total items on left
+                // SCENARIO B & C: Show total amount on left
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -98,7 +113,7 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                     isButtonEnabled
                         ? () {
                           debugPrint('🟢 $buttonText button tapped');
-                          controller.addItemToCart();
+                          controller.addOrUpdateItemToCart();
                         }
                         : null,
                 child: Container(
