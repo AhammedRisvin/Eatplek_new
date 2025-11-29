@@ -16,6 +16,7 @@ import 'package:get/get.dart';
 
 import '../../screens/auth/view/login_view.dart';
 import '../../screens/bottom_nav/view/bottom_nav_view.dart';
+import '../../screens/coupons/view/coupons_view.dart';
 import '../../screens/on_boarding_view/view/on_boarding_view.dart';
 import '../../screens/splash_view/view/splash_screen.dart';
 import '../bindings/cart_bindings.dart';
@@ -42,6 +43,9 @@ class Routes {
   static const orderDetailsView = '/orderDetailsView';
   static const profileView = '/profileView';
   static const searchView = '/searchView';
+  static const couponsView = '/couponsView';
+
+  //CouponsView
 
   static const String initialRoute = splash;
 
@@ -107,7 +111,8 @@ class Routes {
       transition: Transition.circularReveal,
       binding: PreBookDetailsBindings(),
     ),
+    GetPage(name: couponsView, page: () => const CouponsView(), transition: Transition.circularReveal),
 
-    //OrderDetailsBindings
+    //CouponsView
   ];
 }

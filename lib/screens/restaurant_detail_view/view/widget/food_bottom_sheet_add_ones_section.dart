@@ -111,6 +111,7 @@ class FoodBottomSheetAddOnsSection extends StatelessWidget {
                 showRemoveButton: quantity > 0,
                 buttonSize: 28,
                 iconSize: 12,
+                isCompactMode: true, // ✅ NEW: Enable compact mode with square buttons
               );
             },
           ),

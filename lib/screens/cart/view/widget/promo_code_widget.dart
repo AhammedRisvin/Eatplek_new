@@ -1,3 +1,4 @@
+import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
@@ -55,14 +56,15 @@ class PromoCodeWidget extends StatelessWidget {
                       ),
                     )
                   else
-                    button(
-                      name: 'Apply',
-                      onTap: controller.applyPromoCode,
-                      width: 63,
-                      height: 30,
-                      borderRadius: BorderRadius.circular(100),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                    GestureDetector(
+                      onTap: () {
+                        Get.toNamed(Routes.couponsView);
+                      },
+                      child: CircleAvatar(
+                        radius: context.hp(2),
+                        backgroundColor: AppColor.appPrimary,
+                        child: Icon(Icons.arrow_forward_ios_rounded, color: AppColor.white, size: 18),
+                      ),
                     ),
                 ],
               ),

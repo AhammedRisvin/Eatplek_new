@@ -183,66 +183,95 @@ class FoodWidget extends StatelessWidget {
 
     // ✅ SCENARIO 1: Show QuantityControlWidget - Full width and centered
     if (isScenario1) {
-      return GetBuilder<RestaurantDetailViewController>(
-        id: 'food_grid',
-        builder: (controller) {
-          final quantity = controller.cartFoodQuantity[foodId] ?? 0;
+      return Obx(() {
+        final quantity = controller.cartFoodQuantity[foodId] ?? 0;
 
-          return Container(
-            width: context.wp(100),
-            height: 36,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(100), color: AppColor.white),
-            child: Center(
-              child: QuantityControlWidget(
-                quantity: quantity,
-                onIncrease: () {
-                  debugPrint('🍕 Increase quantity: ${foodItem.foodName}');
-                  controller.increaseScenario1Quantity(foodId);
-                },
-                onDecrease: () {
-                  debugPrint('🍕 Decrease quantity: ${foodItem.foodName}');
-                  controller.decreaseScenario1Quantity(foodId);
-                },
-                showRemoveButton: true,
-                buttonSize: 28,
-                iconSize: 14,
-                addButtonText: 'Add',
-              ),
+        return Container(
+          width: context.wp(100),
+          height: 36,
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(100), color: AppColor.white),
+          child: Center(
+            child: QuantityControlWidget(
+              quantity: quantity,
+              onIncrease: () {
+                debugPrint('🍕 Increase quantity: ${foodItem.foodName}');
+                controller.increaseScenario1Quantity(foodId);
+              },
+              onDecrease: () {
+                debugPrint('🍕 Decrease quantity: ${foodItem.foodName}');
+                controller.decreaseScenario1Quantity(foodId);
+              },
+              showRemoveButton: true,
+              buttonSize: 28,
+              iconSize: 14,
+              addButtonText: 'Add',
             ),
-          );
-        },
-      );
+          ),
+        );
+      });
     }
 
     // ✅ SCENARIOS 2-4: Show Add/Edit button with bottom sheet
-    return GetBuilder<RestaurantDetailViewController>(
-      id: 'food_grid',
-      builder: (controller) {
-        final isInCart = controller.isFoodInCart(foodId);
-
-        final isEditMode = isInCart;
-        final buttonText = isEditMode ? 'Edit' : 'Add';
-        final bgColor = isEditMode ? AppColor.appPrimary.withOpacity(0.15) : AppColor.appPrimary;
-        final textColor = isEditMode ? AppColor.appPrimary : AppColor.white;
-
+    return Obx(() {
+      // ✅ FIXED: Read directly from CartService through controller
+      // This ensures we have the latest data after API updates
+      final foodId = foodItem.foodId ?? '';
+      if (foodId.isEmpty) {
         return GestureDetector(
           onTap: () {
-            debugPrint('🔵 Add/Edit button tapped: ${foodItem.foodName}');
-            _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, isEdit: isEditMode);
+            debugPrint('🔵 Add button tapped (no food ID)');
+            _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, isEdit: false);
           },
           child: Container(
             width: context.wp(100),
             height: 36,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(100),
-              color: bgColor,
-              border: isEditMode ? Border.all(color: AppColor.appPrimary, width: 1.5) : null,
-            ),
-            child: Center(child: text(text: buttonText, size: 13, fontWeight: FontWeight.w600, color: textColor)),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(100), color: AppColor.appPrimary),
+            child: Center(child: text(text: 'Add', size: 13, fontWeight: FontWeight.w600, color: AppColor.white)),
           ),
         );
-      },
-    );
+      }
+
+      // ✅ Check all conditions for item in cart
+      final hasFoodInCart = controller.cartFoodQuantity.containsKey(foodId) && controller.cartFoodQuantity[foodId]! > 0;
+
+      final hasCustomizationsInCart =
+          controller.cartCustomizationQuantity.containsKey(foodId) &&
+          controller.cartCustomizationQuantity[foodId]!.isNotEmpty &&
+          controller.cartCustomizationQuantity[foodId]!.values.any((qty) => qty > 0);
+
+      // ✅ Item is in cart if:
+      // - Has food (Scenario 1 & 2) OR
+      // - Has customizations (Scenario 3 & 4)
+      final isInCart = hasFoodInCart || hasCustomizationsInCart;
+
+      final isEditMode = isInCart;
+      final buttonText = isEditMode ? 'Edit' : 'Add';
+      final bgColor = isEditMode ? AppColor.appPrimary.withOpacity(0.15) : AppColor.appPrimary;
+      final textColor = isEditMode ? AppColor.appPrimary : AppColor.white;
+
+      debugPrint(
+        '🎨 FoodWidget ($foodId): hasFoodQty=${controller.cartFoodQuantity[foodId] ?? 0}, '
+        'hasCustom=${hasCustomizationsInCart ? "yes" : "no"}, '
+        'isInCart=$isInCart, buttonText=$buttonText',
+      );
+
+      return GestureDetector(
+        onTap: () {
+          debugPrint('🔵 $buttonText button tapped: ${foodItem.foodName}');
+          _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, isEdit: isEditMode);
+        },
+        child: Container(
+          width: context.wp(100),
+          height: 36,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(100),
+            color: bgColor,
+            border: isEditMode ? Border.all(color: AppColor.appPrimary, width: 1.5) : null,
+          ),
+          child: Center(child: text(text: buttonText, size: 13, fontWeight: FontWeight.w600, color: textColor)),
+        ),
+      );
+    });
   }
 
   // ✅ Show appropriate bottom sheet based on scenario

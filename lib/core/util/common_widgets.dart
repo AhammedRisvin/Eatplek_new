@@ -41,7 +41,7 @@ Widget text({
   );
 }
 
-button({
+Widget button({
   double? height,
   double? width,
   Color? color,
@@ -98,7 +98,7 @@ button({
   );
 }
 
-image({
+CachedNetworkImage image({
   required String url,
   double? height,
   double? width,

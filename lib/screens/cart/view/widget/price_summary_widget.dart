@@ -76,7 +76,7 @@ class PriceSummaryWidget extends StatelessWidget {
           // Taxes
           if (showTaxes && taxAmount > 0)
             priceRow(
-              title: customTaxTitle ?? 'Taxes (${taxPercentage.toInt()}%)',
+              title: customTaxTitle ?? 'Taxes',
               value: '$currency${taxAmount.toInt()}',
               padding: EdgeInsets.only(bottom: 20),
             ),

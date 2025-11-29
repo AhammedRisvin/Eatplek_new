@@ -1,141 +1,416 @@
+import 'dart:async';
+
+import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
-import 'package:eatplek_app/screens/cart/model/cart_model.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
-class CartController extends GetxController {
-  // Cart items
-  List<CartItem> _cartItems = [];
-  List<CartItem> get cartItems => _cartItems;
+import '../../../core/network/api_client.dart';
+import '../model/cart_api_model.dart';
+import 'cart_service.dart';
 
-  // Instructions
+class CartController extends GetxController {
+  final FittorConnect _apiClient = FittorConnect();
+  final CartService _cartService = Get.find<CartService>();
+
+  bool isLoading = false;
+  bool hasError = false;
+  String errorMessage = '';
+
+  CartModel? cartModel;
+
   final TextEditingController instructionsController = TextEditingController();
   String _instructionsError = '';
   String get instructionsError => _instructionsError;
 
-  // Promo code
   final TextEditingController promoCodeController = TextEditingController();
   String _promoCodeError = '';
   String get promoCodeError => _promoCodeError;
   String _appliedPromoCode = '';
   String get appliedPromoCode => _appliedPromoCode;
-  double _promoDiscount = 0.0;
+  final double _promoDiscount = 0.0;
   double get promoDiscount => _promoDiscount;
 
-  // Price constants (can be made dynamic later)
-  final double deliveryFee = 25.0;
-  final double taxPercentage = 5.0; // 5%
-  final double packingCharge = 10.0;
+  Timer? _quantityDebounceTimer;
+  static const Duration _debounceDuration = Duration(milliseconds: 500);
+
+  List<CartItem> get cartItems {
+    try {
+      if (cartModel?.data?.items != null) {
+        return cartModel!.data!.items!;
+      }
+    } catch (e) {
+      debugPrint('Error getting cart items: $e');
+    }
+    return [];
+  }
+
+  bool get isCartEmpty => cartItems.isEmpty;
 
   @override
   void onInit() {
     super.onInit();
-    _loadSampleData();
+    _fetchCartData();
+    _listenToCartServiceUpdates();
   }
 
-  // Load sample cart data
-  void _loadSampleData() {
-    _cartItems = [
-      CartItem(
-        id: '1',
-        name: 'Classic Chicken Burger',
-        category: 'Burger',
-        basePrice: 180.0,
-        imageUrl: 'https://picsum.photos/250?image=30',
-        quantity: 1,
-        selectedAddOns: [
-          AddOn(
-            id: '1',
-            name: 'Extra Cheese',
-            price: 25.0,
-            imageUrl: 'https://picsum.photos/100/100?random=1',
-            isSelected: true,
-          ),
-          AddOn(
-            id: '2',
-            name: 'Crispy Bacon',
-            price: 45.0,
-            imageUrl: 'https://picsum.photos/100/100?random=2',
-            isSelected: true,
-          ),
-        ],
-      ),
-      CartItem(
-        id: '2',
-        name: 'Margherita Pizza',
-        category: 'Pizza',
-        basePrice: 299.0,
-        imageUrl: 'https://picsum.photos/250?image=31',
-        quantity: 2,
-        selectedAddOns: [
-          AddOn(
-            id: '3',
-            name: 'Extra Toppings',
-            price: 30.0,
-            imageUrl: 'https://picsum.photos/100/100?random=3',
-            isSelected: true,
-          ),
-        ],
-      ),
-    ];
-    update(['cart_items', 'price_summary']);
+  void _listenToCartServiceUpdates() {
+    ever(_cartService.cartItems, (_) {
+      _syncCartModelWithService();
+      update(['cart_items', 'price_summary', 'empty_cart']);
+    });
+
+    ever(_cartService.totalPrice, (_) {
+      update(['price_summary']);
+    });
+
+    ever(_cartService.itemCount, (_) {
+      update(['price_summary', 'empty_cart']);
+    });
   }
 
-  // Quantity management
-  void incrementQuantity(String itemId) {
-    final index = _cartItems.indexWhere((item) => item.id == itemId);
-    if (index != -1 && _cartItems[index].quantity < 10) {
-      _cartItems[index].quantity++;
-      update(['cart_items', 'price_summary']);
+  void _syncCartModelWithService() {
+    try {
+      if (_cartService.cartItems.isNotEmpty) {
+        final convertedItems = _convertToCartItems(_cartService.cartItems);
+
+        cartModel = CartModel(
+          success: true,
+          message: 'Cart updated',
+          data: CartData(
+            items: convertedItems,
+            totals:
+                cartModel?.data?.totals != null
+                    ? Totals(
+                      subTotal: cartModel!.data!.totals!.subTotal ?? 0,
+                      addOnTotal: cartModel!.data!.totals!.addOnTotal ?? 0,
+                      customizationTotal: cartModel!.data!.totals!.customizationTotal ?? 0,
+                      packingChargeTotal: cartModel!.data!.totals!.packingChargeTotal ?? 0,
+                      discountTotal: cartModel!.data!.totals!.discountTotal ?? 0,
+                      couponDiscount: cartModel!.data!.totals!.couponDiscount ?? 0,
+                      taxAmount: cartModel!.data!.totals!.taxAmount ?? 0,
+                      taxPercentage: cartModel!.data!.totals!.taxPercentage ?? 0,
+                      grandTotal: _cartService.totalPrice.value,
+                      itemCount: _cartService.itemCount.value,
+                    )
+                    : Totals(
+                      subTotal: 0,
+                      addOnTotal: 0,
+                      customizationTotal: 0,
+                      packingChargeTotal: 0,
+                      discountTotal: 0,
+                      couponDiscount: 0,
+                      taxAmount: 0,
+                      taxPercentage: 0,
+                      grandTotal: _cartService.totalPrice.value,
+                      itemCount: _cartService.itemCount.value,
+                    ),
+          ),
+        );
+      } else {
+        cartModel = null;
+      }
+    } catch (e) {
+      debugPrint('Error syncing cart model: $e');
     }
   }
 
-  void decrementQuantity(String itemId) {
-    final index = _cartItems.indexWhere((item) => item.id == itemId);
-    if (index != -1) {
-      if (_cartItems[index].quantity > 1) {
-        _cartItems[index].quantity--;
-        update(['cart_items', 'price_summary']);
+  List<CartItem> _convertToCartItems(List<Map<String, dynamic>> items) {
+    return items.map((item) {
+      return CartItem(
+        foodId: item['foodId'],
+        foodName: item['foodName'],
+        foodImage: item['foodImage'],
+        quantity: item['quantity'] ?? 1,
+        basePrice: (item['basePrice'] ?? 0).toDouble(),
+        effectivePrice: (item['effectivePrice'] ?? 0).toDouble(),
+        customizations:
+            (item['customizations'] as List?)?.map((c) {
+              return AddOn(
+                customizationId: c['customizationId'],
+                name: c['name'],
+                price: c['price'],
+                quantity: c['quantity'],
+                addOnId: c['customizationId'],
+              );
+            }).toList(),
+        addOns:
+            (item['addOns'] as List?)?.map((a) {
+              return AddOn(addOnId: a['addOnId'], name: a['name'], price: a['price'], quantity: a['quantity']);
+            }).toList(),
+        itemTotal: (item['itemTotal'] ?? 0).toDouble(),
+      );
+    }).toList();
+  }
+
+  Future<void> _fetchCartData() async {
+    try {
+      isLoading = true;
+      hasError = false;
+      errorMessage = '';
+      update(['cart_items', 'price_summary', 'empty_cart']);
+
+      final response = await _apiClient.get(endpoint: Urls.getCartUrl);
+
+      if (response != null && response is Map<String, dynamic>) {
+        cartModel = CartModel.fromJson(response);
+
+        if (cartModel?.success == true && cartModel?.data != null) {
+          _cartService.updateCartFromApi({
+            'items': cartModel!.data!.items?.map((item) => _convertCartItemToMap(item)).toList() ?? [],
+            'totals': {
+              'itemCount': cartModel!.data!.totals?.itemCount ?? 0,
+              'grandTotal': cartModel!.data!.totals?.grandTotal ?? 0,
+              'subTotal': cartModel!.data!.totals?.subTotal ?? 0,
+              'taxAmount': cartModel!.data!.totals?.taxAmount ?? 0,
+              'taxPercentage': cartModel!.data!.totals?.taxPercentage ?? 0,
+              'packingChargeTotal': cartModel!.data!.totals?.packingChargeTotal ?? 0,
+              'discountTotal': cartModel!.data!.totals?.discountTotal ?? 0,
+              'couponDiscount': cartModel!.data!.totals?.couponDiscount ?? 0,
+            },
+          });
+
+          hasError = false;
+          isLoading = false;
+        } else {
+          hasError = true;
+          errorMessage = cartModel?.message ?? 'Failed to load cart';
+          isLoading = false;
+        }
       } else {
-        // Remove item completely when quantity reaches 0
-        removeItem(itemId);
+        hasError = true;
+        errorMessage = 'Invalid response format';
+        isLoading = false;
+      }
+
+      update(['cart_items', 'price_summary', 'empty_cart']);
+    } catch (e) {
+      hasError = true;
+      errorMessage = 'Error loading cart: $e';
+      isLoading = false;
+      update(['cart_items', 'price_summary', 'empty_cart']);
+      debugPrint('Error fetching cart: $e');
+    }
+  }
+
+  Map<String, dynamic> _convertCartItemToMap(CartItem item) {
+    return {
+      'foodId': item.foodId,
+      'foodName': item.foodName,
+      'foodImage': item.foodImage,
+      'quantity': item.quantity ?? 1,
+      'basePrice': item.effectivePrice ?? item.basePrice ?? 0,
+      'customizations':
+          item.customizations
+              ?.map(
+                (c) => {'customizationId': c.customizationId, 'name': c.name, 'price': c.price, 'quantity': c.quantity},
+              )
+              .toList() ??
+          [],
+      'addOns':
+          item.addOns
+              ?.map((a) => {'addOnId': a.addOnId, 'name': a.name, 'price': a.price, 'quantity': a.quantity})
+              .toList() ??
+          [],
+      'itemTotal': item.itemTotal ?? 0,
+    };
+  }
+
+  int _detectScenario(CartItem item) {
+    final hasCustomizations = item.customizations != null && item.customizations!.isNotEmpty;
+    final hasAddOns = item.addOns != null && item.addOns!.isNotEmpty;
+
+    if (!hasCustomizations && !hasAddOns) {
+      return 1;
+    } else if (!hasCustomizations && hasAddOns) {
+      return 2;
+    } else if (hasCustomizations && !hasAddOns) {
+      return 3;
+    } else {
+      return 4;
+    }
+  }
+
+  Future<void> updateItemQuantity(String foodId, int newQuantity, {String? customizationId, String? addOnId}) async {
+    try {
+      final itemIndex = cartItems.indexWhere((item) => item.foodId == foodId);
+      if (itemIndex == -1) return;
+
+      final item = cartItems[itemIndex];
+      final scenario = _detectScenario(item);
+
+      final requestBody = _buildUpdateRequestBody(foodId, item, scenario, newQuantity, customizationId, addOnId);
+
+      if (requestBody == null) return;
+
+      final response = await _apiClient.post(endpoint: Urls.addOrUpdateCartUrl, data: requestBody);
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true && response['data'] != null) {
+          _cartService.updateCartFromApi({
+            'items': response['data']['items'] ?? [],
+            'totals': response['data']['totals'] ?? {},
+          });
+        } else {
+          Get.snackbar('Error', response['message'] ?? 'Failed to update cart');
+        }
+      }
+    } catch (e) {
+      debugPrint('Exception while updating item: $e');
+      Get.snackbar('Error', 'Failed to update cart');
+    }
+  }
+
+  Map<String, dynamic>? _buildUpdateRequestBody(
+    String foodId,
+    CartItem item,
+    int scenario,
+    int newQuantity,
+    String? customizationId,
+    String? addOnId,
+  ) {
+    final serviceType = _getCleanServiceType(Store.deliveryPreference);
+
+    if (scenario == 1) {
+      return {'foodId': foodId, 'quantity': newQuantity, 'serviceType': serviceType};
+    } else if (scenario == 2) {
+      if (customizationId == null && addOnId == null) {
+        return {
+          'foodId': foodId,
+          'quantity': newQuantity,
+          'serviceType': serviceType,
+          'addOns': _buildAddOnsArray(item),
+        };
+      } else if (addOnId != null) {
+        return {
+          'foodId': foodId,
+          'quantity': item.quantity ?? 1,
+          'serviceType': serviceType,
+          'addOns': _buildUpdatedAddOnsArray(item, addOnId, newQuantity),
+        };
+      }
+    } else if (scenario == 3) {
+      if (customizationId != null) {
+        return {
+          'foodId': foodId,
+          'quantity': 1,
+          'serviceType': serviceType,
+          'customizations': _buildUpdatedCustomizationsArray(item, customizationId, newQuantity),
+        };
+      }
+    } else if (scenario == 4) {
+      if (customizationId != null) {
+        return {
+          'foodId': foodId,
+          'quantity': 1,
+          'serviceType': serviceType,
+          'customizations': _buildUpdatedCustomizationsArray(item, customizationId, newQuantity),
+          'addOns': _buildAddOnsArray(item),
+        };
+      } else if (addOnId != null) {
+        return {
+          'foodId': foodId,
+          'quantity': 1,
+          'serviceType': serviceType,
+          'customizations': _buildCustomizationsArray(item),
+          'addOns': _buildUpdatedAddOnsArray(item, addOnId, newQuantity),
+        };
       }
     }
+
+    return null;
   }
 
-  // Remove item from cart
+  List<Map<String, dynamic>> _buildAddOnsArray(CartItem item) {
+    if (item.addOns == null || item.addOns!.isEmpty) return [];
+    return item.addOns!.map((addOn) => {'addOnId': addOn.addOnId, 'quantity': addOn.quantity ?? 0}).toList();
+  }
+
+  List<Map<String, dynamic>> _buildUpdatedAddOnsArray(CartItem item, String addOnId, int newQuantity) {
+    if (item.addOns == null || item.addOns!.isEmpty) return [];
+    return item.addOns!.map((addOn) {
+      return {'addOnId': addOn.addOnId, 'quantity': addOn.addOnId == addOnId ? newQuantity : (addOn.quantity ?? 0)};
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> _buildCustomizationsArray(CartItem item) {
+    if (item.customizations == null || item.customizations!.isEmpty) return [];
+    return item.customizations!
+        .map((custom) => {'customizationId': custom.customizationId, 'quantity': custom.quantity ?? 0})
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _buildUpdatedCustomizationsArray(CartItem item, String customizationId, int newQuantity) {
+    if (item.customizations == null || item.customizations!.isEmpty) return [];
+    return item.customizations!.map((custom) {
+      return {
+        'customizationId': custom.customizationId,
+        'quantity': custom.customizationId == customizationId ? newQuantity : (custom.quantity ?? 0),
+      };
+    }).toList();
+  }
+
   void removeItem(String itemId) {
-    _cartItems.removeWhere((item) => item.id == itemId);
+    final items = _cartService.cartItems.where((item) => item['foodId'] != itemId).toList();
+    _cartService.cartItems.value = items;
     update(['cart_items', 'price_summary', 'empty_cart']);
   }
 
-  // Add-on management
-  void toggleAddOn(String itemId, String addOnId) {
-    final itemIndex = _cartItems.indexWhere((item) => item.id == itemId);
-    if (itemIndex != -1) {
-      final addOnIndex = _cartItems[itemIndex].selectedAddOns.indexWhere((addOn) => addOn.id == addOnId);
-      if (addOnIndex != -1) {
-        _cartItems[itemIndex].selectedAddOns[addOnIndex].isSelected =
-            !_cartItems[itemIndex].selectedAddOns[addOnIndex].isSelected;
-        update(['cart_items', 'price_summary']);
-      }
+  double get subtotal {
+    if (cartModel?.data?.totals != null) {
+      return cartModel!.data!.totals!.subTotal ?? 0;
     }
+    return 0;
   }
 
-  // Price calculations
-  double get subtotal {
-    return _cartItems.fold(0, (sum, item) => sum + item.totalItemPrice);
+  double get deliveryFee {
+    return 0.0;
   }
 
   double get taxAmount {
-    return subtotal * taxPercentage / 100;
+    if (cartModel?.data?.totals != null) {
+      return cartModel!.data!.totals!.taxAmount ?? 0;
+    }
+    return 0;
+  }
+
+  int get taxPercentageValue {
+    if (cartModel?.data?.totals != null) {
+      return cartModel!.data!.totals!.taxPercentage ?? 0;
+    }
+    return 0;
+  }
+
+  double get packingCharge {
+    if (cartModel?.data?.totals != null) {
+      return (cartModel!.data!.totals!.packingChargeTotal ?? 0).toDouble();
+    }
+    return 0;
+  }
+
+  double get discountAmount {
+    if (cartModel?.data?.totals != null) {
+      return (cartModel!.data!.totals!.discountTotal ?? 0).toDouble();
+    }
+    return 0;
+  }
+
+  double get couponDiscount {
+    if (cartModel?.data?.totals != null) {
+      return (cartModel!.data!.totals!.couponDiscount ?? 0).toDouble();
+    }
+    return 0;
   }
 
   double get totalAmount {
-    return subtotal + deliveryFee + taxAmount + packingCharge - _promoDiscount;
+    return _cartService.totalPrice.value;
   }
 
-  // Instructions validation
+  int get itemCount {
+    return _cartService.itemCount.value;
+  }
+
   bool validateInstructions() {
     final instructions = instructionsController.text.trim();
 
@@ -156,44 +431,12 @@ class CartController extends GetxController {
     return true;
   }
 
-  // Clear instructions error
   void clearInstructionsError() {
     if (_instructionsError.isNotEmpty) {
       _instructionsError = '';
       update(['instructions_validation']);
     }
   }
-
-  // Promo code management
-  final List<PromoCode> _availablePromoCodes = [
-    PromoCode(
-      code: 'SAVE20',
-      description: '20% off on orders above ₹300',
-      discountAmount: 0,
-      discountPercentage: 20,
-      minimumOrderValue: 300,
-      isActive: true,
-      expiryDate: DateTime.now().add(Duration(days: 30)),
-    ),
-    PromoCode(
-      code: 'FLAT50',
-      description: 'Flat ₹50 off on orders above ₹200',
-      discountAmount: 50,
-      discountPercentage: 0,
-      minimumOrderValue: 200,
-      isActive: true,
-      expiryDate: DateTime.now().add(Duration(days: 15)),
-    ),
-    PromoCode(
-      code: 'NEWUSER',
-      description: '30% off for new users',
-      discountAmount: 0,
-      discountPercentage: 30,
-      minimumOrderValue: 100,
-      isActive: true,
-      expiryDate: DateTime.now().add(Duration(days: 60)),
-    ),
-  ];
 
   void applyPromoCode() {
     final code = promoCodeController.text.trim().toUpperCase();
@@ -204,57 +447,22 @@ class CartController extends GetxController {
       return;
     }
 
-    final promoCode = _availablePromoCodes.firstWhereOrNull((promo) => promo.code == code);
-
-    if (promoCode == null) {
-      _promoCodeError = 'Invalid promo code';
-      update(['promo_validation']);
-      return;
-    }
-
-    if (!promoCode.isValid) {
-      _promoCodeError = 'Promo code has expired';
-      update(['promo_validation']);
-      return;
-    }
-
-    if (subtotal < promoCode.minimumOrderValue) {
-      _promoCodeError = 'Minimum order value ₹${promoCode.minimumOrderValue.toInt()} required';
-      update(['promo_validation']);
-      return;
-    }
-
-    // Apply discount
-    if (promoCode.discountPercentage > 0) {
-      _promoDiscount = subtotal * promoCode.discountPercentage / 100;
-    } else {
-      _promoDiscount = promoCode.discountAmount;
-    }
-
     _appliedPromoCode = code;
     _promoCodeError = '';
-    promoCodeController.text = code; // Show uppercase code
+    promoCodeController.text = code;
 
     update(['promo_validation', 'price_summary']);
 
-    Get.snackbar(
-      'Success',
-      'Promo code applied! You saved ₹${_promoDiscount.toInt()}',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Get.theme.primaryColor,
-      colorText: Get.theme.colorScheme.onPrimary,
-    );
+    Get.snackbar('Success', 'Promo code applied!', snackPosition: SnackPosition.BOTTOM);
   }
 
   void removePromoCode() {
     _appliedPromoCode = '';
-    _promoDiscount = 0.0;
     _promoCodeError = '';
     promoCodeController.clear();
     update(['promo_validation', 'price_summary']);
   }
 
-  // Format promo code input to uppercase
   void formatPromoCode(String value) {
     final upperCaseValue = value.toUpperCase();
     if (promoCodeController.text != upperCaseValue) {
@@ -273,46 +481,49 @@ class CartController extends GetxController {
     }
   }
 
-  // Check if cart is empty
-  bool get isCartEmpty => _cartItems.isEmpty;
+  String _getCleanServiceType(String servicePreference) {
+    String cleaned = servicePreference.toLowerCase().trim();
 
-  // Place order
+    if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
+      return 'delivery';
+    } else if (cleaned.contains('dine-in') || cleaned.contains('dine in') || cleaned.contains('🍽')) {
+      return 'dine-in';
+    } else if (cleaned.contains('takeaway') || cleaned.contains('🎁')) {
+      return 'takeaway';
+    } else if (cleaned.contains('car-dine') || cleaned.contains('car dine') || cleaned.contains('🚗')) {
+      return 'car-dine-in';
+    }
+
+    return 'delivery';
+  }
+
   void placeOrder() {
-    // Validate instructions if provided
     if (!validateInstructions()) {
       return;
     }
 
-    if (_cartItems.isEmpty) {
-      Get.snackbar(
-        'Empty Cart',
-        'Please add items to cart before placing order',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Get.theme.colorScheme.error,
-        colorText: Get.theme.colorScheme.onError,
-      );
+    if (cartItems.isEmpty) {
+      Get.snackbar('Empty Cart', 'Please add items to cart before placing order', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    // Here you would typically send the order to your backend
     Get.snackbar(
       'Order Placed',
       'Your order has been placed successfully!',
       snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: Get.theme.primaryColor,
-      colorText: Get.theme.colorScheme.onPrimary,
       duration: Duration(seconds: 3),
     );
 
     Get.toNamed(Routes.orderConfirmationView);
+  }
 
-    // Navigate to order confirmation or clear cart
-    // _cartItems.clear();
-    // update(['cart_items', 'price_summary', 'empty_cart']);
+  void retryFetchCart() {
+    _fetchCartData();
   }
 
   @override
   void onClose() {
+    _quantityDebounceTimer?.cancel();
     instructionsController.dispose();
     promoCodeController.dispose();
     super.onClose();
