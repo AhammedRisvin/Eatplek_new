@@ -168,15 +168,19 @@ class FittorConnect {
     dynamic data,
     Map<String, String>? queryParameters,
     Map<String, String>? headers,
+    Duration? timeout,
   }) async {
     try {
       log('data $data');
-      final response = await _client.post(
-        _buildUrl(endpoint),
-        body: data is Map ? jsonEncode(data) : data,
-        queryParameters: queryParameters,
-        headers: headers,
-      );
+
+      final response = await _client
+          .post(
+            _buildUrl(endpoint),
+            body: data is Map ? jsonEncode(data) : data,
+            queryParameters: queryParameters,
+            headers: headers,
+          )
+          .timeout(timeout ?? const Duration(seconds: 30));
 
       if (response.isSuccessful) {
         return parseResponse<T>(response);

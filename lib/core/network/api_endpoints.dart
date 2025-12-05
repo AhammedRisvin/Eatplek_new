@@ -14,6 +14,7 @@ mixin Urls {
   static const String getCartUrl = 'api/cart';
   static const String addOrUpdateCartUrl = 'api/cart/items';
   static const String deleteCartItemUrl = 'api/cart/items/';
+  static const String placeOrderUrl = 'api/bookings';
 
   //removeFromCartUrl
 

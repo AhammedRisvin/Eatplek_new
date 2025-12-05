@@ -7,6 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../core/routes/routes.dart';
 import '../controller/cart_controller.dart';
 import 'widget/additional_notes_widget.dart';
 import 'widget/cart_food_list.dart';
@@ -25,16 +26,12 @@ class _CartViewState extends State<CartView> {
   @override
   void initState() {
     super.initState();
-    // Note: CartController is already initialized with Get.find() in CartView
-    // API call happens in CartController.onInit()
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      // ✅ FIXED: Use WillPopScope to handle back navigation properly
       onWillPop: () async {
-        // ✅ Use Navigator.pop instead of Get.back to avoid snackbar controller error
         Navigator.of(context).pop();
         return false;
       },
@@ -48,7 +45,6 @@ class _CartViewState extends State<CartView> {
                   ? SizedBox.shrink()
                   : GestureDetector(
                     onTap: () {
-                      // ✅ Use Navigator.pop instead of Get.back
                       Navigator.of(context).pop();
                     },
                     child: CircleAvatar(
@@ -90,8 +86,6 @@ class _CartViewState extends State<CartView> {
               child: Column(
                 children: [
                   CartFoodListWidget(),
-                  // PromoCodeWidget(),
-                  // FriendInvitationCard(),
                   AdditionalNotesWidget(),
                   GetBuilder<CartController>(
                     id: 'price_summary',
@@ -138,7 +132,7 @@ class _CartViewState extends State<CartView> {
                     height: 60,
                     fontWeight: FontWeight.w600,
                     borderRadius: BorderRadius.circular(100),
-                    onTap: () => Get.find<CartController>().placeOrder(),
+                    onTap: () => _navigateToOrderConfirmation(controller),
                   ),
                 ],
               ),
@@ -146,6 +140,58 @@ class _CartViewState extends State<CartView> {
           },
         ),
       ),
+    );
+  }
+
+  /// ✅ Navigate to Order Confirmation with cart data
+  void _navigateToOrderConfirmation(CartController cartController) {
+    // Validate instructions first
+    if (!cartController.validateInstructions()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(cartController.instructionsError), backgroundColor: Colors.red.withOpacity(0.8)),
+      );
+      return;
+    }
+
+    // Check cart not empty
+    if (cartController.isCartEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please add items to cart before placing order'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+        ),
+      );
+      return;
+    }
+
+    // ✅ Extract vendor from cartModel
+    final vendor = cartController.cartModel?.data?.vendor;
+
+    // ✅ DEBUG LOGGING
+    debugPrint('═════════════════════════════════════════');
+    debugPrint('🛒 NAVIGATING TO ORDER CONFIRMATION');
+    debugPrint('═════════════════════════════════════════');
+    debugPrint('📦 Cart Items Count: ${cartController.cartItems.length}');
+    debugPrint('🏪 Vendor Object: $vendor');
+    debugPrint('🏪 Vendor Name: ${vendor?.name}');
+    debugPrint('🏪 Vendor ID: ${vendor?.id}');
+    debugPrint('💵 Total Amount: ${cartController.totalAmount}');
+    debugPrint('═════════════════════════════════════════');
+
+    // ✅ Navigate with vendor data
+    Get.toNamed(
+      Routes.orderConfirmationView,
+      arguments: {
+        'cartItems': cartController.cartItems,
+        'vendor': vendor,
+        'subtotal': cartController.subtotal,
+        'taxAmount': cartController.taxAmount,
+        'packingCharge': cartController.packingCharge,
+        'totalAmount': cartController.totalAmount,
+        'instructions': cartController.instructionsController.text.trim(),
+        'appliedPromoCode': cartController.appliedPromoCode,
+        'promoDiscount': cartController.promoDiscount,
+      },
     );
   }
 
@@ -157,7 +203,6 @@ class _CartViewState extends State<CartView> {
         padding: EdgeInsets.all(20),
         child: Column(
           children: [
-            // Food item skeleton
             ...List.generate(
               3,
               (index) => Padding(
@@ -195,7 +240,6 @@ class _CartViewState extends State<CartView> {
                 ),
               ),
             ),
-            // Price summary skeleton
             Container(
               width: context.wp(100),
               padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),

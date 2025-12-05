@@ -1,12 +1,11 @@
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 import '../../../../../core/util/app_color.dart';
 import '../../../../../core/util/common_widgets.dart';
 import '../../../home/model/new_home_model.dart';
-import '../../../restaurant_detail_view/view/widget/quantity_control_widget.dart';
 import '../../view_model/pre_book_controller.dart';
+import 'pre_book_quantity_control_widget.dart';
 
 class PrebookInfoSection extends StatelessWidget {
   final String prebookName;
@@ -71,26 +70,14 @@ class PrebookInfoSection extends StatelessWidget {
                   ],
                 ),
               20.h,
-              GetBuilder<PrebookDetailController>(
-                id: 'prebook_quantity_$prebookId',
-                builder: (controller) {
-                  final quantity = controller.getQuantity(prebookId);
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      QuantityControlWidget(
-                        quantity: quantity,
-                        onIncrease: () => controller.incrementQuantity(prebookId),
-                        onDecrease: () => controller.decrementQuantity(prebookId),
-                        showRemoveButton: quantity > 0,
-                        buttonSize: quantity > 0 ? 40 : 60,
-                        iconSize: 18,
-                        addButtonText: quantity == 0 ? 'ADD' : null,
-                      ),
-                      3.h,
-                    ],
-                  );
-                },
+              Align(
+                alignment: Alignment.centerRight,
+                child: PrebookQuantityControlWidget(
+                  prebookId: prebookId,
+                  controller: controller,
+                  buttonSize: 40,
+                  iconSize: 18,
+                ),
               ),
             ],
           ),

@@ -26,7 +26,9 @@ class NumberOfGuestWidget extends StatelessWidget {
         boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ✅ Section Header
           Row(
             children: [
               SvgPicture.string(personSvg),
@@ -35,6 +37,8 @@ class NumberOfGuestWidget extends StatelessWidget {
             ],
           ),
           16.h,
+
+          // ✅ Guest Count Input Field
           buildCommonTextFormField(
             hintText: 'Enter number of guests',
             hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
@@ -50,6 +54,8 @@ class NumberOfGuestWidget extends StatelessWidget {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
           ),
           12.h,
+
+          // ✅ Guest Range Information
           text(
             text:
                 'Minimum ${OrderConfirmationController.minGuests} guest, Maximum ${OrderConfirmationController.maxGuests} guests',

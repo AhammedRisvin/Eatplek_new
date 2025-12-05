@@ -27,7 +27,7 @@ class OrderSummaryWidget extends StatelessWidget {
     this.showAddOnsSection = true,
     this.showTotalSection = true,
     this.mainDishesTitle = 'Main Dishes',
-    this.addOnsTitle = 'Add-ons',
+    this.addOnsTitle = 'Add-ons & Customizations',
     this.totalTitle = 'Total Amount',
   });
 
@@ -46,9 +46,8 @@ class OrderSummaryWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (title != null) ...[text(text: title!, size: 16, fontWeight: FontWeight.w500), 16.h],
+          if (title != null) ...[text(text: title!, size: 16, fontWeight: FontWeight.w600), 16.h],
 
-          // Main Dishes Section
           if (showMainDishesSection && mainDishes.isNotEmpty) ...[
             text(text: mainDishesTitle, size: 14, fontWeight: FontWeight.w600, color: AppColor.appPrimary),
             8.h,
@@ -66,7 +65,7 @@ class OrderSummaryWidget extends StatelessWidget {
             16.h,
           ],
 
-          // Add-ons Section
+          // ✅ ADD-ONS & CUSTOMIZATIONS SECTION (With Quantities)
           if (showAddOnsSection && addOns.isNotEmpty) ...[
             text(text: addOnsTitle, size: 14, fontWeight: FontWeight.w600, color: Colors.orange),
             8.h,
@@ -76,7 +75,8 @@ class OrderSummaryWidget extends StatelessWidget {
               physics: NeverScrollableScrollPhysics(),
               itemBuilder: (context, index) {
                 final item = addOns[index];
-                return _buildOrderItem(item, showQuantity: false);
+                // ✅ Show quantity for all add-ons and customizations
+                return _buildOrderItem(item, showQuantity: true);
               },
               separatorBuilder: (context, index) => 12.h,
               itemCount: addOns.length,
@@ -84,7 +84,7 @@ class OrderSummaryWidget extends StatelessWidget {
             16.h,
           ],
 
-          // Total Section
+          // ✅ TOTAL SECTION
           if (showTotalSection) ...[
             Divider(color: AppColor.black.withOpacity(0.1)),
             8.h,
@@ -106,6 +106,7 @@ class OrderSummaryWidget extends StatelessWidget {
     );
   }
 
+  /// ✅ Build individual order item with proper display
   Widget _buildOrderItem(OrderItem item, {required bool showQuantity}) {
     return Row(
       children: [
@@ -115,6 +116,7 @@ class OrderSummaryWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Name with quantity
               Row(
                 children: [
                   Expanded(
@@ -126,19 +128,22 @@ class OrderSummaryWidget extends StatelessWidget {
                       overFlow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (showQuantity) text(text: 'X${item.quantity}', size: 14, fontWeight: FontWeight.w500),
+                  // ✅ Show quantity for all items (main dishes and add-ons)
+                  if (showQuantity && item.quantity > 0)
+                    text(text: 'x${item.quantity}', size: 14, fontWeight: FontWeight.w500, color: AppColor.appPrimary),
                 ],
               ),
               6.h,
-              text(
-                text:
-                    showQuantity
-                        ? '₹ ${(item.price * item.quantity).toStringAsFixed(2)}'
-                        : '₹ ${item.price.toStringAsFixed(2)}',
-                size: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColor.black,
-              ),
+              if (item.price > 0)
+                text(
+                  text:
+                      showQuantity
+                          ? '₹ ${(item.price * item.quantity).toStringAsFixed(2)}'
+                          : '₹ ${item.price.toStringAsFixed(2)}',
+                  size: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColor.black,
+                ),
             ],
           ),
         ),

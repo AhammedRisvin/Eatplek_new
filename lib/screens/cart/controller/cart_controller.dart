@@ -80,6 +80,7 @@ class CartController extends GetxController {
           message: 'Cart updated',
           data: CartData(
             items: convertedItems,
+            vendor: cartModel?.data?.vendor, // ✅ PRESERVE VENDOR
             totals:
                 cartModel?.data?.totals != null
                     ? Totals(
@@ -153,8 +154,83 @@ class CartController extends GetxController {
 
       final response = await _apiClient.get(endpoint: Urls.getCartUrl);
 
+      // ✅ EXTENSIVE DEBUG LOGGING
+      debugPrint('═════════════════════════════════════════════════════════');
+      debugPrint('🔍 CART API RAW RESPONSE DEBUG');
+      debugPrint('═════════════════════════════════════════════════════════');
+      debugPrint('Full Response Type: ${response.runtimeType}');
+      debugPrint('Full Response: $response');
+
+      if (response != null && response is Map<String, dynamic>) {
+        debugPrint('\n📋 RESPONSE STRUCTURE:');
+        debugPrint('Top-level Keys: ${response.keys.toList()}');
+
+        // Check data key
+        if (response.containsKey('data')) {
+          final data = response['data'];
+          debugPrint('\n📦 DATA STRUCTURE:');
+          debugPrint('Data Type: ${data.runtimeType}');
+          debugPrint('Data is Map: ${data is Map}');
+
+          if (data is Map<String, dynamic>) {
+            debugPrint('Data Keys: ${data.keys.toList()}');
+
+            // Check vendor specifically
+            debugPrint('\n🏪 VENDOR CHECKING:');
+            debugPrint('Has vendor key: ${data.containsKey('vendor')}');
+
+            if (data.containsKey('vendor')) {
+              final vendor = data['vendor'];
+              debugPrint('Vendor Type: ${vendor.runtimeType}');
+              debugPrint('Vendor is null: ${vendor == null}');
+              debugPrint('Vendor Value: $vendor');
+
+              if (vendor is Map) {
+                debugPrint('Vendor Keys: ${vendor.keys.toList()}');
+                debugPrint('Vendor Name: ${vendor['name']}');
+                debugPrint('Vendor ID: ${vendor['id']}');
+              }
+            } else {
+              debugPrint('❌ VENDOR KEY NOT FOUND IN RESPONSE');
+              debugPrint('Available keys: ${data.keys.join(", ")}');
+            }
+
+            // Check items
+            debugPrint('\n📍 ITEMS CHECKING:');
+            debugPrint('Has items key: ${data.containsKey('items')}');
+            if (data.containsKey('items')) {
+              final items = data['items'];
+              debugPrint('Items Type: ${items.runtimeType}');
+              debugPrint('Items Count: ${items is List ? (items).length : "N/A"}');
+            }
+
+            // Check totals
+            debugPrint('\n💰 TOTALS CHECKING:');
+            debugPrint('Has totals key: ${data.containsKey('totals')}');
+            if (data.containsKey('totals')) {
+              final totals = data['totals'];
+              debugPrint('Totals Type: ${totals.runtimeType}');
+              if (totals is Map) {
+                debugPrint('Totals Keys: ${totals.keys.toList()}');
+              }
+            }
+          }
+        } else {
+          debugPrint('❌ No data key in response');
+        }
+      }
+
+      debugPrint('═════════════════════════════════════════════════════════\n');
+
       if (response != null && response is Map<String, dynamic>) {
         cartModel = CartModel.fromJson(response);
+
+        debugPrint('📦 PARSED MODEL DEBUG');
+        debugPrint('CartModel success: ${cartModel?.success}');
+        debugPrint('CartModel data exists: ${cartModel?.data != null}');
+        debugPrint('CartModel vendor: ${cartModel?.data?.vendor}');
+        debugPrint('CartModel vendor name: ${cartModel?.data?.vendor?.name}');
+        debugPrint('═════════════════════════════════════════════════════════\n');
 
         if (cartModel?.success == true && cartModel?.data != null) {
           _cartService.updateCartFromApi({
@@ -190,7 +266,7 @@ class CartController extends GetxController {
       errorMessage = 'Error loading cart: $e';
       isLoading = false;
       update(['cart_items', 'price_summary', 'empty_cart']);
-      debugPrint('Error fetching cart: $e');
+      debugPrint('❌ Error fetching cart: $e');
     }
   }
 
@@ -506,13 +582,6 @@ class CartController extends GetxController {
       Get.snackbar('Empty Cart', 'Please add items to cart before placing order', snackPosition: SnackPosition.BOTTOM);
       return;
     }
-
-    Get.snackbar(
-      'Order Placed',
-      'Your order has been placed successfully!',
-      snackPosition: SnackPosition.BOTTOM,
-      duration: Duration(seconds: 3),
-    );
 
     Get.toNamed(Routes.orderConfirmationView);
   }

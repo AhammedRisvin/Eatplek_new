@@ -8,11 +8,16 @@ import '../../../../core/util/app_color.dart';
 import '../../../../core/util/assets.dart';
 import '../../controller/order_confirmation_controller.dart';
 
-class AddressWidget extends StatelessWidget {
+class AddressWidget extends StatefulWidget {
   final OrderConfirmationController controller;
 
   const AddressWidget({super.key, required this.controller});
 
+  @override
+  State<AddressWidget> createState() => _AddressWidgetState();
+}
+
+class _AddressWidgetState extends State<AddressWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -28,71 +33,117 @@ class AddressWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ✅ Section Header
           Row(
             children: [
               SvgPicture.string(locationSvg),
               10.w,
-              text(text: 'Delivery Address', size: 16, fontWeight: FontWeight.w500),
+              text(text: 'Delivery Details', size: 16, fontWeight: FontWeight.w600),
             ],
           ),
           20.h,
 
-          // Full Name Field
+          // ✅ FULL NAME FIELD
+          text(text: 'Full Name *', size: 13, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.8)),
+          6.h,
           buildCommonTextFormField(
-            hintText: 'Full Name',
+            hintText: 'Enter your full name',
             hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
             borderColor: AppColor.black.withOpacity(0.1),
             bgColor: AppColor.white,
             keyboardType: TextInputType.name,
             textInputAction: TextInputAction.next,
-            controller: controller.fullNameController,
+            controller: widget.controller.fullNameController,
             context: context,
-            validator: controller.validateFullName,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            validator: widget.controller.validateFullName,
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           ),
-          10.h,
+          16.h,
 
-          // Phone Number Field
-          buildCommonTextFormField(
-            hintText: 'Phone Number',
-            hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
-            borderColor: AppColor.black.withOpacity(0.1),
-            bgColor: AppColor.white,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.next,
-            controller: controller.phoneController,
-            context: context,
-            validator: controller.validatePhoneNumber,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-
-            maxLength: 10,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+          // ✅ PHONE NUMBER FIELD
+          text(text: 'Phone Number *', size: 13, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.8)),
+          6.h,
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColor.white,
+                  border: Border.all(color: AppColor.black.withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: text(text: '+91', size: 14, fontWeight: FontWeight.w500),
+              ),
+              8.w,
+              Expanded(
+                child: buildCommonTextFormField(
+                  hintText: '10-digit number',
+                  hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
+                  borderColor: AppColor.black.withOpacity(0.1),
+                  bgColor: AppColor.white,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  controller: widget.controller.phoneController,
+                  context: context,
+                  validator: widget.controller.validatePhoneNumber,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                ),
+              ),
+            ],
           ),
-          10.h,
+          16.h,
 
-          // Address Field
+          // ✅ ADDRESS FIELD
+          text(
+            text: 'Delivery Address *',
+            size: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColor.black.withOpacity(0.8),
+          ),
+          6.h,
           buildCommonTextFormField(
-            hintText: 'Enter Full Address',
+            hintText: 'Enter complete address (street, building, flat number)',
             hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
             borderColor: AppColor.black.withOpacity(0.1),
             bgColor: AppColor.white,
             keyboardType: TextInputType.multiline,
             textInputAction: TextInputAction.done,
-            controller: controller.addressController,
+            controller: widget.controller.addressController,
             context: context,
-            validator: controller.validateAddress,
-            minLine: 4,
-            hintTextSize: 16,
-            contentPadding: EdgeInsets.only(left: 16, top: 12, right: 10, bottom: 12),
+            validator: widget.controller.validateAddress,
+            minLine: 3,
+            maxLine: 5,
+            hintTextSize: 13,
+            contentPadding: EdgeInsets.only(left: 14, top: 12, right: 14, bottom: 12),
             textAlignVertical: TextAlignVertical.top,
           ),
           12.h,
           text(
-            text: 'Your order will be delivered to this address.',
+            text: '✓ Your order will be delivered to this address',
             size: 12,
             fontWeight: FontWeight.w400,
-            color: AppColor.black.withOpacity(0.6),
-            textAlign: TextAlign.center,
+            color: Colors.green,
+          ),
+          16.h,
+
+          // ✅ GUEST COUNT FIELD (Optional but shown for restaurant orders)
+          text(text: 'Number of Guests', size: 13, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.8)),
+          6.h,
+          buildCommonTextFormField(
+            hintText: 'Enter number of guests (1-30)',
+            hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
+            borderColor: AppColor.black.withOpacity(0.1),
+            bgColor: AppColor.white,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            controller: widget.controller.guestCountController,
+            context: context,
+            validator: widget.controller.validateGuestCount,
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            onChanged: (value) => widget.controller.updateGuestCount(value),
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
           ),
         ],
       ),
