@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/home_controller.dart';
 
 class BannerCarouselSection extends StatelessWidget {
@@ -12,30 +13,32 @@ class BannerCarouselSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return GetBuilder<HomeController>(
       id: HomeController.carouselId,
       builder: (controller) {
         if (controller.isLoadingServices && controller.banners.isEmpty) {
-          return _buildCarouselSkeleton();
+          return _buildCarouselSkeleton(responsive);
         }
         if (controller.banners.isEmpty) {
           return const SizedBox.shrink();
         }
         if (controller.banners.length == 1) {
-          return _buildSingleBanner(controller.banners.first.bannerImage ?? '');
+          return _buildSingleBanner(controller.banners.first.bannerImage ?? '', responsive);
         }
-        return _buildCarousel(controller);
+        return _buildCarousel(controller, responsive);
       },
     );
   }
 
   /// Builds carousel for multiple banners
-  Widget _buildCarousel(HomeController controller) {
+  Widget _buildCarousel(HomeController controller, ResponsiveHelper responsive) {
     return Column(
       children: [
         CarouselSlider(
           options: CarouselOptions(
-            height: 180,
+            height: responsive.bannerHeight,
             autoPlay: true,
             autoPlayInterval: const Duration(seconds: 3),
             autoPlayAnimationDuration: const Duration(milliseconds: 800),
@@ -50,7 +53,7 @@ class BannerCarouselSection extends StatelessWidget {
               controller.banners.map((banner) {
                 return Builder(
                   builder: (BuildContext context) {
-                    return _buildBannerItem(banner.bannerImage ?? '');
+                    return _buildBannerItem(banner.bannerImage ?? '', responsive);
                   },
                 );
               }).toList(),
@@ -60,16 +63,16 @@ class BannerCarouselSection extends StatelessWidget {
   }
 
   /// Builds individual banner item
-  Widget _buildBannerItem(String imageUrl) {
+  Widget _buildBannerItem(String imageUrl, ResponsiveHelper responsive) {
     return Container(
-      width: Get.width,
-      margin: const EdgeInsets.symmetric(horizontal: 5.0),
+      width: responsive.screenWidth,
+      margin: EdgeInsets.symmetric(horizontal: responsive.spacing5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
         boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14)],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
@@ -85,16 +88,16 @@ class BannerCarouselSection extends StatelessWidget {
   }
 
   /// Builds single banner without carousel
-  Widget _buildSingleBanner(String imageUrl) {
+  Widget _buildSingleBanner(String imageUrl, ResponsiveHelper responsive) {
     return Container(
-      width: Get.width,
-      height: 180,
+      width: responsive.screenWidth,
+      height: responsive.bannerHeight,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
         boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14)],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
@@ -110,11 +113,14 @@ class BannerCarouselSection extends StatelessWidget {
   }
 
   /// Builds skeleton loading state
-  Widget _buildCarouselSkeleton() {
+  Widget _buildCarouselSkeleton(ResponsiveHelper responsive) {
     return Container(
-      width: Get.width,
-      height: 180,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: Colors.grey[300]),
+      width: responsive.screenWidth,
+      height: responsive.bannerHeight,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+        color: Colors.grey[300],
+      ),
       child: Skeletonizer(
         enabled: true,
         effect: ShimmerEffect(
@@ -123,7 +129,12 @@ class BannerCarouselSection extends StatelessWidget {
           duration: const Duration(milliseconds: 1500),
         ),
         child: Skeleton.leaf(
-          child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), color: Colors.grey[300])),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+              color: Colors.grey[300],
+            ),
+          ),
         ),
       ),
     );

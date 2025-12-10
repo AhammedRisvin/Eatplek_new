@@ -1,9 +1,8 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/home_controller.dart';
 import 'banner_carousal_section.dart';
 
@@ -14,53 +13,55 @@ class ErrorScreenSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: responsive.horizontalPadding20,
         child: Column(
           children: [
-            20.h,
+            SizedBox(height: responsive.spacing20),
             BannerCarouselSection(controller: controller),
             SizedBox(
-              height: Get.height * 0.4,
+              height: responsive.heightPercent(40),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 80, color: AppColor.redColor),
-                  20.h,
+                  Icon(Icons.error_outline, size: responsive.iconSizeXL, color: AppColor.redColor),
+                  SizedBox(height: responsive.spacing20),
                   text(
                     text: _getErrorTitle(controller.errorMessage),
-                    size: 18,
+                    size: responsive.fontSize18,
                     fontWeight: FontWeight.w600,
                     color: AppColor.black,
                     textAlign: TextAlign.center,
                   ),
-                  12.h,
+                  SizedBox(height: responsive.spacing12),
                   text(
                     text:
                         controller.errorMessage.isEmpty
                             ? 'Unable to load data. Please try again.'
                             : controller.errorMessage,
-                    size: 14,
+                    size: responsive.fontSize14,
                     fontWeight: FontWeight.w400,
                     color: AppColor.black.withOpacity(0.6),
                     textAlign: TextAlign.center,
                   ),
-                  30.h,
+                  SizedBox(height: responsive.spacing30),
                   if (!_isLocationError(controller.errorMessage))
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         button(
                           name: 'Retry',
-                          width: 120,
-                          height: 45,
-                          borderRadius: BorderRadius.circular(12),
-                          fontSize: 16,
+                          width: responsive.spacing120,
+                          height: responsive.buttonHeight,
+                          borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+                          fontSize: responsive.fontSize16,
                           fontWeight: FontWeight.w600,
                           onTap: controller.retryFetchingVendors,
                         ),
-                        15.w,
+                        SizedBox(width: responsive.spacing15),
                       ],
                     ),
                 ],

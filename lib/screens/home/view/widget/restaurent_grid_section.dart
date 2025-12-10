@@ -1,10 +1,9 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/home_controller.dart';
 import 'restaurant_card_widget.dart';
 
@@ -15,88 +14,115 @@ class VendorGridSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(children: [20.h, _buildSectionHeader(), 20.h, _buildVendorsGrid()]);
-  }
+    final responsive = ResponsiveHelper();
 
-  /// Builds section header with title and view all button
-  Widget _buildSectionHeader() {
-    return Row(
+    return Column(
       children: [
-        text(text: 'Delicious Options Around You', size: 16, fontWeight: FontWeight.w600, color: AppColor.black),
-        const Spacer(),
-        button(
-          name: 'View All',
-          width: 80,
-          height: 30,
-          borderRadius: BorderRadius.circular(30),
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-          onTap: controller.onViewAllRestaurants,
-          color: AppColor.appPrimary.withOpacity(0.1),
-          borderColor: AppColor.appPrimary.withOpacity(0.1),
-          textColor: AppColor.appPrimary,
-        ),
+        SizedBox(height: responsive.spacing20),
+        _buildSectionHeader(responsive),
+        SizedBox(height: responsive.spacing20),
+        _buildVendorsGrid(responsive),
       ],
     );
   }
 
-  /// Builds the vendors grid with loading and empty states
-  Widget _buildVendorsGrid() {
-    if (controller.isLoadingVendors && controller.vendors.isEmpty) {
-      return _buildSkeletonGrid();
-    }
-    if (!controller.isLoadingVendors && !controller.hasError && controller.vendors.isEmpty) {
-      return _buildEmptyState();
-    }
-    return GridView.builder(
-      shrinkWrap: true,
-      padding: EdgeInsets.zero,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 12,
-        childAspectRatio: Get.height * 0.001,
+  /// Builds section header with title and view all button
+  Widget _buildSectionHeader(ResponsiveHelper responsive) {
+    return Padding(
+      padding: responsive.horizontalPadding20,
+      child: Row(
+        children: [
+          text(
+            text: 'Delicious Options Around You',
+            size: responsive.fontSize16,
+            fontWeight: FontWeight.w600,
+            color: AppColor.black,
+          ),
+          const Spacer(),
+          button(
+            name: 'View All',
+            width: responsive.smallButtonWidth,
+            height: responsive.buttonSmallHeight,
+            borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+            fontSize: responsive.fontSize12,
+            fontWeight: FontWeight.w400,
+            onTap: controller.onViewAllRestaurants,
+            color: AppColor.appPrimary.withOpacity(0.1),
+            borderColor: AppColor.appPrimary.withOpacity(0.1),
+            textColor: AppColor.appPrimary,
+          ),
+        ],
       ),
-      itemCount: controller.vendors.length,
-      itemBuilder: (context, index) {
-        final vendor = controller.vendors[index];
-        return VendorCardWidget(vendor: vendor, onTap: () => controller.onRestaurantTapped(vendor));
-      },
     );
   }
 
-  /// Builds skeleton grid for loading state
-  Widget _buildSkeletonGrid() {
-    return Skeletonizer(
-      enabled: true,
-      effect: ShimmerEffect(
-        baseColor: Colors.grey.shade200,
-        highlightColor: Colors.grey.shade50,
-        duration: const Duration(milliseconds: 1500),
-      ),
+  /// Builds the vendors grid with loading and empty states
+  Widget _buildVendorsGrid(ResponsiveHelper responsive) {
+    if (controller.isLoadingVendors && controller.vendors.isEmpty) {
+      return _buildSkeletonGrid(responsive);
+    }
+    if (!controller.isLoadingVendors && !controller.hasError && controller.vendors.isEmpty) {
+      return _buildEmptyState(responsive);
+    }
+
+    return Padding(
+      padding: responsive.horizontalPadding20,
       child: GridView.builder(
         shrinkWrap: true,
         padding: EdgeInsets.zero,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 16,
-          crossAxisSpacing: 12,
-          childAspectRatio: Get.height * 0.001,
+          crossAxisCount: responsive.gridCrossAxisCount,
+          mainAxisSpacing: responsive.gridMainAxisSpacing,
+          crossAxisSpacing: responsive.gridCrossAxisSpacing,
+          childAspectRatio: responsive.gridChildAspectRatio,
         ),
-        itemCount: 6,
+        itemCount: controller.vendors.length,
         itemBuilder: (context, index) {
-          return _buildSkeletonCard();
+          final vendor = controller.vendors[index];
+          return VendorCardWidget(vendor: vendor, onTap: () => controller.onRestaurantTapped(vendor));
         },
       ),
     );
   }
 
+  /// Builds skeleton grid for loading state
+  Widget _buildSkeletonGrid(ResponsiveHelper responsive) {
+    return Padding(
+      padding: responsive.horizontalPadding20,
+      child: Skeletonizer(
+        enabled: true,
+        effect: ShimmerEffect(
+          baseColor: Colors.grey.shade200,
+          highlightColor: Colors.grey.shade50,
+          duration: const Duration(milliseconds: 1500),
+        ),
+        child: GridView.builder(
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: responsive.gridCrossAxisCount,
+            mainAxisSpacing: responsive.gridMainAxisSpacing,
+            crossAxisSpacing: responsive.gridCrossAxisSpacing,
+            childAspectRatio: responsive.gridChildAspectRatio,
+          ),
+          itemCount: 6,
+          itemBuilder: (context, index) {
+            return _buildSkeletonCard(responsive);
+          },
+        ),
+      ),
+    );
+  }
+
   /// Builds individual skeleton card
-  Widget _buildSkeletonCard() {
+  Widget _buildSkeletonCard(ResponsiveHelper responsive) {
     return Container(
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.grey[300]),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+        color: Colors.grey[300],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -105,21 +131,26 @@ class VendorGridSection extends StatelessWidget {
             child: Skeleton.leaf(
               child: Container(
                 decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(10), topRight: Radius.circular(10)),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(responsive.cardBorderRadius),
+                    topRight: Radius.circular(responsive.cardBorderRadius),
+                  ),
                   color: Colors.grey[300],
                 ),
               ),
             ),
           ),
-          10.h,
+          SizedBox(height: responsive.spacing10),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Skeleton.leaf(child: Container(height: 12, color: Colors.grey[300])),
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing8),
+            child: Skeleton.leaf(child: Container(height: responsive.spacing12, color: Colors.grey[300])),
           ),
-          5.h,
+          SizedBox(height: responsive.spacing5),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Skeleton.leaf(child: Container(height: 10, width: 80, color: Colors.grey[300])),
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing8),
+            child: Skeleton.leaf(
+              child: Container(height: responsive.spacing10, width: responsive.spacing80, color: Colors.grey[300]),
+            ),
           ),
         ],
       ),
@@ -127,21 +158,24 @@ class VendorGridSection extends StatelessWidget {
   }
 
   /// Builds empty state when no vendors found
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 40),
-        child: Column(
-          children: [
-            Icon(Icons.restaurant_menu, size: 60, color: Colors.grey[300]),
-            12.h,
-            text(
-              text: 'No vendors found',
-              size: 16,
-              fontWeight: FontWeight.w500,
-              color: AppColor.black.withOpacity(0.5),
-            ),
-          ],
+  Widget _buildEmptyState(ResponsiveHelper responsive) {
+    return Padding(
+      padding: responsive.horizontalPadding20,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: responsive.spacing40),
+          child: Column(
+            children: [
+              Icon(Icons.restaurant_menu, size: responsive.iconSizeXL, color: Colors.grey[300]),
+              SizedBox(height: responsive.spacing12),
+              text(
+                text: 'No vendors found',
+                size: responsive.fontSize16,
+                fontWeight: FontWeight.w500,
+                color: AppColor.black.withOpacity(0.5),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,9 +1,8 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../model/new_home_model.dart';
 import 'restaurant_card_widget.dart';
 
@@ -21,16 +20,24 @@ class MultipleBranchBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Container(
-      width: context.wp(100),
+      width: responsive.screenWidth,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(responsive.largeBorderRadius),
+          topRight: Radius.circular(responsive.largeBorderRadius),
+        ),
         color: AppColor.scaffoldColor,
       ),
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.8, // 80% of screen height
+      constraints: BoxConstraints(maxHeight: responsive.screenHeight * 0.8),
+      padding: EdgeInsets.only(
+        left: responsive.spacing16,
+        right: responsive.spacing16,
+        top: responsive.spacing10,
+        bottom: responsive.spacing20,
       ),
-      padding: const EdgeInsets.only(left: 16.0, right: 16, top: 10, bottom: 20),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -40,35 +47,43 @@ class MultipleBranchBottomSheet extends StatelessWidget {
             Align(
               alignment: Alignment.center,
               child: Container(
-                width: 120,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(color: const Color(0XFFD9D9D9), borderRadius: BorderRadius.circular(100)),
+                width: responsive.spacing120,
+                height: responsive.spacing4,
+                margin: EdgeInsets.only(bottom: responsive.spacing10),
+                decoration: BoxDecoration(
+                  color: const Color(0XFFD9D9D9),
+                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                ),
               ),
             ),
-            6.h,
+            SizedBox(height: responsive.spacing6),
             // Title
-            text(text: 'Select a Branch', size: 18, fontWeight: FontWeight.w600, color: AppColor.black),
-            6.h,
+            text(
+              text: 'Select a Branch',
+              size: responsive.fontSize18,
+              fontWeight: FontWeight.w600,
+              color: AppColor.black,
+            ),
+            SizedBox(height: responsive.spacing6),
             text(
               text: '$vendorName has multiple branches within your selected location radius.',
-              size: 12,
+              size: responsive.fontSize12,
               fontWeight: FontWeight.w400,
               color: AppColor.black.withOpacity(0.6),
             ),
-            8.h,
+            SizedBox(height: responsive.spacing8),
             Divider(color: AppColor.black.withOpacity(0.1), thickness: 1),
-            8.h,
+            SizedBox(height: responsive.spacing8),
             text(
               text: 'Please choose your preferred branch to continue your order.',
-              size: 12,
+              size: responsive.fontSize12,
               fontWeight: FontWeight.w300,
               color: AppColor.black.withOpacity(0.6),
             ),
-            20.h,
+            SizedBox(height: responsive.spacing20),
             // Branches Grid
-            _buildBranchesGrid(),
-            20.h,
+            _buildBranchesGrid(responsive),
+            SizedBox(height: responsive.spacing20),
           ],
         ),
       ),
@@ -76,16 +91,16 @@ class MultipleBranchBottomSheet extends StatelessWidget {
   }
 
   /// Build branches grid with vendor cards
-  Widget _buildBranchesGrid() {
+  Widget _buildBranchesGrid(ResponsiveHelper responsive) {
     return GridView.builder(
       padding: EdgeInsets.zero,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 12,
-        childAspectRatio: Get.height * 0.001,
+        crossAxisCount: responsive.gridCrossAxisCount,
+        mainAxisSpacing: responsive.gridMainAxisSpacing,
+        crossAxisSpacing: responsive.gridCrossAxisSpacing,
+        childAspectRatio: responsive.gridChildAspectRatio,
       ),
       itemCount: branches.length,
       itemBuilder: (context, index) {

@@ -1,11 +1,11 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/home_controller.dart';
 
 class HomeHeaderSection extends StatelessWidget {
@@ -15,22 +15,29 @@ class HomeHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Container(
-      padding: EdgeInsets.only(top: Get.mediaQuery.padding.top + 20, left: 20, right: 20, bottom: 20),
+      padding: EdgeInsets.only(
+        top: responsive.topPadding + responsive.spacing20,
+        left: responsive.spacing20,
+        right: responsive.spacing20,
+        bottom: responsive.spacing20,
+      ),
       child: Row(
         children: [
-          Expanded(child: _buildUserGreeting()),
-          10.w,
-          _buildIconButton(searchSvg, controller.onSearchTapped),
-          10.w,
-          _buildIconButton(bellSvg, controller.onNotificationTapped),
+          Expanded(child: _buildUserGreeting(responsive)),
+          SizedBox(width: responsive.spacing10),
+          _buildIconButton(searchSvg, controller.onSearchTapped, responsive),
+          SizedBox(width: responsive.spacing10),
+          _buildIconButton(bellSvg, controller.onNotificationTapped, responsive),
         ],
       ),
     );
   }
 
   /// Builds the user greeting section with location
-  Widget _buildUserGreeting() {
+  Widget _buildUserGreeting(ResponsiveHelper responsive) {
     return GetBuilder<HomeController>(
       id: HomeController.userGreetingId,
       builder: (controller) {
@@ -39,27 +46,41 @@ class HomeHeaderSection extends StatelessWidget {
           children: [
             Row(
               children: [
-                text(text: 'Hello,', size: 26, fontWeight: FontWeight.w600, color: AppColor.appPrimary),
-                10.w,
+                text(
+                  text: 'Hello,',
+                  size: responsive.fontSize26,
+                  fontWeight: FontWeight.w600,
+                  color: AppColor.appPrimary,
+                ),
+                SizedBox(width: responsive.spacing10),
                 Flexible(
                   child: text(
                     text: '${controller.userName} 👋',
-                    size: 26,
+                    size: responsive.fontSize26,
                     fontWeight: FontWeight.w600,
                     color: AppColor.black.withOpacity(0.6),
                   ),
                 ),
               ],
             ),
-            5.h,
-            // Location with change option
+            SizedBox(height: responsive.spacing5),
             Row(
               children: [
-                text(text: controller.userCity, size: 14, fontWeight: FontWeight.w300, color: AppColor.black),
-                10.w,
+                text(
+                  text: controller.userCity,
+                  size: responsive.fontSize14,
+                  fontWeight: FontWeight.w300,
+                  color: AppColor.black,
+                ),
+                SizedBox(width: responsive.spacing10),
                 GestureDetector(
                   onTap: controller.onLocationChangeTapped,
-                  child: text(text: 'Change', size: 10, fontWeight: FontWeight.w600, color: AppColor.appPrimary),
+                  child: text(
+                    text: 'Change',
+                    size: responsive.fontSize10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColor.appPrimary,
+                  ),
                 ),
               ],
             ),
@@ -70,14 +91,14 @@ class HomeHeaderSection extends StatelessWidget {
   }
 
   /// Builds an icon button with svg
-  Widget _buildIconButton(String svgString, VoidCallback onTap) {
+  Widget _buildIconButton(String svgString, VoidCallback onTap, ResponsiveHelper responsive) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(11),
+        padding: EdgeInsets.all(responsive.spacing11),
         decoration: BoxDecoration(
           color: AppColor.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
           border: Border.all(color: AppColor.black.withOpacity(0.1), width: 1),
         ),
         child: Center(child: SvgPicture.string(svgString)),

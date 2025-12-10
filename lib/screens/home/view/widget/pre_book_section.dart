@@ -1,10 +1,10 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/routes/routes.dart';
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../model/new_home_model.dart';
 
 class PrebookListSection extends StatelessWidget {
@@ -14,9 +14,12 @@ class PrebookListSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     if (prebookList.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
+
     final now = DateTime.now();
     final validPrebooks =
         prebookList.where((prebook) {
@@ -27,44 +30,58 @@ class PrebookListSection extends StatelessWidget {
 
           return now.isAfter(startDate) && now.isBefore(endDate);
         }).toList();
+
     if (validPrebooks.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        30.h,
+        SizedBox(height: responsive.spacing30),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: responsive.horizontalPadding20,
           child: Row(
             children: [
               Container(
-                height: 16,
-                width: 4,
-                decoration: BoxDecoration(color: AppColor.appPrimary, borderRadius: BorderRadius.circular(100)),
-                margin: EdgeInsets.only(right: 8),
+                height: responsive.spacing16,
+                width: responsive.spacing4,
+                decoration: BoxDecoration(
+                  color: AppColor.appPrimary,
+                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                ),
+                margin: EdgeInsets.only(right: responsive.spacing8),
               ),
-              text(text: 'Pre-Book Offers', size: 16, fontWeight: FontWeight.w600, color: AppColor.black),
-              8.w,
+              text(
+                text: 'Pre-Book Offers',
+                size: responsive.fontSize16,
+                fontWeight: FontWeight.w600,
+                color: AppColor.black,
+              ),
+              SizedBox(width: responsive.spacing8),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: EdgeInsets.symmetric(horizontal: responsive.spacing8, vertical: responsive.spacing3),
                 decoration: BoxDecoration(
                   color: AppColor.appPrimary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
                 ),
-                child: text(text: 'Limited Time', size: 10, fontWeight: FontWeight.w500, color: AppColor.appPrimary),
+                child: text(
+                  text: 'Limited Time',
+                  size: responsive.fontSize10,
+                  fontWeight: FontWeight.w500,
+                  color: AppColor.appPrimary,
+                ),
               ),
             ],
           ),
         ),
-        16.h,
+        SizedBox(height: responsive.spacing16),
         SizedBox(
-          height: 280,
+          height: responsive.spacing280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: validPrebooks.length,
-            padding: EdgeInsets.symmetric(horizontal: 20),
+            padding: responsive.horizontalPadding20,
             itemBuilder: (context, index) {
               final prebook = validPrebooks[index];
               return _PrebookCard(prebook: prebook);
@@ -78,7 +95,9 @@ class PrebookListSection extends StatelessWidget {
 
 class _PrebookCard extends StatelessWidget {
   final PrebookList prebook;
+
   const _PrebookCard({required this.prebook});
+
   String _getRemainingTimeText(DateTime? endDate) {
     if (endDate == null) return 'Offer ends soon';
     final now = DateTime.now();
@@ -99,9 +118,10 @@ class _PrebookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
     final basePrice = prebook.basePrice ?? 0.0;
     final effectivePrice = prebook.effectivePrice ?? 0.0;
-    const cardWidth = 160.0;
+    final cardWidth = responsive.screenWidth * 0.4; // 40% of screen width
 
     return GestureDetector(
       onTap: () {
@@ -109,11 +129,11 @@ class _PrebookCard extends StatelessWidget {
       },
       child: Container(
         width: cardWidth,
-        margin: EdgeInsets.only(right: 12),
+        margin: EdgeInsets.only(right: responsive.spacing12),
         decoration: BoxDecoration(
           color: AppColor.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 12, offset: Offset(0, 4))],
+          borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+          boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
           border: Border.all(color: AppColor.black.withOpacity(0.06)),
         ),
         child: Column(
@@ -122,65 +142,77 @@ class _PrebookCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(responsive.largeBorderRadius),
+                    topRight: Radius.circular(responsive.largeBorderRadius),
+                  ),
                   child: Image.network(
                     prebook.foodImage ?? '',
                     width: cardWidth,
-                    height: 140,
+                    height: responsive.cardImageHeight,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
                         width: cardWidth,
-                        height: 140,
+                        height: responsive.cardImageHeight,
                         color: AppColor.black.withOpacity(0.1),
-                        child: Icon(Icons.image_not_supported, color: AppColor.black.withOpacity(0.3)),
+                        child: Icon(
+                          Icons.image_not_supported,
+                          color: AppColor.black.withOpacity(0.3),
+                          size: responsive.iconSizeLarge,
+                        ),
                       );
                     },
                   ),
                 ),
                 Positioned(
-                  top: 8,
-                  right: 8,
+                  top: responsive.spacing8,
+                  right: responsive.spacing8,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.symmetric(horizontal: responsive.spacing8, vertical: responsive.spacing4),
                     decoration: BoxDecoration(
                       color: AppColor.appPrimary,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
                       boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.1), blurRadius: 4)],
                     ),
                     child: text(
                       text: _getRemainingTimeText(prebook.prebookEndDate),
-                      size: 9,
+                      size: responsive.fontSize9,
                       fontWeight: FontWeight.w600,
                       color: AppColor.white,
                     ),
                   ),
                 ),
                 Positioned(
-                  top: 8,
-                  left: 8,
+                  top: responsive.spacing8,
+                  left: responsive.spacing8,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    padding: EdgeInsets.symmetric(horizontal: responsive.spacing6, vertical: responsive.spacing3),
                     decoration: BoxDecoration(
                       color: AppColor.white,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
                       boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.1), blurRadius: 4)],
                     ),
-                    child: text(text: 'PRE-BOOK', size: 8, fontWeight: FontWeight.w700, color: AppColor.appPrimary),
+                    child: text(
+                      text: 'PRE-BOOK',
+                      size: responsive.fontSize8,
+                      fontWeight: FontWeight.w700,
+                      color: AppColor.appPrimary,
+                    ),
                   ),
                 ),
               ],
             ),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(10),
+                padding: EdgeInsets.all(responsive.spacing10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     text(
                       text: prebook.foodName ?? '',
-                      size: 13,
+                      size: responsive.fontSize13,
                       fontWeight: FontWeight.w600,
                       color: AppColor.black,
                       maxLines: 3,
@@ -188,13 +220,13 @@ class _PrebookCard extends StatelessWidget {
                     ),
                     text(
                       text: prebook.vendor?.hotelName ?? 'Restaurant',
-                      size: 11,
+                      size: responsive.fontSize11,
                       fontWeight: FontWeight.w400,
                       color: AppColor.black.withOpacity(0.6),
                       maxLines: 1,
                       overFlow: TextOverflow.ellipsis,
                     ),
-                    _buildPriceSection(basePrice, effectivePrice),
+                    _buildPriceSection(basePrice, effectivePrice, responsive),
                   ],
                 ),
               ),
@@ -205,22 +237,22 @@ class _PrebookCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceSection(double basePrice, double effectivePrice) {
+  Widget _buildPriceSection(double basePrice, double effectivePrice, ResponsiveHelper responsive) {
     final showStrikethrough = basePrice != effectivePrice && basePrice > 0;
 
     return Row(
       children: [
         text(
           text: '₹${effectivePrice.toStringAsFixed(0)}',
-          size: 13,
+          size: responsive.fontSize13,
           fontWeight: FontWeight.w600,
           color: AppColor.appPrimary,
         ),
-        7.w,
+        SizedBox(width: responsive.spacing7),
         if (showStrikethrough) ...[
           text(
             text: '₹${basePrice.toStringAsFixed(0)}',
-            size: 11,
+            size: responsive.fontSize11,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.5),
             decoration: TextDecoration.lineThrough,
