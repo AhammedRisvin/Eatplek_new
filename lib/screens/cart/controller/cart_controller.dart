@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
@@ -32,8 +33,14 @@ class CartController extends GetxController {
   final double _promoDiscount = 0.0;
   double get promoDiscount => _promoDiscount;
 
+  // Tracks whether a promo apply/remove API call is in flight
+  bool isPromoApplying = false;
+
   Timer? _quantityDebounceTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
+
+  // ── Public getter so CartExtrasController can access _cartService ─────────
+  CartService get cartService => _cartService;
 
   List<CartItem> get cartItems {
     try {
@@ -80,18 +87,24 @@ class CartController extends GetxController {
           message: 'Cart updated',
           data: CartData(
             items: convertedItems,
-            vendor: cartModel?.data?.vendor, // ✅ PRESERVE VENDOR
+            vendor: cartModel?.data?.vendor,
+            couponCode: cartModel?.data?.couponCode, // ✅ preserve coupon code
             totals:
                 cartModel?.data?.totals != null
                     ? Totals(
                       subTotal: cartModel!.data!.totals!.subTotal ?? 0,
                       addOnTotal: cartModel!.data!.totals!.addOnTotal ?? 0,
-                      customizationTotal: cartModel!.data!.totals!.customizationTotal ?? 0,
-                      packingChargeTotal: cartModel!.data!.totals!.packingChargeTotal ?? 0,
-                      discountTotal: cartModel!.data!.totals!.discountTotal ?? 0,
-                      couponDiscount: cartModel!.data!.totals!.couponDiscount ?? 0,
+                      customizationTotal:
+                          cartModel!.data!.totals!.customizationTotal ?? 0,
+                      packingChargeTotal:
+                          cartModel!.data!.totals!.packingChargeTotal ?? 0,
+                      discountTotal:
+                          cartModel!.data!.totals!.discountTotal ?? 0,
+                      couponDiscount:
+                          cartModel!.data!.totals!.couponDiscount ?? 0,
                       taxAmount: cartModel!.data!.totals!.taxAmount ?? 0,
-                      taxPercentage: cartModel!.data!.totals!.taxPercentage ?? 0,
+                      taxPercentage:
+                          cartModel!.data!.totals!.taxPercentage ?? 0,
                       grandTotal: _cartService.totalPrice.value,
                       itemCount: _cartService.itemCount.value,
                     )
@@ -120,6 +133,7 @@ class CartController extends GetxController {
   List<CartItem> _convertToCartItems(List<Map<String, dynamic>> items) {
     return items.map((item) {
       return CartItem(
+        id: item['id'],
         foodId: item['foodId'],
         foodName: item['foodName'],
         foodImage: item['foodImage'],
@@ -138,7 +152,12 @@ class CartController extends GetxController {
             }).toList(),
         addOns:
             (item['addOns'] as List?)?.map((a) {
-              return AddOn(addOnId: a['addOnId'], name: a['name'], price: a['price'], quantity: a['quantity']);
+              return AddOn(
+                addOnId: a['addOnId'],
+                name: a['name'],
+                price: a['price'],
+                quantity: a['quantity'],
+              );
             }).toList(),
         itemTotal: (item['itemTotal'] ?? 0).toDouble(),
       );
@@ -154,18 +173,16 @@ class CartController extends GetxController {
 
       final response = await _apiClient.get(endpoint: Urls.getCartUrl);
 
-      // ✅ EXTENSIVE DEBUG LOGGING
       debugPrint('═════════════════════════════════════════════════════════');
       debugPrint('🔍 CART API RAW RESPONSE DEBUG');
       debugPrint('═════════════════════════════════════════════════════════');
       debugPrint('Full Response Type: ${response.runtimeType}');
-      debugPrint('Full Response: $response');
+      log('Full Response: $response');
 
       if (response != null && response is Map<String, dynamic>) {
         debugPrint('\n📋 RESPONSE STRUCTURE:');
         debugPrint('Top-level Keys: ${response.keys.toList()}');
 
-        // Check data key
         if (response.containsKey('data')) {
           final data = response['data'];
           debugPrint('\n📦 DATA STRUCTURE:');
@@ -175,7 +192,6 @@ class CartController extends GetxController {
           if (data is Map<String, dynamic>) {
             debugPrint('Data Keys: ${data.keys.toList()}');
 
-            // Check vendor specifically
             debugPrint('\n🏪 VENDOR CHECKING:');
             debugPrint('Has vendor key: ${data.containsKey('vendor')}');
 
@@ -195,16 +211,16 @@ class CartController extends GetxController {
               debugPrint('Available keys: ${data.keys.join(", ")}');
             }
 
-            // Check items
             debugPrint('\n📍 ITEMS CHECKING:');
             debugPrint('Has items key: ${data.containsKey('items')}');
             if (data.containsKey('items')) {
               final items = data['items'];
               debugPrint('Items Type: ${items.runtimeType}');
-              debugPrint('Items Count: ${items is List ? (items).length : "N/A"}');
+              debugPrint(
+                'Items Count: ${items is List ? (items).length : "N/A"}',
+              );
             }
 
-            // Check totals
             debugPrint('\n💰 TOTALS CHECKING:');
             debugPrint('Has totals key: ${data.containsKey('totals')}');
             if (data.containsKey('totals')) {
@@ -230,22 +246,44 @@ class CartController extends GetxController {
         debugPrint('CartModel data exists: ${cartModel?.data != null}');
         debugPrint('CartModel vendor: ${cartModel?.data?.vendor}');
         debugPrint('CartModel vendor name: ${cartModel?.data?.vendor?.name}');
-        debugPrint('═════════════════════════════════════════════════════════\n');
+        debugPrint('CartModel couponCode: ${cartModel?.data?.couponCode}');
+        debugPrint(
+          '═════════════════════════════════════════════════════════\n',
+        );
 
         if (cartModel?.success == true && cartModel?.data != null) {
           _cartService.updateCartFromApi({
-            'items': cartModel!.data!.items?.map((item) => _convertCartItemToMap(item)).toList() ?? [],
+            'items':
+                cartModel!.data!.items
+                    ?.map((item) => _convertCartItemToMap(item))
+                    .toList() ??
+                [],
             'totals': {
               'itemCount': cartModel!.data!.totals?.itemCount ?? 0,
               'grandTotal': cartModel!.data!.totals?.grandTotal ?? 0,
               'subTotal': cartModel!.data!.totals?.subTotal ?? 0,
               'taxAmount': cartModel!.data!.totals?.taxAmount ?? 0,
               'taxPercentage': cartModel!.data!.totals?.taxPercentage ?? 0,
-              'packingChargeTotal': cartModel!.data!.totals?.packingChargeTotal ?? 0,
+              'packingChargeTotal':
+                  cartModel!.data!.totals?.packingChargeTotal ?? 0,
               'discountTotal': cartModel!.data!.totals?.discountTotal ?? 0,
               'couponDiscount': cartModel!.data!.totals?.couponDiscount ?? 0,
             },
           });
+
+          // ── Restore coupon state from API ─────────────────────────────────
+          // couponCode from API is the source of truth — always sync local state
+          final couponFromApi = cartModel!.data!.couponCode;
+          if (couponFromApi != null && couponFromApi.isNotEmpty) {
+            _appliedPromoCode = couponFromApi;
+            promoCodeController.text = couponFromApi;
+            _promoCodeError = '';
+            debugPrint('🎟️ Restored applied coupon from API: $couponFromApi');
+          } else {
+            _appliedPromoCode = '';
+            promoCodeController.clear();
+            _promoCodeError = '';
+          }
 
           hasError = false;
           isLoading = false;
@@ -260,7 +298,7 @@ class CartController extends GetxController {
         isLoading = false;
       }
 
-      update(['cart_items', 'price_summary', 'empty_cart']);
+      update(['cart_items', 'price_summary', 'empty_cart', 'promo_validation']);
     } catch (e) {
       hasError = true;
       errorMessage = 'Error loading cart: $e';
@@ -270,8 +308,12 @@ class CartController extends GetxController {
     }
   }
 
+  // ── Public wrapper so CouponsController can trigger a cart refresh ─────────
+  Future<void> fetchCartData() => _fetchCartData();
+
   Map<String, dynamic> _convertCartItemToMap(CartItem item) {
     return {
+      'id': item.id,
       'foodId': item.foodId,
       'foodName': item.foodName,
       'foodImage': item.foodImage,
@@ -280,13 +322,25 @@ class CartController extends GetxController {
       'customizations':
           item.customizations
               ?.map(
-                (c) => {'customizationId': c.customizationId, 'name': c.name, 'price': c.price, 'quantity': c.quantity},
+                (c) => {
+                  'customizationId': c.customizationId,
+                  'name': c.name,
+                  'price': c.price,
+                  'quantity': c.quantity,
+                },
               )
               .toList() ??
           [],
       'addOns':
           item.addOns
-              ?.map((a) => {'addOnId': a.addOnId, 'name': a.name, 'price': a.price, 'quantity': a.quantity})
+              ?.map(
+                (a) => {
+                  'addOnId': a.addOnId,
+                  'name': a.name,
+                  'price': a.price,
+                  'quantity': a.quantity,
+                },
+              )
               .toList() ??
           [],
       'itemTotal': item.itemTotal ?? 0,
@@ -294,7 +348,8 @@ class CartController extends GetxController {
   }
 
   int _detectScenario(CartItem item) {
-    final hasCustomizations = item.customizations != null && item.customizations!.isNotEmpty;
+    final hasCustomizations =
+        item.customizations != null && item.customizations!.isNotEmpty;
     final hasAddOns = item.addOns != null && item.addOns!.isNotEmpty;
 
     if (!hasCustomizations && !hasAddOns) {
@@ -308,7 +363,12 @@ class CartController extends GetxController {
     }
   }
 
-  Future<void> updateItemQuantity(String foodId, int newQuantity, {String? customizationId, String? addOnId}) async {
+  Future<void> updateItemQuantity(
+    String foodId,
+    int newQuantity, {
+    String? customizationId,
+    String? addOnId,
+  }) async {
     try {
       final itemIndex = cartItems.indexWhere((item) => item.foodId == foodId);
       if (itemIndex == -1) return;
@@ -316,18 +376,69 @@ class CartController extends GetxController {
       final item = cartItems[itemIndex];
       final scenario = _detectScenario(item);
 
-      final requestBody = _buildUpdateRequestBody(foodId, item, scenario, newQuantity, customizationId, addOnId);
+      final requestBody = _buildUpdateRequestBody(
+        foodId,
+        item,
+        scenario,
+        newQuantity,
+        customizationId,
+        addOnId,
+      );
 
       if (requestBody == null) return;
 
-      final response = await _apiClient.post(endpoint: Urls.addOrUpdateCartUrl, data: requestBody);
+      final response = await _apiClient.post(
+        endpoint: Urls.addOrUpdateCartUrl,
+        data: requestBody,
+      );
+
+      debugPrint('Update Cart Response: $response');
 
       if (response != null && response is Map<String, dynamic>) {
         if (response['success'] == true && response['data'] != null) {
+          final updatedModel = CartModel.fromJson(response);
+
+          if (updatedModel.data != null) {
+            cartModel = CartModel(
+              success: updatedModel.success,
+              message: updatedModel.message,
+              data: CartData(
+                id: updatedModel.data!.id,
+                cartCode: updatedModel.data!.cartCode,
+                user: updatedModel.data!.user,
+                serviceType: updatedModel.data!.serviceType,
+                isPrebookCart: updatedModel.data!.isPrebookCart,
+                vendor: updatedModel.data!.vendor ?? cartModel?.data?.vendor,
+                items: updatedModel.data!.items,
+                couponCode:
+                    updatedModel.data!.couponCode ??
+                    cartModel?.data?.couponCode,
+                totals: updatedModel.data!.totals,
+                lastUpdatedAt: updatedModel.data!.lastUpdatedAt,
+              ),
+            );
+          }
+
           _cartService.updateCartFromApi({
-            'items': response['data']['items'] ?? [],
-            'totals': response['data']['totals'] ?? {},
+            'items':
+                cartModel!.data!.items
+                    ?.map((item) => _convertCartItemToMap(item))
+                    .toList() ??
+                [],
+            'totals': {
+              'itemCount': cartModel!.data!.totals?.itemCount ?? 0,
+              'grandTotal': cartModel!.data!.totals?.grandTotal ?? 0,
+              'subTotal': cartModel!.data!.totals?.subTotal ?? 0,
+              'taxAmount': cartModel!.data!.totals?.taxAmount ?? 0,
+              'taxPercentage': cartModel!.data!.totals?.taxPercentage ?? 0,
+              'packingChargeTotal':
+                  cartModel!.data!.totals?.packingChargeTotal ?? 0,
+              'discountTotal': cartModel!.data!.totals?.discountTotal ?? 0,
+              'couponDiscount': cartModel!.data!.totals?.couponDiscount ?? 0,
+            },
           });
+
+          update(['cart_items', 'price_summary', 'empty_cart']);
         } else {
           Get.snackbar('Error', response['message'] ?? 'Failed to update cart');
         }
@@ -349,7 +460,11 @@ class CartController extends GetxController {
     final serviceType = _getCleanServiceType(Store.deliveryPreference);
 
     if (scenario == 1) {
-      return {'foodId': foodId, 'quantity': newQuantity, 'serviceType': serviceType};
+      return {
+        'foodId': foodId,
+        'quantity': newQuantity,
+        'serviceType': serviceType,
+      };
     } else if (scenario == 2) {
       if (customizationId == null && addOnId == null) {
         return {
@@ -364,6 +479,7 @@ class CartController extends GetxController {
           'quantity': item.quantity ?? 1,
           'serviceType': serviceType,
           'addOns': _buildUpdatedAddOnsArray(item, addOnId, newQuantity),
+          'updateAddOns': true,
         };
       }
     } else if (scenario == 3) {
@@ -372,7 +488,11 @@ class CartController extends GetxController {
           'foodId': foodId,
           'quantity': 1,
           'serviceType': serviceType,
-          'customizations': _buildUpdatedCustomizationsArray(item, customizationId, newQuantity),
+          'customizations': _buildUpdatedCustomizationsArray(
+            item,
+            customizationId,
+            newQuantity,
+          ),
         };
       }
     } else if (scenario == 4) {
@@ -381,7 +501,11 @@ class CartController extends GetxController {
           'foodId': foodId,
           'quantity': 1,
           'serviceType': serviceType,
-          'customizations': _buildUpdatedCustomizationsArray(item, customizationId, newQuantity),
+          'customizations': _buildUpdatedCustomizationsArray(
+            item,
+            customizationId,
+            newQuantity,
+          ),
           'addOns': _buildAddOnsArray(item),
         };
       } else if (addOnId != null) {
@@ -391,6 +515,7 @@ class CartController extends GetxController {
           'serviceType': serviceType,
           'customizations': _buildCustomizationsArray(item),
           'addOns': _buildUpdatedAddOnsArray(item, addOnId, newQuantity),
+          'updateAddOns': true,
         };
       }
     }
@@ -400,39 +525,70 @@ class CartController extends GetxController {
 
   List<Map<String, dynamic>> _buildAddOnsArray(CartItem item) {
     if (item.addOns == null || item.addOns!.isEmpty) return [];
-    return item.addOns!.map((addOn) => {'addOnId': addOn.addOnId, 'quantity': addOn.quantity ?? 0}).toList();
+    return item.addOns!
+        .map(
+          (addOn) => {
+            'addOnId': addOn.addOnId,
+            'quantity': addOn.quantity ?? 0,
+          },
+        )
+        .toList();
   }
 
-  List<Map<String, dynamic>> _buildUpdatedAddOnsArray(CartItem item, String addOnId, int newQuantity) {
+  List<Map<String, dynamic>> _buildUpdatedAddOnsArray(
+    CartItem item,
+    String addOnId,
+    int newQuantity,
+  ) {
     if (item.addOns == null || item.addOns!.isEmpty) return [];
     return item.addOns!.map((addOn) {
-      return {'addOnId': addOn.addOnId, 'quantity': addOn.addOnId == addOnId ? newQuantity : (addOn.quantity ?? 0)};
+      return {
+        'addOnId': addOn.addOnId,
+        'quantity':
+            addOn.addOnId == addOnId ? newQuantity : (addOn.quantity ?? 0),
+      };
     }).toList();
   }
 
   List<Map<String, dynamic>> _buildCustomizationsArray(CartItem item) {
     if (item.customizations == null || item.customizations!.isEmpty) return [];
     return item.customizations!
-        .map((custom) => {'customizationId': custom.customizationId, 'quantity': custom.quantity ?? 0})
+        .map(
+          (custom) => {
+            'customizationId': custom.customizationId,
+            'quantity': custom.quantity ?? 0,
+          },
+        )
         .toList();
   }
 
-  List<Map<String, dynamic>> _buildUpdatedCustomizationsArray(CartItem item, String customizationId, int newQuantity) {
+  List<Map<String, dynamic>> _buildUpdatedCustomizationsArray(
+    CartItem item,
+    String customizationId,
+    int newQuantity,
+  ) {
     if (item.customizations == null || item.customizations!.isEmpty) return [];
     return item.customizations!.map((custom) {
       return {
         'customizationId': custom.customizationId,
-        'quantity': custom.customizationId == customizationId ? newQuantity : (custom.quantity ?? 0),
+        'quantity':
+            custom.customizationId == customizationId
+                ? newQuantity
+                : (custom.quantity ?? 0),
       };
     }).toList();
   }
 
   void removeItem(String itemId) {
-    final items = _cartService.cartItems.where((item) => item['foodId'] != itemId).toList();
+    final items =
+        _cartService.cartItems
+            .where((item) => item['foodId'] != itemId)
+            .toList();
     _cartService.cartItems.value = items;
     update(['cart_items', 'price_summary', 'empty_cart']);
   }
 
+  // ─── Price getters ────────────────────────────────────────────────────────
   double get subtotal {
     if (cartModel?.data?.totals != null) {
       return cartModel!.data!.totals!.subTotal ?? 0;
@@ -440,9 +596,7 @@ class CartController extends GetxController {
     return 0;
   }
 
-  double get deliveryFee {
-    return 0.0;
-  }
+  double get deliveryFee => 0.0;
 
   double get taxAmount {
     if (cartModel?.data?.totals != null) {
@@ -479,14 +633,11 @@ class CartController extends GetxController {
     return 0;
   }
 
-  double get totalAmount {
-    return _cartService.totalPrice.value;
-  }
+  double get totalAmount => _cartService.totalPrice.value;
 
-  int get itemCount {
-    return _cartService.itemCount.value;
-  }
+  int get itemCount => _cartService.itemCount.value;
 
+  // ─── Instructions ─────────────────────────────────────────────────────────
   bool validateInstructions() {
     final instructions = instructionsController.text.trim();
 
@@ -514,29 +665,59 @@ class CartController extends GetxController {
     }
   }
 
-  void applyPromoCode() {
-    final code = promoCodeController.text.trim().toUpperCase();
+  // ─── Promo / Coupon ───────────────────────────────────────────────────────
 
-    if (code.isEmpty) {
-      _promoCodeError = 'Please enter a promo code';
-      update(['promo_validation']);
-      return;
-    }
-
+  /// Called by CouponsController after successful apply
+  void setAppliedPromoCode(String code) {
     _appliedPromoCode = code;
-    _promoCodeError = '';
     promoCodeController.text = code;
-
+    _promoCodeError = '';
+    isPromoApplying = false;
     update(['promo_validation', 'price_summary']);
-
-    Get.snackbar('Success', 'Promo code applied!', snackPosition: SnackPosition.BOTTOM);
   }
 
+  /// Called to show inline error in PromoCodeWidget
+  void setPromoError(String error) {
+    _promoCodeError = error;
+    isPromoApplying = false;
+    update(['promo_validation']);
+  }
+
+  /// Clears applied promo locally — used after successful remove API call
   void removePromoCode() {
     _appliedPromoCode = '';
     _promoCodeError = '';
+    isPromoApplying = false;
     promoCodeController.clear();
     update(['promo_validation', 'price_summary']);
+  }
+
+  /// DELETE coupon from cart API then refresh cart
+  Future<void> removeCouponFromCart({Function(String error)? onError}) async {
+    try {
+      final vendorId = cartModel?.data?.vendor?.id ?? '';
+      final response = await _apiClient.delete(
+        endpoint:
+            vendorId.isNotEmpty
+                ? '${Urls.removeCouponUrl}?vendor=$vendorId'
+                : Urls.removeCouponUrl,
+      );
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true) {
+          await _fetchCartData();
+          debugPrint('✅ Coupon removed');
+        } else {
+          onError?.call(response['message'] ?? 'Failed to remove coupon');
+        }
+      } else {
+        onError?.call('Failed to remove coupon');
+      }
+    } catch (e) {
+      debugPrint('❌ Error removing coupon: $e');
+      final message = e.toString().replaceAll('Exception: ', '');
+      onError?.call(message);
+    }
   }
 
   void formatPromoCode(String value) {
@@ -547,7 +728,8 @@ class CartController extends GetxController {
         selection: TextSelection.collapsed(offset: upperCaseValue.length),
       );
     }
-    clearPromoError();
+    // Always rebuild so button switches instantly on every keystroke
+    update(['promo_validation']);
   }
 
   void clearPromoError() {
@@ -557,16 +739,21 @@ class CartController extends GetxController {
     }
   }
 
+  // ─── Helpers ──────────────────────────────────────────────────────────────
   String _getCleanServiceType(String servicePreference) {
     String cleaned = servicePreference.toLowerCase().trim();
 
     if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
       return 'delivery';
-    } else if (cleaned.contains('dine-in') || cleaned.contains('dine in') || cleaned.contains('🍽')) {
+    } else if (cleaned.contains('dine-in') ||
+        cleaned.contains('dine in') ||
+        cleaned.contains('🍽')) {
       return 'dine-in';
     } else if (cleaned.contains('takeaway') || cleaned.contains('🎁')) {
       return 'takeaway';
-    } else if (cleaned.contains('car-dine') || cleaned.contains('car dine') || cleaned.contains('🚗')) {
+    } else if (cleaned.contains('car-dine') ||
+        cleaned.contains('car dine') ||
+        cleaned.contains('🚗')) {
       return 'car-dine-in';
     }
 
@@ -574,22 +761,23 @@ class CartController extends GetxController {
   }
 
   void placeOrder() {
-    if (!validateInstructions()) {
-      return;
-    }
+    if (!validateInstructions()) return;
 
     if (cartItems.isEmpty) {
-      Get.snackbar('Empty Cart', 'Please add items to cart before placing order', snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar(
+        'Empty Cart',
+        'Please add items to cart before placing order',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return;
     }
 
     Get.toNamed(Routes.orderConfirmationView);
   }
 
-  void retryFetchCart() {
-    _fetchCartData();
-  }
+  void retryFetchCart() => _fetchCartData();
 
+  // ─── Dispose ──────────────────────────────────────────────────────────────
   @override
   void onClose() {
     _quantityDebounceTimer?.cancel();

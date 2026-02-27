@@ -15,10 +15,16 @@ import 'api_endpoints.dart';
 
 class FittorConnect {
   late final FittorClient _client;
-  final Map<String, String> _commonHeaders = {'Accept': 'application/json', 'Content-Type': 'application/json'};
+  final Map<String, String> _commonHeaders = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  };
 
   FittorConnect() {
-    _client = FittorClient(defaultTimeout: const Duration(seconds: 30), enableLogging: true);
+    _client = FittorClient(
+      defaultTimeout: const Duration(seconds: 30),
+      enableLogging: true,
+    );
 
     // 🔵 ADD DETAILED LOGGING INTERCEPTOR
     _client.addInterceptor(
@@ -59,14 +65,19 @@ class FittorConnect {
 
     // Add normal logging interceptor (disabled but keeping your config)
     _client.addInterceptor(
-      LoggingInterceptor(logRequest: false, logResponse: false, logError: false, logTag: 'FittorConnect'),
+      LoggingInterceptor(
+        logRequest: false,
+        logResponse: false,
+        logError: false,
+        logTag: 'FittorConnect',
+      ),
     );
 
     // Add retry
     _client.addInterceptor(
       RetryInterceptor(
-        maxRetries: 3,
-        baseDelay: const Duration(milliseconds: 1000),
+        maxRetries: 1,
+        baseDelay: const Duration(milliseconds: 2000),
         retryOnTimeout: true,
         retryOnConnectionError: true,
       ),
@@ -113,7 +124,9 @@ class FittorConnect {
         case 400:
           return errorMessage.isNotEmpty ? errorMessage : 'Bad request';
         case 401:
-          return errorMessage.isNotEmpty ? errorMessage : 'Authentication required';
+          return errorMessage.isNotEmpty
+              ? errorMessage
+              : 'Authentication required';
         case 403:
           return errorMessage.isNotEmpty ? errorMessage : 'Access denied';
         case 404:
@@ -141,7 +154,11 @@ class FittorConnect {
     Map<String, String>? headers,
   }) async {
     try {
-      final response = await _client.get(_buildUrl(endpoint), queryParameters: queryParameters, headers: headers);
+      final response = await _client.get(
+        _buildUrl(endpoint),
+        queryParameters: queryParameters,
+        headers: headers,
+      );
 
       if (response.isSuccessful) {
         return parseResponse<T>(response);
@@ -153,10 +170,18 @@ class FittorConnect {
               await Store.clear();
               Get.offAllNamed(Routes.login);
             }
-            throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
+            throw FittorHttpException(
+              resp['message'],
+              response.statusCode,
+              response.statusMessage,
+            );
           }
         }
-        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Request failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -192,10 +217,18 @@ class FittorConnect {
               await Store.clear();
               Get.offAllNamed(Routes.login);
             }
-            throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
+            throw FittorHttpException(
+              resp['message'],
+              response.statusCode,
+              response.statusMessage,
+            );
           }
         }
-        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Request failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -226,10 +259,18 @@ class FittorConnect {
               await Store.clear();
               Get.offAllNamed(Routes.login);
             }
-            throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
+            throw FittorHttpException(
+              resp['message'],
+              response.statusCode,
+              response.statusMessage,
+            );
           }
         }
-        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Request failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -260,10 +301,18 @@ class FittorConnect {
               await Store.clear();
               Get.offAllNamed(Routes.login);
             }
-            throw FittorHttpException(resp['message'], response.statusCode, response.statusMessage);
+            throw FittorHttpException(
+              resp['message'],
+              response.statusCode,
+              response.statusMessage,
+            );
           }
         }
-        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Request failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -276,12 +325,20 @@ class FittorConnect {
     Map<String, String>? headers,
   }) async {
     try {
-      final response = await _client.delete(_buildUrl(endpoint), queryParameters: queryParameters, headers: headers);
+      final response = await _client.delete(
+        _buildUrl(endpoint),
+        queryParameters: queryParameters,
+        headers: headers,
+      );
 
       if (response.isSuccessful) {
         return parseResponse<T>(response);
       } else {
-        throw FittorHttpException('Request failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Request failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -301,11 +358,15 @@ class FittorConnect {
       final fileBytes = await file.readAsBytes();
       final fileName = file.path.split('/').last;
 
-      final boundary = 'fittor-boundary-${DateTime.now().millisecondsSinceEpoch}';
+      final boundary =
+          'fittor-boundary-${DateTime.now().millisecondsSinceEpoch}';
       final List<int> body = [];
 
       body.addAll('--$boundary\r\n'.codeUnits);
-      body.addAll('Content-Disposition: form-data; name="$fieldName"; filename="$fileName"\r\n'.codeUnits);
+      body.addAll(
+        'Content-Disposition: form-data; name="$fieldName"; filename="$fileName"\r\n'
+            .codeUnits,
+      );
       body.addAll('Content-Type: application/octet-stream\r\n\r\n'.codeUnits);
       body.addAll(fileBytes);
       body.addAll('\r\n'.codeUnits);
@@ -313,21 +374,35 @@ class FittorConnect {
       if (extraData != null) {
         for (final entry in extraData.entries) {
           body.addAll('--$boundary\r\n'.codeUnits);
-          body.addAll('Content-Disposition: form-data; name="${entry.key}"\r\n\r\n'.codeUnits);
+          body.addAll(
+            'Content-Disposition: form-data; name="${entry.key}"\r\n\r\n'
+                .codeUnits,
+          );
           body.addAll('${entry.value}\r\n'.codeUnits);
         }
       }
 
       body.addAll('--$boundary--\r\n'.codeUnits);
 
-      final uploadHeaders = {'Content-Type': 'multipart/form-data; boundary=$boundary', ...?headers};
+      final uploadHeaders = {
+        'Content-Type': 'multipart/form-data; boundary=$boundary',
+        ...?headers,
+      };
 
-      final response = await _client.post(_buildUrl(endpoint), body: Uint8List.fromList(body), headers: uploadHeaders);
+      final response = await _client.post(
+        _buildUrl(endpoint),
+        body: Uint8List.fromList(body),
+        headers: uploadHeaders,
+      );
 
       if (response.isSuccessful) {
         return parseResponse<T>(response);
       } else {
-        throw FittorHttpException('Upload failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Upload failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -347,7 +422,11 @@ class FittorConnect {
         await file.writeAsBytes(response.bodyBytes);
         return savePath;
       } else {
-        throw FittorHttpException('Download failed', response.statusCode, response.statusMessage);
+        throw FittorHttpException(
+          'Download failed',
+          response.statusCode,
+          response.statusMessage,
+        );
       }
     } catch (e) {
       throw _handleError(e);
@@ -414,8 +493,12 @@ class UploadProgress {
 }
 
 class MIconsUploader {
-  static Stream<UploadProgress> uploadFiles({required Map<String, File> files, String? folder}) {
-    final StreamController<UploadProgress> controller = StreamController.broadcast();
+  static Stream<UploadProgress> uploadFiles({
+    required Map<String, File> files,
+    String? folder,
+  }) {
+    final StreamController<UploadProgress> controller =
+        StreamController.broadcast();
     final cloudinary = Cloudinary.signedConfig(
       apiKey: "856197342338424",
       apiSecret: "TbKAxeMx8jsxTWruUNlZ1Vc1uxU",
@@ -435,18 +518,47 @@ class MIconsUploader {
           fileName: fileName,
           progressCallback: (count, total) {
             double progress = count / total;
-            controller.add(UploadProgress(fileKey: fileKey, fileName: fileName, progress: progress));
+            controller.add(
+              UploadProgress(
+                fileKey: fileKey,
+                fileName: fileName,
+                progress: progress,
+              ),
+            );
           },
         );
         uploadedUrls[fileKey] = response.secureUrl ?? '';
-        controller.add(UploadProgress(fileKey: fileKey, fileName: fileName, progress: 1.0, url: response.secureUrl));
+        controller.add(
+          UploadProgress(
+            fileKey: fileKey,
+            fileName: fileName,
+            progress: 1.0,
+            url: response.secureUrl,
+          ),
+        );
       } catch (e) {
-        controller.add(UploadProgress(fileKey: fileKey, fileName: fileName, progress: 0.0, error: e.toString()));
+        controller.add(
+          UploadProgress(
+            fileKey: fileKey,
+            fileName: fileName,
+            progress: 0.0,
+            error: e.toString(),
+          ),
+        );
       }
     }
 
-    Future.wait(files.entries.map((entry) => uploadFile(entry.key, entry.value))).then((_) {
-      controller.add(UploadProgress(fileKey: 'all', fileName: 'all', progress: 1.0, urls: uploadedUrls));
+    Future.wait(
+      files.entries.map((entry) => uploadFile(entry.key, entry.value)),
+    ).then((_) {
+      controller.add(
+        UploadProgress(
+          fileKey: 'all',
+          fileName: 'all',
+          progress: 1.0,
+          urls: uploadedUrls,
+        ),
+      );
       controller.close();
     });
 

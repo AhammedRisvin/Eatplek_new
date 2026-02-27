@@ -1,3 +1,4 @@
+import 'package:eatplek_app/screens/cart/controller/cart_extra_controller.dart';
 import 'package:eatplek_app/screens/cart/controller/cart_service.dart';
 import 'package:get/instance_manager.dart';
 
@@ -8,5 +9,6 @@ class CartBindings extends Bindings {
   void dependencies() {
     Get.lazyPut<CartController>(() => CartController());
     Get.lazyPut<CartService>(() => CartService());
+    Get.lazyPut<CartExtrasController>(() => CartExtrasController());
   }
 }

@@ -1,8 +1,8 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 
 class QuantityControlWidget extends StatelessWidget {
   final num quantity;
@@ -13,7 +13,7 @@ class QuantityControlWidget extends StatelessWidget {
   final double iconSize;
   final EdgeInsets? margin;
   final String? addButtonText;
-  final bool isCompactMode; // ✅ NEW: Flag to determine if this is used in add-ons/customization
+  final bool isCompactMode;
 
   const QuantityControlWidget({
     super.key,
@@ -25,13 +25,14 @@ class QuantityControlWidget extends StatelessWidget {
     this.iconSize = 14,
     this.margin,
     this.addButtonText,
-    this.isCompactMode = false, // ✅ Default false (full-width mode)
+    this.isCompactMode = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    // ✅ When showing full-width "Add" button (food card scenario - quantity is 0)
-    // This check is important: when quantity becomes 0, we should show Add button
+    final responsive = ResponsiveHelper();
+
+    // Full-width "Add" button (food card scenario - quantity is 0)
     if (addButtonText != null && quantity == 0 && !isCompactMode) {
       return Container(
         margin: margin,
@@ -41,22 +42,30 @@ class QuantityControlWidget extends StatelessWidget {
           child: Container(
             width: double.infinity,
             height: buttonSize + 8,
-            decoration: BoxDecoration(color: AppColor.appPrimary, borderRadius: BorderRadius.circular(100)),
+            decoration: BoxDecoration(
+              color: AppColor.appPrimary,
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+            ),
             child: Center(
-              child: text(text: addButtonText!, color: AppColor.white, size: 13, fontWeight: FontWeight.w600),
+              child: text(
+                text: addButtonText!,
+                color: AppColor.white,
+                size: responsive.fontSize13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
       );
     }
 
-    // ✅ Compact quantity control (add-ons, customizations, OR when quantity > 0)
+    // Compact quantity control
     return Container(
       margin: margin,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Decrease button - only show if quantity > 0
+          // Decrease button
           if (showRemoveButton && quantity > 0)
             GestureDetector(
               onTap: onDecrease,
@@ -65,24 +74,28 @@ class QuantityControlWidget extends StatelessWidget {
                 height: buttonSize,
                 decoration: BoxDecoration(
                   border: Border.all(color: AppColor.black.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(6), // ✅ Rounded square (not fully rounded)
+                  borderRadius: BorderRadius.circular(responsive.spacing6),
                 ),
                 child: Icon(Icons.remove, color: AppColor.black.withOpacity(0.4), size: iconSize),
               ),
             ),
 
-          // Quantity display - only show if quantity > 0
+          // Quantity display
           if (quantity > 0) ...[
-            5.w,
+            SizedBox(width: responsive.spacing5),
             Container(
-              constraints: BoxConstraints(minWidth: 20),
+              constraints: BoxConstraints(minWidth: responsive.spacing20),
               child: Text(
                 quantity.toString(),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.6)),
+                style: TextStyle(
+                  fontSize: responsive.fontSize14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColor.black.withOpacity(0.6),
+                ),
               ),
             ),
-            5.w,
+            SizedBox(width: responsive.spacing5),
           ],
 
           // Add/Increase button
@@ -93,7 +106,7 @@ class QuantityControlWidget extends StatelessWidget {
               height: buttonSize,
               decoration: BoxDecoration(
                 color: AppColor.appPrimary,
-                borderRadius: BorderRadius.circular(6), // ✅ Rounded square (not fully rounded circle)
+                borderRadius: BorderRadius.circular(responsive.spacing6),
               ),
               child: Icon(Icons.add, color: AppColor.white, size: iconSize),
             ),

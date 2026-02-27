@@ -38,7 +38,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text('Failed to load order details'),
-                  ElevatedButton(onPressed: controller.refreshOrder, child: Text('Retry')),
+                  ElevatedButton(
+                    onPressed: controller.refreshOrder,
+                    child: Text('Retry'),
+                  ),
                 ],
               ),
             );
@@ -60,7 +63,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                 ),
                 GetBuilder<OrderDetailsController>(
                   id: 'order_details',
-                  builder: (controller) => _buildTimeEstimate(controller.order!.estimatedDeliveryTime),
+                  builder:
+                      (controller) => _buildTimeEstimate(
+                        controller.order!.estimatedDeliveryTime,
+                      ),
                 ),
                 GetBuilder<OrderDetailsController>(
                   id: 'order_details',
@@ -72,7 +78,8 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                       ),
                 ),
                 text(
-                  text: 'Please show your order ID at the counter to collect your food.',
+                  text:
+                      'Please show your order ID at the counter to collect your food.',
                   size: 12,
                   fontWeight: FontWeight.w400,
                   color: AppColor.black.withOpacity(0.6),
@@ -81,7 +88,7 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                 GetBuilder<OrderDetailsController>(
                   id: 'order_details',
                   builder: (controller) {
-                    return OrderSummaryWidget(
+                    return ResponsiveOrderSummaryWidget(
                       mainDishes: controller.getMainDishes(),
                       addOns: controller.getAddOns(),
                       totalAmount: controller.getTotalPrice(),
@@ -97,7 +104,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                 ),
                 GetBuilder<OrderDetailsController>(
                   id: 'order_details',
-                  builder: (controller) => _buildAdditionalInfo(controller.order!.additionalNotes),
+                  builder:
+                      (controller) => _buildAdditionalInfo(
+                        controller.order!.additionalNotes,
+                      ),
                 ),
                 GetBuilder<OrderDetailsController>(
                   id: 'order_details',
@@ -107,7 +117,6 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                       subtotal: pricing.subtotal,
                       deliveryFee: pricing.deliveryFee,
                       taxAmount: pricing.taxAmount,
-                      taxPercentage: pricing.taxPercentage,
                       packingCharge: pricing.packingCharge,
                       promoDiscount: pricing.promoDiscount,
                       // appliedPromoCode: controller.order!.promoCode,
@@ -139,7 +148,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                   height: 60,
                   fontWeight: FontWeight.w600,
                   borderRadius: BorderRadius.circular(100),
-                  onTap: controller.order!.canCancel ? controller.cancelOrder : null,
+                  onTap:
+                      controller.order!.canCancel
+                          ? controller.cancelOrder
+                          : null,
                   color:
                       controller.order!.canCancel
                           ? Color(0Xfffe6308).withOpacity(0.1)
@@ -148,7 +160,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
                       controller.order!.canCancel
                           ? Color(0Xfffe6308).withOpacity(0.1)
                           : AppColor.black.withOpacity(0.1),
-                  textColor: controller.order!.canCancel ? Color(0Xfffe6308) : AppColor.black.withOpacity(0.4),
+                  textColor:
+                      controller.order!.canCancel
+                          ? Color(0Xfffe6308)
+                          : AppColor.black.withOpacity(0.4),
                 ),
                 10.h,
                 text(
@@ -182,7 +197,13 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         color: AppColor.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColor.black.withOpacity(0.03), width: 1),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.black.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 0),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -190,7 +211,12 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
         children: [
           text(text: 'Additional Notes', size: 18, fontWeight: FontWeight.w600),
           10.h,
-          text(text: additionalNotes, size: 13, fontWeight: FontWeight.w300, color: AppColor.black.withOpacity(0.4)),
+          text(
+            text: additionalNotes,
+            size: 13,
+            fontWeight: FontWeight.w300,
+            color: AppColor.black.withOpacity(0.4),
+          ),
         ],
       ),
     );
@@ -201,7 +227,10 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       margin: EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(color: AppColor.appPrimary, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: AppColor.appPrimary,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
         children: [
           SvgPicture.string(scooterSvg),
@@ -237,8 +266,17 @@ class _OrderDetailsViewState extends State<OrderDetailsView> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColor.white,
-              border: Border.all(color: Colors.black.withOpacity(0.06), width: 1.5),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 2))],
+              border: Border.all(
+                color: Colors.black.withOpacity(0.06),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             padding: const EdgeInsets.all(12),
             child: SvgPicture.string(arrowBack2),

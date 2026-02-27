@@ -1,10 +1,10 @@
 import 'package:eatplek_app/core/routes/routes.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../../cart/controller/cart_service.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
 
@@ -13,6 +13,8 @@ class BottomCartBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return GetBuilder<RestaurantDetailViewController>(
       id: 'bottom_cart_bar',
       builder: (controller) {
@@ -38,16 +40,16 @@ class BottomCartBar extends StatelessWidget {
               width: Get.width,
               decoration: BoxDecoration(
                 color: AppColor.appPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.largeBorderRadius)),
                 boxShadow: [
                   BoxShadow(color: AppColor.appPrimary.withOpacity(0.3), blurRadius: 20, offset: Offset(0, -5)),
                 ],
               ),
               padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 12,
-                bottom: 16 + MediaQuery.of(context).viewPadding.bottom,
+                left: responsive.spacing16,
+                right: responsive.spacing16,
+                top: responsive.spacing12,
+                bottom: responsive.spacing16 + MediaQuery.of(context).viewPadding.bottom,
               ),
               child: Row(
                 children: [
@@ -58,14 +60,14 @@ class BottomCartBar extends StatelessWidget {
                       children: [
                         text(
                           text: '$totalItems $itemText added',
-                          size: 14,
+                          size: responsive.fontSize14,
                           fontWeight: FontWeight.w500,
                           color: AppColor.white,
                         ),
-                        4.h,
+                        SizedBox(height: responsive.spacing4),
                         text(
                           text: '₹${totalPrice.toStringAsFixed(0)}',
-                          size: 18,
+                          size: responsive.fontSize18,
                           fontWeight: FontWeight.w600,
                           color: AppColor.white,
                         ),
@@ -78,14 +80,22 @@ class BottomCartBar extends StatelessWidget {
                       Get.toNamed(Routes.cartView);
                     },
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(100)),
+                      padding: EdgeInsets.symmetric(horizontal: responsive.spacing16, vertical: responsive.spacing10),
+                      decoration: BoxDecoration(
+                        color: AppColor.white,
+                        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          text(text: 'View Cart', size: 14, fontWeight: FontWeight.w600, color: AppColor.appPrimary),
-                          4.w,
-                          Icon(Icons.arrow_forward, size: 14, color: AppColor.appPrimary),
+                          text(
+                            text: 'View Cart',
+                            size: responsive.fontSize14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColor.appPrimary,
+                          ),
+                          SizedBox(width: responsive.spacing4),
+                          Icon(Icons.arrow_forward, size: responsive.fontSize14, color: AppColor.appPrimary),
                         ],
                       ),
                     ),

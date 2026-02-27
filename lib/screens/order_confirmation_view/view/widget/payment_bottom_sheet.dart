@@ -1,24 +1,26 @@
+import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../core/util/app_color.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/order_confirmation_controller.dart';
 
-class PaymentBottomSheet extends StatelessWidget {
+class ResponsivePaymentBottomSheet extends StatelessWidget {
   final OrderConfirmationController controller;
 
-  const PaymentBottomSheet({super.key, required this.controller});
+  const ResponsivePaymentBottomSheet({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Container(
-      width: context.wp(100),
-      padding: const EdgeInsets.only(left: 16.0, right: 16, top: 10, bottom: 20),
+      width: responsive.widthPercent(100),
+      padding: responsive.bottomSheetPadding,
       decoration: BoxDecoration(
         color: AppColor.scaffoldColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.extraLargeBorderRadius)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -28,30 +30,38 @@ class PaymentBottomSheet extends StatelessWidget {
           Align(
             alignment: Alignment.center,
             child: Container(
-              width: 120,
-              height: 4,
-              margin: EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(color: Color(0XFFD9D9D9), borderRadius: BorderRadius.circular(100)),
+              width: responsive.spacing120,
+              height: responsive.spacing4,
+              margin: EdgeInsets.only(bottom: responsive.spacing10),
+              decoration: BoxDecoration(
+                color: const Color(0XFFD9D9D9),
+                borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+              ),
             ),
           ),
-          6.h,
+          SizedBox(height: responsive.spacing6),
 
           // ✅ Title
-          text(text: 'Select Your Payment Method', size: 18, fontWeight: FontWeight.w600, color: AppColor.black),
-          6.h,
+          text(
+            text: 'Select Your Payment Method',
+            size: responsive.fontSize18,
+            fontWeight: FontWeight.w600,
+            color: AppColor.black,
+          ),
+          SizedBox(height: responsive.spacing6),
 
           // ✅ Description
           text(
             text: 'Choose a secure and convenient way to pay for your order.',
-            size: 14,
+            size: responsive.fontSize14,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),
           ),
-          12.h,
+          SizedBox(height: responsive.spacing12),
 
           // ✅ Divider
-          Divider(color: AppColor.black.withOpacity(0.06), thickness: 1),
-          12.h,
+          Divider(color: AppColor.black.withOpacity(0.06), thickness: responsive.dividerThickness),
+          SizedBox(height: responsive.spacing12),
 
           // ✅ Payment Methods List
           GetBuilder<OrderConfirmationController>(
@@ -60,7 +70,7 @@ class PaymentBottomSheet extends StatelessWidget {
               return ListView.separated(
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
-                physics: NeverScrollableScrollPhysics(),
+                physics: const NeverScrollableScrollPhysics(),
                 itemBuilder: (context, index) {
                   final paymentMethod = controller.paymentMethods[index];
                   final isSelected = controller.selectedPaymentMethodIndex == index;
@@ -68,27 +78,27 @@ class PaymentBottomSheet extends StatelessWidget {
                   return GestureDetector(
                     onTap: () => controller.selectPaymentMethod(index),
                     child: Container(
-                      width: context.wp(100),
-                      padding: EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                      width: responsive.widthPercent(100),
+                      padding: EdgeInsets.symmetric(vertical: responsive.spacing14, horizontal: responsive.spacing14),
                       decoration: BoxDecoration(
                         color: AppColor.white,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
                         border: Border.all(
                           color: isSelected ? AppColor.appPrimary : AppColor.black.withOpacity(0.08),
-                          width: isSelected ? 2 : 1,
+                          width: isSelected ? responsive.borderWidthThick : responsive.borderWidthThin,
                         ),
                         boxShadow: [
                           if (isSelected)
                             BoxShadow(
                               color: AppColor.appPrimary.withOpacity(0.2),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+                              blurRadius: responsive.shadowBlurMedium,
+                              offset: Offset(0, responsive.shadowOffsetMedium),
                             )
                           else
                             BoxShadow(
                               color: AppColor.black.withOpacity(0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                              blurRadius: responsive.shadowBlurSmall,
+                              offset: Offset(0, responsive.shadowOffsetSmall),
                             ),
                         ],
                       ),
@@ -96,27 +106,31 @@ class PaymentBottomSheet extends StatelessWidget {
                         children: [
                           // ✅ Payment method image
                           Container(
-                            width: 50,
-                            height: 50,
+                            width: responsive.paymentIconSize,
+                            height: responsive.paymentIconSize,
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
                               color: AppColor.scaffoldColor,
                             ),
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
                               child: Image.network(
                                 paymentMethod['imageUrl'],
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
                                   return Container(
                                     color: AppColor.appPrimary.withOpacity(0.1),
-                                    child: Icon(Icons.payment, color: AppColor.appPrimary),
+                                    child: Icon(
+                                      Icons.payment,
+                                      color: AppColor.appPrimary,
+                                      size: responsive.iconSizeMedium,
+                                    ),
                                   );
                                 },
                               ),
                             ),
                           ),
-                          14.w,
+                          SizedBox(width: responsive.spacing14),
 
                           // ✅ Payment method info
                           Expanded(
@@ -125,14 +139,14 @@ class PaymentBottomSheet extends StatelessWidget {
                               children: [
                                 text(
                                   text: paymentMethod['name'] ?? 'Payment Method',
-                                  size: 15,
+                                  size: responsive.fontSize15,
                                   fontWeight: FontWeight.w600,
                                   color: AppColor.black,
                                 ),
-                                4.h,
+                                SizedBox(height: responsive.spacing4),
                                 text(
                                   text: paymentMethod['description'] ?? 'Secure payment',
-                                  size: 12,
+                                  size: responsive.fontSize12,
                                   fontWeight: FontWeight.w400,
                                   color: AppColor.black.withOpacity(0.6),
                                   maxLines: 1,
@@ -155,20 +169,20 @@ class PaymentBottomSheet extends StatelessWidget {
                     ),
                   );
                 },
-                separatorBuilder: (context, index) => 12.h,
+                separatorBuilder: (context, index) => SizedBox(height: responsive.spacing12),
                 itemCount: controller.paymentMethods.length,
               );
             },
           ),
-          20.h,
+          SizedBox(height: responsive.spacing20),
 
           // ✅ Payment button
           button(
             name: 'Pay Now',
-            width: context.wp(100),
-            height: 56,
-            borderRadius: BorderRadius.circular(100),
-            fontSize: 16,
+            width: responsive.widthPercent(100),
+            height: responsive.formFieldHeight,
+            borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+            fontSize: responsive.fontSize16,
             fontWeight: FontWeight.w600,
             onTap: () {
               final selectedPaymentMethod = controller.paymentMethods[controller.selectedPaymentMethodIndex];
@@ -181,47 +195,39 @@ class PaymentBottomSheet extends StatelessWidget {
               debugPrint('Amount: ₹${controller.getTotalPrice()}');
               debugPrint('═════════════════════════════════════════');
 
-              // ✅ TODO: Integrate with payment gateway
-              // Get.back();
-              // TODO: Call payment processing method
-              // Example: controller.processPayment(selectedPaymentMethod);
-
               Get.snackbar(
                 'Payment Initiated',
                 'Processing ${selectedPaymentMethod['name']} payment...',
                 snackPosition: SnackPosition.BOTTOM,
                 backgroundColor: AppColor.appPrimary.withOpacity(0.8),
                 colorText: Colors.white,
-                duration: Duration(seconds: 2),
+                duration: const Duration(seconds: 2),
               );
 
-              // For now, just close the sheet after 2 seconds
-              Future.delayed(Duration(seconds: 2), () {
+              Future.delayed(const Duration(seconds: 2), () {
                 Get.back();
-                // TODO: Navigate to order success page
-                // Get.offAllNamed(Routes.orderSuccess);
               });
             },
           ),
-          10.h,
+          SizedBox(height: responsive.spacing10),
 
           // ✅ Security info
           Container(
-            width: context.wp(100),
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            width: responsive.widthPercent(100),
+            padding: EdgeInsets.symmetric(vertical: responsive.spacing12, horizontal: responsive.spacing12),
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
               border: Border.all(color: Colors.green.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.lock, size: 16, color: Colors.green),
-                8.w,
+                Icon(Icons.lock, size: responsive.iconSizeSmall, color: Colors.green),
+                SizedBox(width: responsive.spacing8),
                 Expanded(
                   child: text(
                     text: 'Your payment information is secure and encrypted.',
-                    size: 12,
+                    size: responsive.fontSize12,
                     fontWeight: FontWeight.w400,
                     color: Colors.green.withOpacity(0.8),
                   ),

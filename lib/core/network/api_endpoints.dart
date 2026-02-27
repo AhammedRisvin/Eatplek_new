@@ -1,5 +1,6 @@
 mixin Urls {
-  static const String baseUrl = 'https://api-dev.eatplek.com/';
+  static const String baseUrl =
+      'https://eatplek-server-dev-production.up.railway.app/';
 
   // Auth
   static const String login = 'api/users/send-otp';
@@ -15,6 +16,15 @@ mixin Urls {
   static const String addOrUpdateCartUrl = 'api/cart/items';
   static const String deleteCartItemUrl = 'api/cart/items/';
   static const String placeOrderUrl = 'api/bookings';
+  static const String fetchAddOnsUrl = 'api/cart/items/';
+
+  //Coupons
+  static const String getCouponsUrl = 'api/coupons/user/list';
+  static const String validateCouponUrl = 'api/coupons/validate';
+  static const String applyCouponUrl = 'api/coupons/apply';
+  static const String removeCouponUrl = 'api/coupons/remove';
+
+  ///api/coupons/remove
 
   //removeFromCartUrl
 

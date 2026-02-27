@@ -1,9 +1,9 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
 import 'food_widget.dart';
 
@@ -14,26 +14,28 @@ class FoodGridSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return GetBuilder<RestaurantDetailViewController>(
       id: 'food_grid',
       builder: (controller) {
         final filteredFoodItems = controller.getFilteredFoodItems();
 
         if (filteredFoodItems.isEmpty) {
-          return _buildEmptyCategoryState();
+          return _buildEmptyCategoryState(responsive);
         }
 
         return Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: GridView.builder(
             shrinkWrap: true,
             padding: EdgeInsets.zero,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
-              childAspectRatio: Get.height * 0.00079,
+              crossAxisCount: responsive.gridCrossAxisCount,
+              mainAxisSpacing: responsive.gridMainAxisSpacing,
+              crossAxisSpacing: responsive.gridCrossAxisSpacing,
+              childAspectRatio: responsive.gridChildAspectRatioForFood,
             ),
             itemCount: filteredFoodItems.length,
             itemBuilder: (context, index) {
@@ -45,18 +47,18 @@ class FoodGridSection extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyCategoryState() {
+  Widget _buildEmptyCategoryState(ResponsiveHelper responsive) {
     return SizedBox(
-      height: 200,
+      height: responsive.spacing200,
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.restaurant_menu, size: 48, color: AppColor.black.withOpacity(0.3)),
-            16.h,
+            Icon(Icons.restaurant_menu, size: responsive.iconSizeLarge, color: AppColor.black.withOpacity(0.3)),
+            SizedBox(height: responsive.spacing16),
             text(
               text: 'No items available in this category',
-              size: 16,
+              size: responsive.fontSize16,
               fontWeight: FontWeight.w500,
               color: AppColor.black.withOpacity(0.6),
             ),

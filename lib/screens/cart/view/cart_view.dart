@@ -1,7 +1,7 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
+import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -13,6 +13,7 @@ import 'widget/additional_notes_widget.dart';
 import 'widget/cart_food_list.dart';
 import 'widget/empty_cart.dart';
 import 'widget/price_summary_widget.dart';
+import 'widget/promo_code_widget.dart';
 
 class CartView extends StatefulWidget {
   final bool isFromBottomNav;
@@ -23,13 +24,18 @@ class CartView extends StatefulWidget {
 }
 
 class _CartViewState extends State<CartView> {
+  late ResponsiveHelper responsive;
+
   @override
   void initState() {
     super.initState();
+    responsive = ResponsiveHelper();
   }
 
   @override
   Widget build(BuildContext context) {
+    responsive = ResponsiveHelper();
+
     return WillPopScope(
       onWillPop: () async {
         Navigator.of(context).pop();
@@ -37,24 +43,34 @@ class _CartViewState extends State<CartView> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leadingWidth: 80,
+          leadingWidth: responsive.spacing80,
           centerTitle: widget.isFromBottomNav ? true : false,
-          title: text(text: 'Cart', size: 18, fontWeight: FontWeight.w600),
+          title: Text(
+            'Cart',
+            style: TextStyle(
+              fontSize: responsive.fontSize18,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
           leading:
               widget.isFromBottomNav
-                  ? SizedBox.shrink()
+                  ? const SizedBox.shrink()
                   : GestureDetector(
                     onTap: () {
                       Navigator.of(context).pop();
                     },
                     child: CircleAvatar(
-                      radius: 25,
+                      radius: responsive.spacing25,
                       backgroundColor: Colors.transparent,
                       child: Container(
-                        padding: EdgeInsets.all(16),
+                        padding: EdgeInsets.all(responsive.spacing16),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.black.withOpacity(0.06), width: 1.5),
+                          border: Border.all(
+                            color: Colors.black.withOpacity(0.06),
+                            width: 1.5,
+                          ),
                         ),
                         child: SvgPicture.string(arrowBack2),
                       ),
@@ -77,26 +93,50 @@ class _CartViewState extends State<CartView> {
 
             // ✅ EMPTY CART STATE
             if (controller.isCartEmpty) {
-              return EmptyCartWidget();
+              return const EmptyCartWidget();
             }
 
             // ✅ CART WITH DATA
             return SingleChildScrollView(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(responsive.spacing20),
               child: Column(
                 children: [
-                  CartFoodListWidget(),
-                  AdditionalNotesWidget(),
+                  const CartFoodListWidget(),
+                  PromoCodeWidget(),
+                  const AdditionalNotesWidget(),
                   GetBuilder<CartController>(
                     id: 'price_summary',
                     builder: (controller) {
+                      final totals = controller.cartModel?.data?.totals;
+
+                      // ── Coupon discount ────────────────────────────────────
+                      final apiCouponDiscount =
+                          (totals?.couponDiscount ?? 0).toDouble();
+                      final effectiveDiscount =
+                          apiCouponDiscount > 0
+                              ? apiCouponDiscount
+                              : controller.promoDiscount;
+
+                      // ── Coupon code label ──────────────────────────────────
+                      final apiCouponCode =
+                          controller.cartModel?.data?.couponCode;
+                      final appliedCode =
+                          (apiCouponCode != null &&
+                                  apiCouponCode.toString().isNotEmpty)
+                              ? apiCouponCode.toString()
+                              : controller.appliedPromoCode;
+
                       return PriceSummaryWidget(
                         subtotal: controller.subtotal,
-                        deliveryFee: controller.deliveryFee,
-                        taxAmount: controller.taxAmount,
-                        packingCharge: controller.packingCharge,
-                        promoDiscount: controller.promoDiscount,
-                        appliedPromoCode: controller.appliedPromoCode,
+                        deliveryFee: null,
+                        taxAmount:
+                            totals != null ? (totals.taxAmount ?? 0) : null,
+                        packingCharge:
+                            totals != null
+                                ? (totals.packingChargeTotal ?? 0).toDouble()
+                                : null,
+                        promoDiscount: effectiveDiscount,
+                        appliedPromoCode: appliedCode,
                         totalAmount: controller.totalAmount,
                       );
                     },
@@ -109,29 +149,34 @@ class _CartViewState extends State<CartView> {
         bottomNavigationBar: GetBuilder<CartController>(
           id: 'empty_cart',
           builder: (controller) {
-            if (controller.isCartEmpty || controller.isLoading || controller.hasError) {
-              return SizedBox.shrink();
+            if (controller.isCartEmpty ||
+                controller.isLoading ||
+                controller.hasError) {
+              return const SizedBox.shrink();
             }
 
             return Container(
-              width: context.wp(100),
+              width: responsive.screenWidth,
               color: AppColor.scaffoldColor,
               padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: widget.isFromBottomNav ? context.hp(12) : 20,
+                left: responsive.spacing20,
+                right: responsive.spacing20,
+                top: responsive.spacing20,
+                bottom:
+                    widget.isFromBottomNav
+                        ? responsive.bottomPadding + 110
+                        : responsive.spacing20,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   button(
                     name: 'Place Order',
-                    width: context.wp(100),
-                    fontSize: 16,
-                    height: 60,
+                    width: responsive.screenWidth,
+                    fontSize: responsive.fontSize16,
+                    height: responsive.buttonHeight,
                     fontWeight: FontWeight.w600,
-                    borderRadius: BorderRadius.circular(100),
+                    borderRadius: BorderRadius.circular(responsive.spacing40),
                     onTap: () => _navigateToOrderConfirmation(controller),
                   ),
                 ],
@@ -145,40 +190,51 @@ class _CartViewState extends State<CartView> {
 
   /// ✅ Navigate to Order Confirmation with cart data
   void _navigateToOrderConfirmation(CartController cartController) {
-    // Validate instructions first
     if (!cartController.validateInstructions()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(cartController.instructionsError), backgroundColor: Colors.red.withOpacity(0.8)),
-      );
-      return;
-    }
-
-    // Check cart not empty
-    if (cartController.isCartEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Please add items to cart before placing order'),
+          content: Text(cartController.instructionsError),
           backgroundColor: Colors.red.withOpacity(0.8),
         ),
       );
       return;
     }
 
-    // ✅ Extract vendor from cartModel
-    final vendor = cartController.cartModel?.data?.vendor;
+    if (cartController.isCartEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please add items to cart before placing order'),
+          backgroundColor: Colors.red.withOpacity(0.8),
+        ),
+      );
+      return;
+    }
 
-    // ✅ DEBUG LOGGING
+    final vendor = cartController.cartModel?.data?.vendor;
+    final totals = cartController.cartModel?.data?.totals;
+
+    // ✅ Resolve effective discount and code from API totals
+    final apiCouponDiscount = (totals?.couponDiscount ?? 0).toDouble();
+    final effectiveDiscount =
+        apiCouponDiscount > 0
+            ? apiCouponDiscount
+            : cartController.promoDiscount;
+
+    final apiCouponCode = cartController.cartModel?.data?.couponCode;
+    final effectiveCode =
+        (apiCouponCode != null && apiCouponCode.toString().isNotEmpty)
+            ? apiCouponCode.toString()
+            : cartController.appliedPromoCode;
+
     debugPrint('═════════════════════════════════════════');
     debugPrint('🛒 NAVIGATING TO ORDER CONFIRMATION');
     debugPrint('═════════════════════════════════════════');
     debugPrint('📦 Cart Items Count: ${cartController.cartItems.length}');
-    debugPrint('🏪 Vendor Object: $vendor');
-    debugPrint('🏪 Vendor Name: ${vendor?.name}');
-    debugPrint('🏪 Vendor ID: ${vendor?.id}');
-    debugPrint('💵 Total Amount: ${cartController.totalAmount}');
+    debugPrint('🏪 Vendor: ${vendor?.name} | ID: ${vendor?.id}');
+    debugPrint('💵 Total: ${cartController.totalAmount}');
+    debugPrint('🎟 Coupon: $effectiveCode | Discount: $effectiveDiscount');
     debugPrint('═════════════════════════════════════════');
 
-    // ✅ Navigate with vendor data
     Get.toNamed(
       Routes.orderConfirmationView,
       arguments: {
@@ -189,8 +245,9 @@ class _CartViewState extends State<CartView> {
         'packingCharge': cartController.packingCharge,
         'totalAmount': cartController.totalAmount,
         'instructions': cartController.instructionsController.text.trim(),
-        'appliedPromoCode': cartController.appliedPromoCode,
-        'promoDiscount': cartController.promoDiscount,
+        // ✅ Pass resolved effective values so OrderConfirmationView is always correct
+        'appliedPromoCode': effectiveCode,
+        'promoDiscount': effectiveDiscount,
       },
     );
   }
@@ -200,38 +257,57 @@ class _CartViewState extends State<CartView> {
     return Skeletonizer(
       enabled: true,
       child: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
+        padding: EdgeInsets.all(responsive.spacing20),
         child: Column(
           children: [
             ...List.generate(
               3,
               (index) => Padding(
-                padding: EdgeInsets.only(bottom: 20),
+                padding: EdgeInsets.only(bottom: responsive.spacing20),
                 child: Container(
-                  width: context.wp(100),
-                  padding: EdgeInsets.all(20),
+                  width: responsive.screenWidth,
+                  padding: EdgeInsets.all(responsive.spacing20),
                   decoration: BoxDecoration(
                     color: AppColor.white,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(
+                      responsive.largeBorderRadius,
+                    ),
                     border: Border.all(color: AppColor.black.withOpacity(0.03)),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                        width: responsive.spacing80,
+                        height: responsive.spacing80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(
+                            responsive.smallBorderRadius,
+                          ),
+                        ),
                       ),
-                      20.w,
+                      SizedBox(width: responsive.spacing20),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(width: context.wp(40), height: 16, color: Colors.grey[300]),
-                            10.h,
-                            Container(width: context.wp(30), height: 14, color: Colors.grey[300]),
-                            10.h,
-                            Container(width: context.wp(25), height: 16, color: Colors.grey[300]),
+                            Container(
+                              width: responsive.screenWidth * 0.4,
+                              height: responsive.spacing16,
+                              color: Colors.grey[300],
+                            ),
+                            SizedBox(height: responsive.spacing10),
+                            Container(
+                              width: responsive.screenWidth * 0.3,
+                              height: responsive.spacing14,
+                              color: Colors.grey[300],
+                            ),
+                            SizedBox(height: responsive.spacing10),
+                            Container(
+                              width: responsive.screenWidth * 0.25,
+                              height: responsive.spacing16,
+                              color: Colors.grey[300],
+                            ),
                           ],
                         ),
                       ),
@@ -241,21 +317,37 @@ class _CartViewState extends State<CartView> {
               ),
             ),
             Container(
-              width: context.wp(100),
-              padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-              margin: EdgeInsets.only(bottom: 100),
-              decoration: BoxDecoration(color: AppColor.white, borderRadius: BorderRadius.circular(20)),
+              width: responsive.screenWidth,
+              padding: EdgeInsets.symmetric(
+                vertical: responsive.spacing20,
+                horizontal: responsive.spacing20,
+              ),
+              margin: EdgeInsets.only(bottom: responsive.spacing100),
+              decoration: BoxDecoration(
+                color: AppColor.white,
+                borderRadius: BorderRadius.circular(
+                  responsive.largeBorderRadius,
+                ),
+              ),
               child: Column(
                 children: [
                   ...List.generate(
                     4,
                     (index) => Padding(
-                      padding: EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.only(bottom: responsive.spacing16),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(width: context.wp(30), height: 14, color: Colors.grey[300]),
-                          Container(width: context.wp(20), height: 14, color: Colors.grey[300]),
+                          Container(
+                            width: responsive.screenWidth * 0.3,
+                            height: responsive.spacing14,
+                            color: Colors.grey[300],
+                          ),
+                          Container(
+                            width: responsive.screenWidth * 0.2,
+                            height: responsive.spacing14,
+                            color: Colors.grey[300],
+                          ),
                         ],
                       ),
                     ),
@@ -275,33 +367,41 @@ class _CartViewState extends State<CartView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 80, color: Colors.red.withOpacity(0.6)),
-          20.h,
-          text(
-            text: 'Oops! Something went wrong',
-            size: 24,
-            fontWeight: FontWeight.w600,
-            color: AppColor.black.withOpacity(0.7),
+          Icon(
+            Icons.error_outline,
+            size: responsive.spacing80,
+            color: Colors.red.withOpacity(0.6),
           ),
-          10.h,
+          SizedBox(height: responsive.spacing20),
+          Text(
+            'Oops! Something went wrong',
+            style: TextStyle(
+              fontSize: responsive.fontSize24,
+              fontWeight: FontWeight.w600,
+              color: AppColor.black.withOpacity(0.7),
+            ),
+          ),
+          SizedBox(height: responsive.spacing10),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: text(
-              text: controller.errorMessage,
-              size: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColor.black.withOpacity(0.5),
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
+            child: Text(
+              controller.errorMessage,
+              style: TextStyle(
+                fontSize: responsive.fontSize14,
+                fontWeight: FontWeight.w400,
+                color: AppColor.black.withOpacity(0.5),
+              ),
               textAlign: TextAlign.center,
             ),
           ),
-          40.h,
+          SizedBox(height: responsive.spacing40),
           button(
             name: 'Retry',
-            width: context.wp(60),
-            fontSize: 16,
-            height: 50,
+            width: responsive.screenWidth * 0.6,
+            fontSize: responsive.fontSize16,
+            height: responsive.spacing50,
             fontWeight: FontWeight.w600,
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(responsive.spacing40),
             onTap: () => controller.retryFetchCart(),
           ),
         ],

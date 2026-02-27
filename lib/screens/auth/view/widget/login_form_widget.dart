@@ -1,6 +1,6 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
+import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import '../../controller/auth_controller.dart';
@@ -12,17 +12,28 @@ class LoginFormWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [_buildPhoneLabel(), 10.h, _buildPhoneInputField(context), 10.h, _buildPhoneHint()],
+      children: [
+        _buildPhoneLabel(responsive),
+        SizedBox(height: responsive.spacing10),
+        _buildPhoneInputField(context, responsive),
+        SizedBox(height: responsive.spacing10),
+        _buildPhoneHint(responsive),
+      ],
     );
   }
 
-  Widget _buildPhoneLabel() {
-    return text(text: 'Mobile Number', size: 16, fontWeight: FontWeight.w500);
+  Widget _buildPhoneLabel(ResponsiveHelper responsive) {
+    return Text(
+      'Mobile Number',
+      style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: Colors.black),
+    );
   }
 
-  Widget _buildPhoneInputField(BuildContext context) {
+  Widget _buildPhoneInputField(BuildContext context, ResponsiveHelper responsive) {
     return buildCommonTextFormField(
       hintText: '9876543210',
       keyboardType: const TextInputType.numberWithOptions(decimal: false),
@@ -31,18 +42,23 @@ class LoginFormWidget extends StatelessWidget {
       context: context,
       maxLength: 10,
       prefixIcon: Padding(
-        padding: const EdgeInsets.only(top: 13.0, left: 10),
-        child: text(text: '+91', size: 16, fontWeight: FontWeight.w500, color: AppColor.hintTextColor),
+        padding: EdgeInsets.only(top: responsive.spacing13, left: responsive.spacing10),
+        child: Text(
+          '+91',
+          style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: AppColor.hintTextColor),
+        ),
       ),
     );
   }
 
-  Widget _buildPhoneHint() {
-    return text(
-      text: 'Please enter your 10-digit mobile number',
-      size: 12,
-      fontWeight: FontWeight.w300,
-      color: AppColor.black.withOpacity(0.6),
+  Widget _buildPhoneHint(ResponsiveHelper responsive) {
+    return Text(
+      'Please enter your 10-digit mobile number',
+      style: TextStyle(
+        fontSize: responsive.fontSize12,
+        fontWeight: FontWeight.w300,
+        color: AppColor.black.withOpacity(0.6),
+      ),
     );
   }
 }

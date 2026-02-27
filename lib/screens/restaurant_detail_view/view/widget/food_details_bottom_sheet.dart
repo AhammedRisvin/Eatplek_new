@@ -1,9 +1,9 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
 import '../../model/restaurent_details_model.dart';
 import 'food_bottom_sheet_add_ones_section.dart';
@@ -36,6 +36,7 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
   @override
   Widget build(BuildContext context) {
     debugPrint('🟢 FoodDetailsBottomSheet build called');
+    final responsive = ResponsiveHelper();
 
     return GetBuilder<RestaurantDetailViewController>(
       id: 'bottom_sheet_content',
@@ -62,7 +63,6 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
               right: 0,
               top: 0,
               child: GestureDetector(
-                // ✅ FIXED: Use Navigator.pop instead of Get.back to avoid snackbar controller error
                 onTap: () {
                   debugPrint('🔵 Tapped outside bottom sheet - dismissing without saving');
                   controller.resetBottomSheetState();
@@ -71,7 +71,6 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
                 child: Container(
                   color: Colors.transparent,
                   child: GestureDetector(
-                    // ✅ Prevent propagation when tapping inside bottom sheet
                     onTap: () {},
                     child: DraggableScrollableSheet(
                       initialChildSize: isScenario1 ? 0.5 : 0.7,
@@ -84,17 +83,13 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
                         return Container(
                           decoration: BoxDecoration(
                             color: AppColor.scaffoldColor,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.largeBorderRadius)),
                           ),
-                          // ✅ KEY FIX: Use Column with proper layout strategy
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Handle bar
-                              _buildHandleBar(controller),
-
-                              // ✅ FIXED: Scrollable content with only content height
+                              _buildHandleBar(controller, responsive),
                               Expanded(
                                 child: SingleChildScrollView(
                                   controller: scrollController,
@@ -102,40 +97,34 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      _buildFoodDetailsSection(controller, foodItem),
-
-                                      // ✅ SCENARIO 1: View-only message (NO extra space)
+                                      _buildFoodDetailsSection(controller, foodItem, responsive),
                                       if (isScenario1) ...[
-                                        20.h,
+                                        SizedBox(height: responsive.spacing20),
                                         Padding(
-                                          padding: EdgeInsets.symmetric(horizontal: 20),
+                                          padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
                                           child: text(
                                             text: 'Adjust quantity from the food card',
-                                            size: 14,
+                                            size: responsive.fontSize14,
                                             color: AppColor.black.withOpacity(0.6),
                                             textAlign: TextAlign.center,
                                           ),
                                         ),
-                                        20.h,
-                                      ]
-                                      // ✅ SCENARIOS 2-4: Show sections with content
-                                      else if (!hasCustomizations && hasAddOns) ...[
-                                        20.h,
+                                        SizedBox(height: responsive.spacing20),
+                                      ] else if (!hasCustomizations && hasAddOns) ...[
+                                        SizedBox(height: responsive.spacing20),
                                         FoodBottomSheetAddOnsSection(foodItem: foodItem),
-                                        30.h, // ✅ REDUCED: Bottom padding for checkout
+                                        SizedBox(height: responsive.spacing30),
                                       ] else if (hasCustomizations) ...[
-                                        20.h,
+                                        SizedBox(height: responsive.spacing20),
                                         FoodBottomSheetCustomizationSection(foodItem: foodItem),
-                                        20.h,
+                                        SizedBox(height: responsive.spacing20),
                                         if (hasAddOns) ...[FoodBottomSheetAddOnsSection(foodItem: foodItem)],
-                                        30.h, // ✅ REDUCED: Bottom padding for checkout
+                                        SizedBox(height: responsive.spacing30),
                                       ],
                                     ],
                                   ),
                                 ),
                               ),
-
-                              // ✅ CHECKOUT SECTION: Only for Scenarios 2-4
                               if (!isScenario1) FoodBottomSheetCheckoutSection(),
                             ],
                           ),
@@ -152,19 +141,21 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
     );
   }
 
-  Widget _buildHandleBar(RestaurantDetailViewController controller) {
+  Widget _buildHandleBar(RestaurantDetailViewController controller, ResponsiveHelper responsive) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: responsive.spacing20, vertical: responsive.spacing12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Handle bar
           Expanded(
             child: Center(
               child: Container(
-                width: 120,
-                height: 4,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(40), color: Color(0XFFD9D9D9)),
+                width: responsive.spacing120,
+                height: responsive.spacing4,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                  color: Color(0XFFD9D9D9),
+                ),
               ),
             ),
           ),
@@ -173,42 +164,51 @@ class _FoodDetailsBottomSheetState extends State<FoodDetailsBottomSheet> {
     );
   }
 
-  Widget _buildFoodDetailsSection(RestaurantDetailViewController controller, Food foodItem) {
+  Widget _buildFoodDetailsSection(
+    RestaurantDetailViewController controller,
+    Food foodItem,
+    ResponsiveHelper responsive,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
             child: image(
               url: foodItem.foodImage ?? '',
-              height: 200,
-              width: Get.width - 40,
-              borderRadius: BorderRadius.circular(12),
+              height: responsive.spacing200,
+              width: Get.width - responsive.spacing40,
+              borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
             ),
           ),
         ),
-        16.h,
+        SizedBox(height: responsive.spacing16),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              text(text: foodItem.foodName ?? '', size: 20, fontWeight: FontWeight.w600, color: AppColor.black),
-              8.h,
+              text(
+                text: foodItem.foodName ?? '',
+                size: responsive.fontSize20,
+                fontWeight: FontWeight.w600,
+                color: AppColor.black,
+              ),
+              SizedBox(height: responsive.spacing8),
               text(
                 text: 'Select options below',
-                size: 12,
+                size: responsive.fontSize12,
                 fontWeight: FontWeight.w400,
                 color: AppColor.black.withOpacity(0.6),
               ),
             ],
           ),
         ),
-        16.h,
+        SizedBox(height: responsive.spacing16),
         Divider(color: AppColor.black.withOpacity(0.1), thickness: 1),
       ],
     );

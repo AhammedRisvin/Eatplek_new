@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget with FittorAppMixin {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        fontFamily: GoogleFonts.poppins().fontFamily,
+        fontFamily: GoogleFonts.urbanist().fontFamily,
         scaffoldBackgroundColor: AppColor.scaffoldColor,
         appBarTheme: const AppBarTheme(
           surfaceTintColor: AppColor.transparent,

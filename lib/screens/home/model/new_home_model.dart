@@ -19,18 +19,41 @@ class Data {
   List<PrebookList>? prebookList;
   List<dynamic>? todayOfferFoods;
 
-  Data({this.availableServices, this.banners, this.vendors, this.prebookList, this.todayOfferFoods});
+  Data({
+    this.availableServices,
+    this.banners,
+    this.vendors,
+    this.prebookList,
+    this.todayOfferFoods,
+  });
 
   factory Data.fromJson(Map<String, dynamic> json) => Data(
     availableServices:
-        json["availableServices"] == null ? [] : List<String>.from(json["availableServices"]!.map((x) => x)),
-    banners: json["banners"] == null ? [] : List<BannerData>.from(json["banners"]!.map((x) => BannerData.fromJson(x))),
-    vendors: json["vendors"] == null ? [] : List<Vendor>.from(json["vendors"]!.map((x) => Vendor.fromJson(x))),
+        json["availableServices"] == null
+            ? []
+            : List<String>.from(json["availableServices"]!.map((x) => x)),
+    banners:
+        json["banners"] == null
+            ? []
+            : List<BannerData>.from(
+              json["banners"]!.map((x) => BannerData.fromJson(x)),
+            ),
+    vendors:
+        json["vendors"] == null
+            ? []
+            : List<Vendor>.from(
+              json["vendors"]!.map((x) => Vendor.fromJson(x)),
+            ),
     prebookList:
         json["prebookList"] == null
             ? []
-            : List<PrebookList>.from(json["prebookList"]!.map((x) => PrebookList.fromJson(x))),
-    todayOfferFoods: json["todayOfferFoods"] == null ? [] : List<dynamic>.from(json["todayOfferFoods"]!.map((x) => x)),
+            : List<PrebookList>.from(
+              json["prebookList"]!.map((x) => PrebookList.fromJson(x)),
+            ),
+    todayOfferFoods:
+        json["todayOfferFoods"] == null
+            ? []
+            : List<dynamic>.from(json["todayOfferFoods"]!.map((x) => x)),
   );
 }
 
@@ -41,7 +64,13 @@ class BannerData {
   Hotel? hotel;
   Prebook? prebook;
 
-  BannerData({this.bannerId, this.bannerImage, this.isPrebookRelated, this.hotel, this.prebook});
+  BannerData({
+    this.bannerId,
+    this.bannerImage,
+    this.isPrebookRelated,
+    this.hotel,
+    this.prebook,
+  });
 
   factory BannerData.fromJson(Map<String, dynamic> json) => BannerData(
     bannerId: json["bannerId"],
@@ -59,7 +88,13 @@ class Hotel {
   String? coverImage;
   String? place;
 
-  Hotel({this.hotelId, this.hotelName, this.profileImage, this.coverImage, this.place});
+  Hotel({
+    this.hotelId,
+    this.hotelName,
+    this.profileImage,
+    this.coverImage,
+    this.place,
+  });
 
   factory Hotel.fromJson(Map<String, dynamic> json) => Hotel(
     hotelId: json["hotelId"],
@@ -98,8 +133,14 @@ class Prebook {
     basePrice: json["basePrice"]?.toDouble(),
     discountPrice: json["discountPrice"]?.toDouble(),
     effectivePrice: json["effectivePrice"]?.toDouble(),
-    prebookStartDate: json["prebookStartDate"] == null ? null : DateTime.parse(json["prebookStartDate"]),
-    prebookEndDate: json["prebookEndDate"] == null ? null : DateTime.parse(json["prebookEndDate"]),
+    prebookStartDate:
+        json["prebookStartDate"] == null
+            ? null
+            : DateTime.parse(json["prebookStartDate"]),
+    prebookEndDate:
+        json["prebookEndDate"] == null
+            ? null
+            : DateTime.parse(json["prebookEndDate"]),
   );
 }
 
@@ -109,7 +150,9 @@ class Vendor {
   String? profileImage;
   String? coverImage;
   String? place;
+  Location? location;
   bool? isOpenNow;
+  Schedule? schedule;
   int? averageRating;
   int? reviewCount;
   List<Vendor>? branchList;
@@ -120,7 +163,9 @@ class Vendor {
     this.profileImage,
     this.coverImage,
     this.place,
+    this.location,
     this.isOpenNow,
+    this.schedule,
     this.averageRating,
     this.reviewCount,
     this.branchList,
@@ -133,10 +178,36 @@ class Vendor {
     coverImage: json["coverImage"],
     place: json["place"],
     isOpenNow: json["isOpenNow"],
+    location:
+        json["location"] == null ? null : Location.fromJson(json["location"]),
+    schedule:
+        json["schedule"] == null ? null : Schedule.fromJson(json["schedule"]),
     averageRating: json["averageRating"],
     reviewCount: json["reviewCount"],
-    branchList: json["branchList"] == null ? [] : List<Vendor>.from(json["branchList"]!.map((x) => Vendor.fromJson(x))),
+    branchList:
+        json["branchList"] == null
+            ? []
+            : List<Vendor>.from(
+              json["branchList"]!.map((x) => Vendor.fromJson(x)),
+            ),
   );
+}
+
+class Location {
+  double? latitude;
+  double? longitude;
+
+  Location({this.latitude, this.longitude});
+
+  factory Location.fromJson(Map<String, dynamic> json) => Location(
+    latitude: json["latitude"]?.toDouble(),
+    longitude: json["longitude"]?.toDouble(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    "latitude": latitude,
+    "longitude": longitude,
+  };
 }
 
 class PrebookList {
@@ -174,9 +245,35 @@ class PrebookList {
     basePrice: json["basePrice"]?.toDouble(),
     discountPrice: json["discountPrice"]?.toDouble(),
     effectivePrice: json["effectivePrice"]?.toDouble(),
-    prebookStartDate: json["prebookStartDate"] == null ? null : DateTime.parse(json["prebookStartDate"]),
-    prebookEndDate: json["prebookEndDate"] == null ? null : DateTime.parse(json["prebookEndDate"]),
+    prebookStartDate:
+        json["prebookStartDate"] == null
+            ? null
+            : DateTime.parse(json["prebookStartDate"]),
+    prebookEndDate:
+        json["prebookEndDate"] == null
+            ? null
+            : DateTime.parse(json["prebookEndDate"]),
     category: json["category"],
     vendor: json["vendor"] == null ? null : Vendor.fromJson(json["vendor"]),
   );
+}
+
+class Schedule {
+  String? openTime;
+  String? closeTime;
+  bool? isClosed;
+
+  Schedule({this.openTime, this.closeTime, this.isClosed});
+
+  factory Schedule.fromJson(Map<String, dynamic> json) => Schedule(
+    openTime: json["openTime"],
+    closeTime: json["closeTime"],
+    isClosed: json["isClosed"],
+  );
+
+  Map<String, dynamic> toJson() => {
+    "openTime": openTime,
+    "closeTime": closeTime,
+    "isClosed": isClosed,
+  };
 }

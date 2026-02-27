@@ -13,7 +13,13 @@ class VendorCardWidget extends StatelessWidget {
   final double? cardHeight;
   final bool showFullOverlay;
 
-  const VendorCardWidget({super.key, required this.vendor, this.onTap, this.cardHeight, this.showFullOverlay = true});
+  const VendorCardWidget({
+    super.key,
+    required this.vendor,
+    this.onTap,
+    this.cardHeight,
+    this.showFullOverlay = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -48,8 +54,9 @@ class VendorCardWidget extends StatelessWidget {
                 SizedBox(height: responsive.spacing10),
               ],
             ),
-            if (!(vendor.isOpenNow ?? true) && showFullOverlay) _buildClosedOverlay(responsive),
-            if (vendor.isOpenNow ?? true) _buildOpenBadge(responsive),
+            if ((vendor.schedule?.isClosed ?? true) && showFullOverlay)
+              _buildClosedOverlay(responsive),
+            if (vendor.schedule?.isClosed == false) _buildOpenBadge(responsive),
           ],
         ),
       ),
@@ -72,7 +79,9 @@ class VendorCardWidget extends StatelessWidget {
           errorBuilder: (context, error, stackTrace) {
             return Container(
               color: Colors.grey[300],
-              child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
+              child: const Center(
+                child: Icon(Icons.image_not_supported, color: Colors.grey),
+              ),
             );
           },
           loadingBuilder: (context, child, loadingProgress) {
@@ -175,7 +184,12 @@ class VendorCardWidget extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              text(text: 'Closed', size: responsive.fontSize16, fontWeight: FontWeight.w600, color: AppColor.redColor),
+              text(
+                text: 'Closed',
+                size: responsive.fontSize16,
+                fontWeight: FontWeight.w600,
+                color: AppColor.redColor,
+              ),
               SizedBox(height: responsive.spacing4),
               text(
                 text: 'Check opening hours',

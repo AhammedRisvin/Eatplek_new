@@ -249,10 +249,15 @@ class AuthController extends GetxController {
         'deviceName': _deviceName,
       };
 
-      await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.login, data: body);
-
-      _goToOtpStep();
+      final response = await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.login, data: body);
+      if (response['success'] == true) {
+        _goToOtpStep();
+      } else {
+        log('error  11');
+        _showErrorSnackbar('Error', response['message'] ?? 'OTP sent failed');
+      }
     } catch (e) {
+      log('error  22');
       _showErrorSnackbar('Error', e.toString());
     } finally {
       _setLoading(false);

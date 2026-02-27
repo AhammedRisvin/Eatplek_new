@@ -1,6 +1,6 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
+import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:percent_indicator/flutter_percent_indicator.dart';
@@ -15,24 +15,25 @@ class OnBoardingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(OnBoardingController());
+    final responsive = ResponsiveHelper();
 
     return Scaffold(
       body: SizedBox(
-        height: context.hp(100),
-        width: context.wp(100),
+        height: responsive.screenHeight,
+        width: responsive.screenWidth,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            20.h,
+            SizedBox(height: responsive.spacing20),
 
             // Logo (Static)
             AnimatedContainer(
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOut,
               child: Image(
-                image: AssetImage('assets/image/logo.png'),
-                height: 43,
-                width: context.wp(34.4),
+                image: const AssetImage('assets/image/logo.png'),
+                height: responsive.spacing48,
+                width: responsive.screenWidth * 0.344,
                 color: AppColor.appPrimary,
               ),
             ),
@@ -56,6 +57,8 @@ class OnBoardingView extends StatelessWidget {
                           child: Image(
                             key: ValueKey(controller.currentPage),
                             image: AssetImage(controller.onBoardingData[controller.currentPage].image),
+                            height: responsive.screenHeight * 0.35,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
@@ -65,7 +68,7 @@ class OnBoardingView extends StatelessWidget {
               },
             ),
 
-            40.h,
+            SizedBox(height: responsive.spacing40),
 
             // Title and Subtitle (Animated)
             GetBuilder<OnBoardingController>(
@@ -91,18 +94,20 @@ class OnBoardingView extends StatelessWidget {
                                   child: FadeTransition(opacity: animation, child: child),
                                 );
                               },
-                              child: text(
-                                text: controller.onBoardingData[controller.currentPage].title,
-                                fontWeight: FontWeight.w900,
-                                size: 30,
-                                color: Color(0XFF3E3E3E),
+                              child: Text(
+                                controller.onBoardingData[controller.currentPage].title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: responsive.fontSize32,
+                                  color: const Color(0XFF3E3E3E),
+                                ),
                               ),
                             ),
 
-                            20.h,
+                            SizedBox(height: responsive.spacing20),
 
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 58.0),
+                              padding: EdgeInsets.symmetric(horizontal: responsive.spacing16 * 3.6),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 600),
                                 transitionBuilder: (child, animation) {
@@ -114,11 +119,13 @@ class OnBoardingView extends StatelessWidget {
                                     child: FadeTransition(opacity: animation, child: child),
                                   );
                                 },
-                                child: text(
-                                  text: controller.onBoardingData[controller.currentPage].subtitle,
-                                  fontWeight: FontWeight.w400,
-                                  size: 18,
-                                  color: AppColor.black.withOpacity(0.6),
+                                child: Text(
+                                  controller.onBoardingData[controller.currentPage].subtitle,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: responsive.fontSize18,
+                                    color: AppColor.black.withOpacity(0.6),
+                                  ),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
@@ -148,9 +155,9 @@ class OnBoardingView extends StatelessWidget {
                           (index) => AnimatedContainer(
                             duration: const Duration(milliseconds: 500),
                             curve: Curves.easeInOut,
-                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                            margin: EdgeInsets.symmetric(horizontal: responsive.spacing10),
                             child: CircleAvatar(
-                              radius: controller.currentPage == index ? 5 : 3,
+                              radius: controller.currentPage == index ? responsive.spacing5 : responsive.spacing3,
                               backgroundColor:
                                   controller.currentPage == index
                                       ? AppColor.appPrimary
@@ -160,7 +167,7 @@ class OnBoardingView extends StatelessWidget {
                         ),
                       ),
                     )
-                    : SizedBox.shrink();
+                    : const SizedBox.shrink();
               },
             ),
 
@@ -172,9 +179,9 @@ class OnBoardingView extends StatelessWidget {
 
                 return currentData.hasButton
                     ? CircularPercentIndicator(
-                      radius: 35.0,
+                      radius: responsive.spacing35,
                       reverse: currentData.reverse,
-                      lineWidth: 3.0,
+                      lineWidth: responsive.spacing3,
                       percent: currentData.percent,
                       center: GestureDetector(
                         onTap: () {
@@ -184,10 +191,10 @@ class OnBoardingView extends StatelessWidget {
                           duration: const Duration(milliseconds: 300),
                           curve: Curves.easeInOut,
                           child: CircleAvatar(
-                            radius: 32,
+                            radius: responsive.spacing32,
                             backgroundColor: AppColor.white,
                             child: CircleAvatar(
-                              radius: 30,
+                              radius: responsive.spacing30,
                               backgroundColor: AppColor.appPrimary,
                               child: const Icon(Icons.arrow_forward_ios, color: AppColor.white),
                             ),
@@ -200,14 +207,14 @@ class OnBoardingView extends StatelessWidget {
                     : button(
                       name: 'Get Started',
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                      height: 60,
+                      fontSize: responsive.fontSize16,
+                      height: responsive.buttonHeight,
                       onTap: () {
                         Store.showedOnBoarding = 'true';
                         Get.offAllNamed(Routes.login);
                       },
-                      width: context.wp(80),
-                      borderRadius: BorderRadius.circular(50),
+                      width: responsive.screenWidth * 0.8,
+                      borderRadius: BorderRadius.circular(responsive.spacing40),
                     );
               },
             ),

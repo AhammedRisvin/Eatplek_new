@@ -30,7 +30,7 @@ Widget text({
       fontSize: size,
       color: color ?? AppColor.black,
       fontWeight: fontWeight,
-      fontFamily: fontFamily ?? GoogleFonts.poppins().fontFamily,
+      fontFamily: fontFamily ?? GoogleFonts.urbanist().fontFamily,
       decoration: decoration,
       decorationColor: decorationColor,
       overflow: overFlow,
@@ -176,7 +176,7 @@ Widget buildCommonTextFormField({
   required BuildContext context,
   bool isFromPhoneText = false,
   TextAlignVertical textAlignVertical = TextAlignVertical.center,
-  int hintTextSize = 16,
+  double hintTextSize = 16,
 }) {
   return TextFormField(
     inputFormatters: inputFormatters,
@@ -184,7 +184,7 @@ Widget buildCommonTextFormField({
     onFieldSubmitted: onFieldSubmitted,
     onTapOutside: (event) => FocusScope.of(context).unfocus(),
     onTap: onTap,
-    style: TextStyle(fontFamily: GoogleFonts.poppins().fontFamily, color: color, fontSize: 14),
+    style: TextStyle(fontFamily: GoogleFonts.urbanist().fontFamily, color: color, fontSize: 14),
     expands: expands,
     keyboardType: keyboardType,
     obscureText: obscureText,
@@ -220,7 +220,7 @@ Widget buildCommonTextFormField({
         color: hintTextColor,
         fontWeight: FontWeight.w400,
         fontSize: hintTextSize.toDouble(),
-        fontFamily: GoogleFonts.poppins().fontFamily,
+        fontFamily: GoogleFonts.urbanist().fontFamily,
       ),
       alignLabelWithHint: true, // **Important: Moves hint to the top**
     ),

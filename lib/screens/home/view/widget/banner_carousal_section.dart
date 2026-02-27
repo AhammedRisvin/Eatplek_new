@@ -25,7 +25,10 @@ class BannerCarouselSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
         if (controller.banners.length == 1) {
-          return _buildSingleBanner(controller.banners.first.bannerImage ?? '', responsive);
+          return _buildSingleBanner(
+            controller.banners.first.bannerImage ?? '',
+            responsive,
+          );
         }
         return _buildCarousel(controller, responsive);
       },
@@ -33,9 +36,13 @@ class BannerCarouselSection extends StatelessWidget {
   }
 
   /// Builds carousel for multiple banners
-  Widget _buildCarousel(HomeController controller, ResponsiveHelper responsive) {
+  Widget _buildCarousel(
+    HomeController controller,
+    ResponsiveHelper responsive,
+  ) {
     return Column(
       children: [
+        SizedBox(height: responsive.spacing20),
         CarouselSlider(
           options: CarouselOptions(
             height: responsive.bannerHeight,
@@ -53,7 +60,10 @@ class BannerCarouselSection extends StatelessWidget {
               controller.banners.map((banner) {
                 return Builder(
                   builder: (BuildContext context) {
-                    return _buildBannerItem(banner.bannerImage ?? '', responsive);
+                    return _buildBannerItem(
+                      banner.bannerImage ?? '',
+                      responsive,
+                    );
                   },
                 );
               }).toList(),
@@ -69,7 +79,9 @@ class BannerCarouselSection extends StatelessWidget {
       margin: EdgeInsets.symmetric(horizontal: responsive.spacing5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14)],
+        boxShadow: [
+          BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
@@ -94,7 +106,9 @@ class BannerCarouselSection extends StatelessWidget {
       height: responsive.bannerHeight,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14)],
+        boxShadow: [
+          BoxShadow(color: Colors.grey.withOpacity(0.12), blurRadius: 14),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(responsive.largeBorderRadius),

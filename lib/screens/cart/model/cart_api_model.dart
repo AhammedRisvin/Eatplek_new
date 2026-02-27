@@ -20,7 +20,7 @@ class CartData {
   bool? isPrebookCart;
   Vendor? vendor;
   List<CartItem>? items;
-  dynamic couponCode;
+  String? couponCode;
   Totals? totals;
   DateTime? lastUpdatedAt;
 
@@ -44,10 +44,18 @@ class CartData {
     serviceType: json["serviceType"],
     isPrebookCart: json["isPrebookCart"],
     vendor: json["vendor"] == null ? null : Vendor.fromJson(json["vendor"]),
-    items: json["items"] == null ? [] : List<CartItem>.from(json["items"]!.map((x) => CartItem.fromJson(x))),
+    items:
+        json["items"] == null
+            ? []
+            : List<CartItem>.from(
+              json["items"]!.map((x) => CartItem.fromJson(x)),
+            ),
     couponCode: json["couponCode"],
     totals: json["totals"] == null ? null : Totals.fromJson(json["totals"]),
-    lastUpdatedAt: json["lastUpdatedAt"] == null ? null : DateTime.parse(json["lastUpdatedAt"]),
+    lastUpdatedAt:
+        json["lastUpdatedAt"] == null
+            ? null
+            : DateTime.parse(json["lastUpdatedAt"]),
   );
 }
 
@@ -97,8 +105,15 @@ class CartItem {
     discountPrice: json["discountPrice"]?.toDouble(),
     effectivePrice: json["effectivePrice"]?.toDouble(),
     customizations:
-        json["customizations"] == null ? [] : List<AddOn>.from(json["customizations"]!.map((x) => AddOn.fromJson(x))),
-    addOns: json["addOns"] == null ? [] : List<AddOn>.from(json["addOns"]!.map((x) => AddOn.fromJson(x))),
+        json["customizations"] == null
+            ? []
+            : List<AddOn>.from(
+              json["customizations"]!.map((x) => AddOn.fromJson(x)),
+            ),
+    addOns:
+        json["addOns"] == null
+            ? []
+            : List<AddOn>.from(json["addOns"]!.map((x) => AddOn.fromJson(x))),
     isPrebook: json["isPrebook"],
     packingCharge: json["packingCharge"],
     itemTotal: json["itemTotal"]?.toDouble(),
@@ -113,7 +128,13 @@ class AddOn {
   int? quantity;
   String? customizationId;
 
-  AddOn({this.addOnId, this.name, this.price, this.quantity, this.customizationId});
+  AddOn({
+    this.addOnId,
+    this.name,
+    this.price,
+    this.quantity,
+    this.customizationId,
+  });
 
   factory AddOn.fromJson(Map<String, dynamic> json) => AddOn(
     addOnId: json["addOnId"],
@@ -170,7 +191,13 @@ class Vendor {
   String? place;
   int? gstPercentage;
 
-  Vendor({this.id, this.name, this.profileImage, this.place, this.gstPercentage});
+  Vendor({
+    this.id,
+    this.name,
+    this.profileImage,
+    this.place,
+    this.gstPercentage,
+  });
 
   factory Vendor.fromJson(Map<String, dynamic> json) => Vendor(
     id: json["id"],

@@ -1,47 +1,44 @@
+import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:svg_flutter/svg.dart';
+import 'package:flutter_svg/svg.dart';
 
-import '../../../../core/util/app_color.dart';
-import '../../../../core/util/assets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/order_confirmation_controller.dart';
 
-class NumberOfGuestWidget extends StatelessWidget {
+class ResponsiveNumberOfGuestWidget extends StatelessWidget {
   final OrderConfirmationController controller;
 
-  const NumberOfGuestWidget({super.key, required this.controller});
+  const ResponsiveNumberOfGuestWidget({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Container(
-      width: context.wp(100),
-      padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-      margin: EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColor.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.black.withOpacity(0.03)),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
-      ),
+      width: responsive.widthPercent(100),
+      padding: responsive.containerPadding,
+      margin: EdgeInsets.only(bottom: responsive.spacing10),
+      decoration: responsive.responsiveContainer(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ✅ Section Header
           Row(
             children: [
-              SvgPicture.string(personSvg),
-              12.w,
-              text(text: 'Number of Guests', size: 16, fontWeight: FontWeight.w500),
+              SvgPicture.string(personSvg, width: responsive.iconSizeSmall, height: responsive.iconSizeSmall),
+              SizedBox(width: responsive.spacing12),
+              text(text: 'Number of Guests', size: responsive.fontSize16, fontWeight: FontWeight.w500),
             ],
           ),
-          16.h,
+          SizedBox(height: responsive.spacing16),
 
           // ✅ Guest Count Input Field
           buildCommonTextFormField(
             hintText: 'Enter number of guests',
-            hintTextColor: Color(0XFF1D1D1D).withOpacity(0.6),
+            hintTextColor: const Color(0XFF1D1D1D).withOpacity(0.6),
             borderColor: AppColor.black.withOpacity(0.1),
             bgColor: AppColor.white,
             keyboardType: TextInputType.number,
@@ -50,16 +47,19 @@ class NumberOfGuestWidget extends StatelessWidget {
             context: context,
             validator: controller.validateGuestCount,
             onChanged: controller.updateGuestCount,
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: responsive.formFieldPaddingHorizontal,
+              vertical: responsive.formFieldPaddingVertical,
+            ),
             inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(2)],
           ),
-          12.h,
+          SizedBox(height: responsive.spacing12),
 
           // ✅ Guest Range Information
           text(
             text:
                 'Minimum ${OrderConfirmationController.minGuests} guest, Maximum ${OrderConfirmationController.maxGuests} guests',
-            size: 12,
+            size: responsive.fontSize12,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),
           ),

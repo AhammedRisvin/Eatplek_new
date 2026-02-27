@@ -1,56 +1,65 @@
+import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
-import 'package:svg_flutter/svg.dart';
 
-import '../../../../core/util/app_color.dart';
-import '../../../../core/util/assets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/order_confirmation_controller.dart';
 
-class TimeSelectingWidget extends StatelessWidget {
+class ResponsiveTimeSelectingWidget extends StatelessWidget {
   final OrderConfirmationController controller;
 
-  const TimeSelectingWidget({super.key, required this.controller});
+  const ResponsiveTimeSelectingWidget({super.key, required this.controller});
 
   Widget _buildTimePickerButton({
     required String value,
     required VoidCallback onIncrement,
     required VoidCallback onDecrement,
+    required ResponsiveHelper responsive,
   }) {
     return Column(
       children: [
         GestureDetector(
           onTap: onIncrement,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: 9, horizontal: 9),
-            margin: EdgeInsets.only(bottom: 10),
+            padding: EdgeInsets.symmetric(vertical: responsive.spacing9, horizontal: responsive.spacing9),
+            margin: EdgeInsets.only(bottom: responsive.spacing10),
             decoration: BoxDecoration(
               color: AppColor.white,
-              borderRadius: BorderRadius.circular(100),
+              borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
               border: Border.all(color: AppColor.black.withOpacity(0.03)),
-              boxShadow: [
-                BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0)),
-              ],
+              boxShadow: [responsive.responsiveBoxShadow(blurRadius: responsive.shadowBlurMedium)],
             ),
-            child: Center(child: Icon(Icons.keyboard_arrow_up_rounded, color: Color(0XFF454545), size: 30)),
+            child: Center(
+              child: Icon(
+                Icons.keyboard_arrow_up_rounded,
+                color: const Color(0XFF454545),
+                size: responsive.iconSizeMedium,
+              ),
+            ),
           ),
         ),
-        text(text: value, size: 18, fontWeight: FontWeight.w400, color: AppColor.black),
+        text(text: value, size: responsive.fontSize18, fontWeight: FontWeight.w400, color: AppColor.black),
         GestureDetector(
           onTap: onDecrement,
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: 9, horizontal: 9),
-            margin: EdgeInsets.only(top: 10),
+            padding: EdgeInsets.symmetric(vertical: responsive.spacing9, horizontal: responsive.spacing9),
+            margin: EdgeInsets.only(top: responsive.spacing10),
             decoration: BoxDecoration(
               color: AppColor.white,
-              borderRadius: BorderRadius.circular(100),
+              borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
               border: Border.all(color: AppColor.black.withOpacity(0.03)),
-              boxShadow: [
-                BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0)),
-              ],
+              boxShadow: [responsive.responsiveBoxShadow(blurRadius: responsive.shadowBlurMedium)],
             ),
-            child: Center(child: Icon(Icons.keyboard_arrow_down_rounded, color: Color(0XFF454545), size: 30)),
+            child: Center(
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: const Color(0XFF454545),
+                size: responsive.iconSizeMedium,
+              ),
+            ),
           ),
         ),
       ],
@@ -59,26 +68,23 @@ class TimeSelectingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Container(
-      width: context.wp(100),
-      padding: EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-      margin: EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColor.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.black.withOpacity(0.03)),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
-      ),
+      width: responsive.widthPercent(100),
+      padding: responsive.containerPadding,
+      margin: EdgeInsets.only(bottom: responsive.spacing10),
+      decoration: responsive.responsiveContainer(),
       child: Column(
         children: [
           Row(
             children: [
-              SvgPicture.string(dineTimeCalender),
-              12.w,
-              text(text: 'Select Your Dining Time', size: 16, fontWeight: FontWeight.w500),
+              SvgPicture.string(dineTimeCalender, width: responsive.iconSizeMedium, height: responsive.iconSizeMedium),
+              SizedBox(width: responsive.spacing12),
+              text(text: 'Select Your Dining Time', size: responsive.fontSize16, fontWeight: FontWeight.w500),
             ],
           ),
-          30.h,
+          SizedBox(height: responsive.spacing30),
           GetBuilder<OrderConfirmationController>(
             id: 'time_widget',
             builder: (controller) {
@@ -90,30 +96,33 @@ class TimeSelectingWidget extends StatelessWidget {
                     value: controller.selectedHour.toString().padLeft(2, '0'),
                     onIncrement: controller.incrementHour,
                     onDecrement: controller.decrementHour,
+                    responsive: responsive,
                   ),
-                  24.w,
-                  text(text: ':', size: 20, fontWeight: FontWeight.w400, color: AppColor.black),
-                  24.w,
+                  SizedBox(width: responsive.spacing24),
+                  text(text: ':', size: responsive.fontSize20, fontWeight: FontWeight.w400, color: AppColor.black),
+                  SizedBox(width: responsive.spacing24),
                   // Minute picker
                   _buildTimePickerButton(
                     value: controller.selectedMinute.toString().padLeft(2, '0'),
                     onIncrement: controller.incrementMinute,
                     onDecrement: controller.decrementMinute,
+                    responsive: responsive,
                   ),
-                  24.w,
-                  text(text: ':', size: 20, fontWeight: FontWeight.w400, color: AppColor.black),
-                  24.w,
+                  SizedBox(width: responsive.spacing24),
+                  text(text: ':', size: responsive.fontSize20, fontWeight: FontWeight.w400, color: AppColor.black),
+                  SizedBox(width: responsive.spacing24),
                   // Period picker (AM/PM)
                   _buildTimePickerButton(
                     value: controller.selectedPeriod,
                     onIncrement: controller.togglePeriod,
                     onDecrement: controller.togglePeriod,
+                    responsive: responsive,
                   ),
                 ],
               );
             },
           ),
-          30.h,
+          SizedBox(height: responsive.spacing30),
           GetBuilder<OrderConfirmationController>(
             id: 'time_widget',
             builder: (controller) {
@@ -121,30 +130,30 @@ class TimeSelectingWidget extends StatelessWidget {
                 children: [
                   text(
                     text: 'Selected Time: ${controller.getFormattedTime()}',
-                    size: 16,
+                    size: responsive.fontSize16,
                     fontWeight: FontWeight.w600,
                     color: controller.timeErrorMessage != null ? Colors.red : AppColor.appPrimary,
                   ),
 
                   // Show error message if there's one
                   if (controller.timeErrorMessage != null) ...[
-                    8.h,
+                    SizedBox(height: responsive.spacing8),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: EdgeInsets.symmetric(horizontal: responsive.spacing12, vertical: responsive.spacing8),
                       decoration: BoxDecoration(
                         color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
                         border: Border.all(color: Colors.red.withOpacity(0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.error_outline, size: 16, color: Colors.red),
-                          8.w,
+                          Icon(Icons.error_outline, size: responsive.iconSizeSmall, color: Colors.red),
+                          SizedBox(width: responsive.spacing8),
                           Flexible(
                             child: text(
                               text: controller.timeErrorMessage!,
-                              size: 13,
+                              size: responsive.fontSize13,
                               fontWeight: FontWeight.w500,
                               color: Colors.red,
                               textAlign: TextAlign.center,
@@ -155,18 +164,18 @@ class TimeSelectingWidget extends StatelessWidget {
                     ),
                   ],
 
-                  8.h,
+                  SizedBox(height: responsive.spacing8),
                   text(
                     text: 'Please select a time that allows at least 30 minutes of preparation before arrival.',
-                    size: 14,
+                    size: responsive.fontSize14,
                     fontWeight: FontWeight.w400,
                     color: AppColor.black.withOpacity(0.6),
                     textAlign: TextAlign.center,
                   ),
-                  6.h,
+                  SizedBox(height: responsive.spacing6),
                   text(
                     text: 'Restaurant Hours: 9:00 AM - 11:00 PM',
-                    size: 12,
+                    size: responsive.fontSize12,
                     fontWeight: FontWeight.w400,
                     color: AppColor.black.withOpacity(0.5),
                     textAlign: TextAlign.center,

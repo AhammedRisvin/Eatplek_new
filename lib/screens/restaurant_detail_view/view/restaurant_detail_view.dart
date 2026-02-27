@@ -1,4 +1,5 @@
-import 'package:fittor/fittor.dart';
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
@@ -7,6 +8,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
+import '../../../core/util/responsive_helper.dart';
 import '../controller/restaurant_detail_view_controller.dart';
 import 'widget/banner_section.dart';
 import 'widget/bottom_cart_bar.dart';
@@ -51,6 +53,8 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return GetBuilder<RestaurantDetailViewController>(
       id: 'main_content',
       builder: (controller) {
@@ -58,13 +62,13 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
           body: Stack(
             children: [
               SizedBox(
-                height: MediaQuery.of(context).size.height,
-                width: MediaQuery.of(context).size.width,
+                height: responsive.screenHeight,
+                width: responsive.screenWidth,
                 child: Stack(
                   children: [
-                    _buildBackgroundImage(controller),
-                    _buildCollapsibleAppBar(controller),
-                    _buildMainContent(controller),
+                    _buildBackgroundImage(controller, responsive),
+                    _buildCollapsibleAppBar(controller, responsive),
+                    _buildMainContent(controller, responsive),
                   ],
                 ),
               ),
@@ -77,56 +81,71 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  Widget _buildBackgroundImage(RestaurantDetailViewController controller) {
+  Widget _buildBackgroundImage(
+    RestaurantDetailViewController controller,
+    ResponsiveHelper responsive,
+  ) {
     if (_isScrolled) return SizedBox();
 
     return Container(
-      width: context.wp(100),
-      height: 201,
+      width: responsive.screenWidth,
+      height: responsive.spacing201,
       decoration: BoxDecoration(
         image: DecorationImage(
-          image: NetworkImage(
-            controller.banners.isNotEmpty ? controller.banners.first : 'https://picsum.photos/250?image=30',
-          ),
+          image: AssetImage('assets/image/restaurantBg.png'),
           fit: BoxFit.cover,
         ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: Column(
             children: [
               Row(
                 children: [
-                  _buildBackButton(),
-                  10.w,
-                  _buildRestaurantInfo(controller),
+                  _buildBackButton(responsive),
+                  SizedBox(width: responsive.spacing10),
+                  _buildRestaurantInfo(responsive),
                   Spacer(),
                   Container(
-                    height: context.hp(5),
-                    width: context.hp(5),
+                    height: responsive.iconSizeLarge,
+                    width: responsive.iconSizeLarge,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(100),
                       color: AppColor.white.withOpacity(0.2),
-                      border: Border.all(color: AppColor.white.withOpacity(0.4)),
+                      border: Border.all(
+                        color: AppColor.white.withOpacity(0.4),
+                      ),
                     ),
-                    child: IconButton(onPressed: () => Get.back(), icon: Image.asset(mapPng)),
+                    child: IconButton(
+                      onPressed: () {
+                        log('map pressed');
+                      },
+                      icon: Image.asset(mapPng),
+                    ),
                   ),
-                  10.w,
+                  SizedBox(width: responsive.spacing10),
                   Container(
-                    height: context.hp(5),
-                    width: context.hp(5),
+                    height: responsive.iconSizeLarge,
+                    width: responsive.iconSizeLarge,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(100),
                       color: AppColor.white.withOpacity(0.2),
-                      border: Border.all(color: AppColor.white.withOpacity(0.4)),
+                      border: Border.all(
+                        color: AppColor.white.withOpacity(0.4),
+                      ),
                     ),
-                    child: IconButton(onPressed: () => Get.back(), icon: Image.asset(sharePng)),
+                    child: IconButton(
+                      onPressed: () {
+                        log('share pressed');
+                      },
+                      icon: Image.asset(sharePng),
+                    ),
                   ),
                 ],
               ),
-              30.h,
+              SizedBox(height: responsive.spacing30),
             ],
           ),
         ),
@@ -134,51 +153,73 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  Widget _buildBackButton() {
+  Widget _buildBackButton(ResponsiveHelper responsive) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        height: context.hp(5),
-        width: context.hp(5),
+        height: responsive.iconSizeLarge,
+        width: responsive.iconSizeLarge,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColor.white.withOpacity(0.4)),
         ),
-        child: IconButton(onPressed: () => Navigator.of(context).pop(), icon: SvgPicture.string(arrowBack)),
+        child: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: SvgPicture.string(arrowBack),
+        ),
       ),
     );
   }
 
-  Widget _buildRestaurantInfo(RestaurantDetailViewController controller) {
-    return Column(children: [text(text: 'Restaurant', color: AppColor.white, size: 20, fontWeight: FontWeight.w600)]);
+  Widget _buildRestaurantInfo(ResponsiveHelper responsive) {
+    return Column(
+      children: [
+        text(
+          text: 'Restaurant',
+          color: AppColor.white,
+          size: responsive.fontSize20,
+          fontWeight: FontWeight.w600,
+        ),
+      ],
+    );
   }
 
-  Widget _buildCollapsibleAppBar(RestaurantDetailViewController controller) {
+  Widget _buildCollapsibleAppBar(
+    RestaurantDetailViewController controller,
+    ResponsiveHelper responsive,
+  ) {
     return AnimatedPositioned(
       duration: Duration(milliseconds: 300),
       top: 0,
       left: 0,
       right: 0,
-      height: _isScrolled ? 120 : 0,
+      height: _isScrolled ? responsive.spacing120 : 0,
       child: AnimatedOpacity(
         duration: Duration(milliseconds: 300),
         opacity: _isScrolled ? 1.0 : 0.0,
         child: Container(
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: NetworkImage(
-                controller.banners.isNotEmpty ? controller.banners.first : 'https://picsum.photos/250?image=30',
-              ),
+              image: AssetImage('assets/image/restaurantBg.png'),
+              // image: NetworkImage(
+              //   controller.banners.isNotEmpty
+              //       ? controller.banners.first
+              //       : 'https://picsum.photos/250?image=30',
+              // ),
               fit: BoxFit.cover,
             ),
           ),
           child: Padding(
-            padding: EdgeInsets.only(left: 16, right: 16, top: 30),
+            padding: EdgeInsets.only(
+              left: responsive.spacing16,
+              right: responsive.spacing16,
+              top: responsive.spacing30,
+            ),
             child: Row(
               children: [
                 Container(
-                  height: 40,
-                  width: 40,
+                  height: responsive.spacing40,
+                  width: responsive.spacing40,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(color: AppColor.white.withOpacity(0.4)),
@@ -189,8 +230,13 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
                     icon: SvgPicture.string(arrowBack),
                   ),
                 ),
-                16.w,
-                text(text: 'Restaurant', color: AppColor.white, size: 16, fontWeight: FontWeight.w600),
+                SizedBox(width: responsive.spacing16),
+                text(
+                  text: 'Restaurant',
+                  color: AppColor.white,
+                  size: responsive.fontSize16,
+                  fontWeight: FontWeight.w600,
+                ),
               ],
             ),
           ),
@@ -199,17 +245,23 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  Widget _buildMainContent(RestaurantDetailViewController controller) {
+  Widget _buildMainContent(
+    RestaurantDetailViewController controller,
+    ResponsiveHelper responsive,
+  ) {
     return AnimatedPositioned(
       duration: Duration(milliseconds: 300),
-      top: _isScrolled ? 120 : 100,
+      top: _isScrolled ? responsive.spacing120 : responsive.spacing100,
       left: 0,
       right: 0,
       bottom: 0,
       child: Container(
         decoration: BoxDecoration(
           color: AppColor.scaffoldColor,
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(responsive.largeBorderRadius),
+            topRight: Radius.circular(responsive.largeBorderRadius),
+          ),
         ),
         child: Skeletonizer(
           enabled: controller.isLoading,
@@ -220,25 +272,27 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
               children: [
                 // Error state
                 if (controller.hasError)
-                  _buildErrorState(controller)
+                  _buildErrorState(controller, responsive)
                 else if (controller.isLoading)
                   // Loading skeleton
-                  _buildLoadingSkeleton()
+                  _buildLoadingSkeleton(responsive)
                 else if (controller.restaurantData.isEmpty)
                   // Empty state
-                  _buildEmptyState()
+                  _buildEmptyState(responsive)
                 else ...[
                   // Banner Section
                   BannerSection(controller: controller),
-                  20.h,
+                  SizedBox(height: responsive.spacing20),
 
                   // Category Section
                   CategorySection(controller: controller),
-                  20.h,
+                  SizedBox(height: responsive.spacing20),
 
                   // Food Grid Section
                   FoodGridSection(controller: controller),
-                  SizedBox(height: 100), // Bottom padding for cart bar
+                  SizedBox(
+                    height: responsive.spacing100,
+                  ), // Bottom padding for cart bar
                 ],
               ],
             ),
@@ -248,42 +302,56 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  Widget _buildErrorState(RestaurantDetailViewController controller) {
+  Widget _buildErrorState(
+    RestaurantDetailViewController controller,
+    ResponsiveHelper responsive,
+  ) {
     return SizedBox(
-      height: context.hp(80),
+      height: responsive.heightPercent(80),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: AppColor.black.withOpacity(0.3)),
-            24.h,
-            text(text: 'Oops! Something went wrong', size: 18, fontWeight: FontWeight.w600, color: AppColor.black),
-            12.h,
+            Icon(
+              Icons.error_outline,
+              size: responsive.iconSizeXL,
+              color: AppColor.black.withOpacity(0.3),
+            ),
+            SizedBox(height: responsive.spacing24),
+            text(
+              text: 'Oops! Something went wrong',
+              size: responsive.fontSize18,
+              fontWeight: FontWeight.w600,
+              color: AppColor.black,
+            ),
+            SizedBox(height: responsive.spacing12),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 32),
+              padding: EdgeInsets.symmetric(horizontal: responsive.spacing32),
               child: text(
                 text: controller.errorMessage,
-                size: 14,
+                size: responsive.fontSize14,
                 fontWeight: FontWeight.w400,
                 color: AppColor.black.withOpacity(0.6),
                 textAlign: TextAlign.center,
               ),
             ),
-            32.h,
+            SizedBox(height: responsive.spacing32),
             button(
               name: 'Try Again',
               onTap: () {
                 if (controller.restaurantId != null) {
-                  controller.getRestaurantDetailsFn(restaurantId: controller.restaurantId!);
+                  controller.getRestaurantDetailsFn(
+                    restaurantId: controller.restaurantId!,
+                  );
                 }
               },
-              width: 150,
-              height: 50,
+              width: responsive.spacing150,
+              height: responsive.spacing50,
               color: AppColor.appPrimary,
               textColor: AppColor.white,
               fontWeight: FontWeight.w600,
-              fontSize: 16,
-              borderRadius: BorderRadius.circular(100),
+              fontSize: responsive.fontSize16,
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
             ),
           ],
         ),
@@ -291,85 +359,108 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  Widget _buildLoadingSkeleton() {
+  Widget _buildLoadingSkeleton(ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Banner skeleton
         Padding(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.all(responsive.spacing16),
           child: Container(
-            height: 180,
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(20)),
+            height: responsive.spacing180,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+            ),
           ),
         ),
-        20.h,
+        SizedBox(height: responsive.spacing20),
         // Category header skeleton
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: Container(
-            height: 24,
-            width: 150,
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(8)),
+            height: responsive.spacing24,
+            width: responsive.spacing150,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(responsive.spacing8),
+            ),
           ),
         ),
-        14.h,
+        SizedBox(height: responsive.spacing14),
         // Category tabs skeleton
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: SizedBox(
-            height: 50,
+            height: responsive.spacing50,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: 5,
-              separatorBuilder: (_, _) => 10.w,
+              separatorBuilder: (_, _) => SizedBox(width: responsive.spacing10),
               itemBuilder:
                   (_, _) => Container(
-                    width: 100,
-                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(40)),
+                    width: responsive.spacing100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(responsive.spacing40),
+                    ),
                   ),
             ),
           ),
         ),
-        20.h,
+        SizedBox(height: responsive.spacing20),
         // Food grid skeleton
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: GridView.builder(
             shrinkWrap: true,
             physics: NeverScrollableScrollPhysics(),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 12,
-              childAspectRatio: Get.height * 0.00098,
+              crossAxisCount: responsive.gridCrossAxisCount,
+              mainAxisSpacing: responsive.gridMainAxisSpacing,
+              crossAxisSpacing: responsive.gridCrossAxisSpacing,
+              childAspectRatio: responsive.gridChildAspectRatio,
             ),
             itemCount: 6,
             itemBuilder:
                 (_, _) => Container(
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(
+                      responsive.largeBorderRadius,
+                    ),
+                  ),
                 ),
           ),
         ),
-        SizedBox(height: 100),
+        SizedBox(height: responsive.spacing100),
       ],
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(ResponsiveHelper responsive) {
     return SizedBox(
-      height: context.hp(80),
+      height: responsive.heightPercent(80),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.restaurant_menu, size: 64, color: AppColor.black.withOpacity(0.3)),
-            24.h,
-            text(text: 'No items available', size: 18, fontWeight: FontWeight.w600, color: AppColor.black),
-            12.h,
+            Icon(
+              Icons.restaurant_menu,
+              size: responsive.iconSizeXL,
+              color: AppColor.black.withOpacity(0.3),
+            ),
+            SizedBox(height: responsive.spacing24),
+            text(
+              text: 'No items available',
+              size: responsive.fontSize18,
+              fontWeight: FontWeight.w600,
+              color: AppColor.black,
+            ),
+            SizedBox(height: responsive.spacing12),
             text(
               text: 'This restaurant has no food items available right now',
-              size: 14,
+              size: responsive.fontSize14,
               fontWeight: FontWeight.w400,
               color: AppColor.black.withOpacity(0.6),
             ),

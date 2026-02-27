@@ -5,7 +5,11 @@ import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../cart/model/cart_api_model.dart';
+import '../view/widget/order_accepted_sheet.dart';
+import '../view/widget/order_rejected_sheet.dart';
 import '../view/widget/payment_bottom_sheet.dart';
+import '../view/widget/time_suggest_bottom_sheet.dart';
+import '../view/widget/waiting_confirmation_sheet.dart';
 
 class OrderConfirmationController extends GetxController {
   // ========== FORM CONTROLLERS ==========
@@ -54,6 +58,15 @@ class OrderConfirmationController extends GetxController {
 
   // ========== DATE VARIABLES ==========
   DateTime? selectedDate;
+
+  // ========== RESTAURANT RESPONSE HANDLING ==========
+  String? orderStatus; // null, 'accepted', 'rejected', 'time_suggestion'
+  String? rejectionReason;
+  String? suggestedTime; // ISO 8601 format from restaurant
+  int? suggestedHour; // 12-hour format
+  int? suggestedMinute;
+  String? suggestedPeriod;
+  bool isTimeSuggestionTimePickerVisible = false; // Toggle time picker visibility in suggestion sheet
 
   // ========== SERVICE TYPE CHECKING METHODS ==========
 
@@ -432,16 +445,11 @@ class OrderConfirmationController extends GetxController {
   // ========== TIME CONVERSION TO ISO 8601 ==========
 
   /// ✅ Convert 12-hour time to ISO 8601 datetime string with Z suffix
-  /// Input: selectedHour=5, selectedMinute=30, selectedPeriod=PM
-  /// Output: "2025-01-15T17:30:00.000Z" (ISO 8601)
   String _convertTimeToISO8601() {
     final hour24 = _convertTo24Hour();
     final now = DateTime.now();
 
-    // Create datetime with selected time
     final selectedDateTime = DateTime(now.year, now.month, now.day, hour24, selectedMinute, 0);
-
-    // Convert to ISO 8601 format and add Z suffix for UTC
     final isoString = '${selectedDateTime.toIso8601String()}Z';
 
     debugPrint('⏰ TIME CONVERSION TO ISO 8601:');
@@ -451,6 +459,43 @@ class OrderConfirmationController extends GetxController {
     debugPrint('   ✅ READY FOR API');
 
     return isoString;
+  }
+
+  // ========== RESTAURANT SUGGESTED TIME CONVERSION ==========
+
+  /// ✅ Parse ISO 8601 time from restaurant to 12-hour format
+  void _parseSuggestedTime(String isoTimeString) {
+    try {
+      debugPrint('⏰ PARSING RESTAURANT SUGGESTED TIME:');
+      debugPrint('   ISO String: $isoTimeString');
+
+      final dateTime = DateTime.parse(isoTimeString);
+      final hour24 = dateTime.hour;
+      final minute = dateTime.minute;
+
+      // Convert to 12-hour format
+      suggestedHour = hour24 > 12 ? hour24 - 12 : (hour24 == 0 ? 12 : hour24);
+      suggestedMinute = minute;
+      suggestedPeriod = hour24 >= 12 ? 'PM' : 'AM';
+
+      debugPrint('   Parsed Hour: $suggestedHour');
+      debugPrint('   Parsed Minute: $suggestedMinute');
+      debugPrint('   Parsed Period: $suggestedPeriod');
+      debugPrint('   ✅ PARSING COMPLETE');
+    } catch (e) {
+      debugPrint('❌ Error parsing suggested time: $e');
+      suggestedHour = null;
+      suggestedMinute = null;
+      suggestedPeriod = null;
+    }
+  }
+
+  /// ✅ Format suggested time for display
+  String getFormattedSuggestedTime() {
+    if (suggestedHour == null || suggestedMinute == null || suggestedPeriod == null) {
+      return '--:-- --';
+    }
+    return '${suggestedHour.toString().padLeft(2, '0')}:${suggestedMinute.toString().padLeft(2, '0')} $suggestedPeriod';
   }
 
   // ========== GUEST COUNT METHODS ==========
@@ -475,6 +520,20 @@ class OrderConfirmationController extends GetxController {
     update(['payment_method']);
   }
 
+  // ========== TIME SUGGESTION SHEET METHODS ==========
+
+  /// ✅ Toggle time picker visibility in suggestion sheet
+  void toggleTimeSuggestionTimePicker() {
+    isTimeSuggestionTimePickerVisible = !isTimeSuggestionTimePickerVisible;
+    update(['time_suggestion_sheet']);
+  }
+
+  /// ✅ Reset time selection to user's original selected time when toggling time picker
+  void resetTimeToOriginalSelection() {
+    isTimeSuggestionTimePickerVisible = false;
+    update(['time_suggestion_sheet']);
+  }
+
   // ========== ORDER CONFIRMATION ==========
 
   /// ✅ Validate all fields based on service type
@@ -484,30 +543,30 @@ class OrderConfirmationController extends GetxController {
       return;
     }
 
+    // ✅ SHOW WAITING SHEET IMMEDIATELY AFTER VALIDATION
+    debugPrint('═════════════════════════════════════════════');
+    debugPrint('📋 SHOWING WAITING SHEET');
+    debugPrint('═════════════════════════════════════════════');
+    _showWaitingBottomSheet();
+
+    // Then place the order
     await _placeOrder();
   }
 
   /// ✅ Validate fields based on service type AND API body requirements
-  /// Delivery: name, phoneNumber, address, latitude, longitude
-  /// Dine-in: personCount, reachTime
-  /// Takeaway: reachTime
-  /// Car Dine-in: reachTime, vehicleDetails
   bool _validateServiceTypeFields() {
     // ✅ DELIVERY
     if (isDelivery()) {
-      // Name is required
       if (fullNameController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Full name is required');
         return false;
       }
 
-      // Phone is required
       if (phoneController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Phone number is required');
         return false;
       }
 
-      // Address is required
       if (addressController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Delivery address is required');
         return false;
@@ -518,7 +577,6 @@ class OrderConfirmationController extends GetxController {
 
     // ✅ DINE-IN
     if (isDineIn()) {
-      // Person count is required
       if (guestCountController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Number of guests is required');
         return false;
@@ -530,7 +588,6 @@ class OrderConfirmationController extends GetxController {
         return false;
       }
 
-      // Time is required
       if (!isTimeValid()) {
         _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
         return false;
@@ -541,7 +598,6 @@ class OrderConfirmationController extends GetxController {
 
     // ✅ TAKEAWAY
     if (isTakeaway()) {
-      // Time is required
       if (!isTimeValid()) {
         _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid pickup time');
         return false;
@@ -552,13 +608,11 @@ class OrderConfirmationController extends GetxController {
 
     // ✅ CAR DINE-IN
     if (isCarDineIn()) {
-      // Time is required
       if (!isTimeValid()) {
         _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
         return false;
       }
 
-      // Vehicle details are required
       if (vehicleDetailsController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Vehicle details are required');
         return false;
@@ -571,10 +625,6 @@ class OrderConfirmationController extends GetxController {
   }
 
   /// ✅ Build dynamic request body based on serviceType
-  /// DELIVERY: {serviceType, address, latitude, longitude, name, phoneNumber, notes?}
-  /// DINE-IN: {serviceType, personCount, reachTime}
-  /// TAKEAWAY: {serviceType, reachTime, notes?}
-  /// CAR DINE-IN: {serviceType, reachTime, vehicleDetails}
   Map<String, dynamic> _buildOrderRequestBody() {
     final cleanedServiceType = _cleanServiceType(Store.deliveryPreference);
 
@@ -591,13 +641,12 @@ class OrderConfirmationController extends GetxController {
         baseOrderData.addAll({
           "serviceType": "Delivery",
           "address": addressController.text.trim(),
-          "latitude": 10.0181, // TODO: Get from location service
-          "longitude": 76.3051, // TODO: Get from location service
+          "latitude": 10.0181,
+          "longitude": 76.3051,
           "name": fullNameController.text.trim(),
           "phoneNumber": "+91${phoneController.text.trim()}",
         });
 
-        // Add notes only if not empty
         if (instructions.isNotEmpty && instructions.trim().isNotEmpty) {
           baseOrderData['notes'] = instructions.trim();
         }
@@ -605,11 +654,8 @@ class OrderConfirmationController extends GetxController {
         debugPrint('✅ Delivery Request:');
         debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
         debugPrint('  address: ${baseOrderData["address"]}');
-        debugPrint('  latitude: ${baseOrderData["latitude"]}');
-        debugPrint('  longitude: ${baseOrderData["longitude"]}');
         debugPrint('  name: ${baseOrderData["name"]}');
         debugPrint('  phoneNumber: ${baseOrderData["phoneNumber"]}');
-        debugPrint('  notes: ${baseOrderData["notes"] ?? "null (omitted)"}');
         break;
 
       case 'dine-in':
@@ -627,7 +673,6 @@ class OrderConfirmationController extends GetxController {
         final reachTimeISO = _convertTimeToISO8601();
         baseOrderData.addAll({"serviceType": "Takeaway", "reachTime": reachTimeISO});
 
-        // Add notes only if not empty
         if (instructions.isNotEmpty && instructions.trim().isNotEmpty) {
           baseOrderData['notes'] = instructions.trim();
         }
@@ -635,7 +680,6 @@ class OrderConfirmationController extends GetxController {
         debugPrint('✅ Takeaway Request:');
         debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
         debugPrint('  reachTime: ${baseOrderData["reachTime"]}');
-        debugPrint('  notes: ${baseOrderData["notes"] ?? "null (omitted)"}');
         break;
 
       case 'car-dine-in':
@@ -710,15 +754,16 @@ class OrderConfirmationController extends GetxController {
       if (response != null && response is Map<String, dynamic>) {
         if (response['success'] == true) {
           debugPrint('✅ ORDER PLACED SUCCESSFULLY');
-          _showSuccessMessage('Success', 'Order placed successfully!');
 
-          // ✅ SHOW PAYMENT SHEET AFTER SUCCESS
-          await Future.delayed(Duration(milliseconds: 500));
-          _showPaymentBottomSheet();
+          // ✅ WAITING SHEET ALREADY SHOWN IN confirmOrder()
+          // ✅ START POLLING FOR RESTAURANT RESPONSE (2 minutes timeout)
+          await _waitForRestaurantResponse();
         } else {
           errorMessage = response['message'] ?? 'Failed to place order';
 
-          // ✅ Handle validation errors from API
+          // ✅ DISMISS WAITING SHEET ON ERROR
+          _dismissWaitingSheet();
+
           if (response['errors'] != null && response['errors'] is List) {
             final errors = response['errors'] as List;
             String errorDetails = errors
@@ -738,11 +783,15 @@ class OrderConfirmationController extends GetxController {
         }
       } else {
         errorMessage = 'Invalid response from server';
+        // ✅ DISMISS WAITING SHEET ON ERROR
+        _dismissWaitingSheet();
         _showErrorMessage('Error', errorMessage);
       }
     } catch (e) {
       errorMessage = 'Error placing order: $e';
       debugPrint('❌ EXCEPTION: $e');
+      // ✅ DISMISS WAITING SHEET ON EXCEPTION
+      _dismissWaitingSheet();
       _showErrorMessage('Error', 'Failed to place order. Please try again.');
     } finally {
       isLoading = false;
@@ -750,10 +799,274 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
+  // ========== RESTAURANT RESPONSE POLLING ==========
+
+  /// ✅ Wait for restaurant response with 2-minute timeout
+  Future<void> _waitForRestaurantResponse() async {
+    const maxWaitTime = Duration(minutes: 2);
+    const pollInterval = Duration(seconds: 3);
+    final startTime = DateTime.now();
+
+    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('⏳ WAITING FOR RESTAURANT RESPONSE (Max 2 minutes)');
+    debugPrint('═════════════════════════════════════════════════════════');
+
+    while (true) {
+      final elapsedTime = DateTime.now().difference(startTime);
+
+      // ✅ Check timeout
+      if (elapsedTime > maxWaitTime) {
+        debugPrint('⏰ TIMEOUT: No response from restaurant after 2 minutes');
+        _handleRestaurantTimeout();
+        break;
+      }
+
+      // ✅ Simulate polling (in real app, call API to check order status)
+      // For now, this is a placeholder - replace with actual API call
+      await Future.delayed(pollInterval);
+
+      // ✅ In production, make an API call here to check order status
+      // Example: final status = await _apiClient.get(endpoint: Urls.getOrderStatusUrl);
+      // Then handle the response accordingly
+
+      debugPrint('🔄 Polling... (${elapsedTime.inSeconds}s elapsed)');
+    }
+  }
+
+  /// ✅ Handle restaurant timeout (no response after 2 minutes)
+  void _handleRestaurantTimeout() {
+    debugPrint('❌ RESTAURANT RESPONSE TIMEOUT');
+    _dismissWaitingSheet();
+    _showErrorMessage('Timeout', 'Restaurant did not respond within 2 minutes. Please contact support.');
+  }
+
+  /// ✅ Handle restaurant response (to be called from API polling)
+  void handleRestaurantResponse(Map<String, dynamic> response) {
+    try {
+      debugPrint('═════════════════════════════════════════════════════════');
+      debugPrint('🎯 RESTAURANT RESPONSE RECEIVED');
+      debugPrint('═════════════════════════════════════════════════════════');
+
+      if (response['success'] != true) {
+        _handleRestaurantTimeout();
+        return;
+      }
+
+      final data = response['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        _handleRestaurantTimeout();
+        return;
+      }
+
+      final status = data['orderStatus'] as String?;
+      final rejectionDetails = data['rejectionDetails'] as Map<String, dynamic>?;
+
+      debugPrint('Order Status: $status');
+
+      switch (status?.toLowerCase()) {
+        case 'accepted':
+          _handleOrderAccepted(data);
+          break;
+
+        case 'rejected':
+          if (rejectionDetails?['hasTimeSuggestion'] == true) {
+            _handleTimeSuggestion(rejectionDetails!);
+          } else {
+            _handleOrderRejected(rejectionDetails);
+          }
+          break;
+
+        default:
+          _handleRestaurantTimeout();
+      }
+    } catch (e) {
+      debugPrint('❌ Error handling restaurant response: $e');
+      _handleRestaurantTimeout();
+    }
+  }
+
+  /// ✅ Handle order accepted by restaurant
+  void _handleOrderAccepted(Map<String, dynamic> data) {
+    debugPrint('✅ ORDER ACCEPTED BY RESTAURANT');
+
+    orderStatus = 'accepted';
+    _dismissWaitingSheet();
+
+    // ✅ Show accepted sheet for 2 seconds
+    _showAcceptedBottomSheet();
+
+    Future.delayed(const Duration(seconds: 2), () {
+      _dismissAcceptedSheet();
+      // ✅ Then show payment sheet
+      _showPaymentBottomSheet();
+    });
+  }
+
+  /// ✅ Handle order rejected by restaurant
+  void _handleOrderRejected(Map<String, dynamic>? rejectionDetails) {
+    debugPrint('❌ ORDER REJECTED BY RESTAURANT');
+
+    orderStatus = 'rejected';
+    rejectionReason = rejectionDetails?['rejectionReason'] as String? ?? 'Order rejected by restaurant';
+
+    _dismissWaitingSheet();
+    _showRejectedBottomSheet();
+  }
+
+  /// ✅ Handle time suggestion from restaurant
+  void _handleTimeSuggestion(Map<String, dynamic> rejectionDetails) {
+    debugPrint('⏰ TIME SUGGESTION FROM RESTAURANT');
+
+    orderStatus = 'time_suggestion';
+    rejectionReason = rejectionDetails['rejectionReason'] as String?;
+    suggestedTime = rejectionDetails['suggestedTime'] as String?;
+
+    // Parse suggested time
+    if (suggestedTime != null) {
+      _parseSuggestedTime(suggestedTime!);
+    }
+
+    // Reset UI state
+    isTimeSuggestionTimePickerVisible = false;
+
+    _dismissWaitingSheet();
+    _showTimeSuggestionBottomSheet();
+  }
+
+  /// ✅ Accept restaurant's suggested time
+  Future<void> acceptSuggestedTime() async {
+    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('✅ ACCEPTING RESTAURANT SUGGESTED TIME');
+    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('Suggested Time: ${getFormattedSuggestedTime()}');
+    debugPrint('═════════════════════════════════════════════════════════');
+
+    // Update user's selected time to suggested time
+    if (suggestedHour != null && suggestedMinute != null && suggestedPeriod != null) {
+      selectedHour = suggestedHour!;
+      selectedMinute = suggestedMinute!;
+      selectedPeriod = suggestedPeriod!;
+    }
+
+    _dismissTimeSuggestionSheet();
+
+    // ✅ Show waiting sheet again and wait for confirmation
+    _showWaitingBottomSheet();
+    await _waitForRestaurantResponse();
+  }
+
+  /// ✅ Submit custom time selection from time picker
+  Future<void> submitCustomTimeSelection() async {
+    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('📤 SUBMITTING CUSTOM TIME SELECTION');
+    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('Selected Time: ${getFormattedTime()}');
+    debugPrint('═════════════════════════════════════════════════════════');
+
+    if (!isTimeValid()) {
+      _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
+      return;
+    }
+
+    _dismissTimeSuggestionSheet();
+
+    // ✅ Show waiting sheet and place order with new time
+    _showWaitingBottomSheet();
+    await _placeOrder();
+  }
+
+  // ========== BOTTOM SHEET MANAGEMENT ==========
+
+  /// ✅ Show waiting bottom sheet (non-dismissible)
+  void _showWaitingBottomSheet() {
+    debugPrint('📋 Showing waiting bottom sheet...');
+
+    Get.bottomSheet(
+      WillPopScope(
+        onWillPop: () async => false, // Prevent dismissal
+        child: const ResponsiveWaitingFormConfirmationSheet(),
+      ),
+      isScrollControlled: true,
+      isDismissible: false, // Non-dismissible
+      enableDrag: false, // Prevent swipe down
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  /// ✅ Dismiss waiting bottom sheet
+  void _dismissWaitingSheet() {
+    debugPrint('❌ Dismissing waiting sheet...');
+
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back();
+    }
+  }
+
+  /// ✅ Show accepted bottom sheet
+  void _showAcceptedBottomSheet() {
+    debugPrint('✅ Showing accepted bottom sheet...');
+
+    Get.bottomSheet(
+      ResponsiveOrderAcceptedSheet(selectedPaymentMethod: paymentMethods[selectedPaymentMethodIndex]),
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  /// ✅ Dismiss accepted bottom sheet
+  void _dismissAcceptedSheet() {
+    debugPrint('❌ Dismissing accepted sheet...');
+
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back();
+    }
+  }
+
+  /// ✅ Show rejected bottom sheet
+  void _showRejectedBottomSheet() {
+    debugPrint('❌ Showing rejected bottom sheet...');
+
+    Get.bottomSheet(
+      ResponsiveOrderRejectedSheet(
+        selectedPaymentMethod: paymentMethods[selectedPaymentMethodIndex],
+        rejectionReason: rejectionReason,
+      ),
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  /// ✅ Show time suggestion bottom sheet
+  void _showTimeSuggestionBottomSheet() {
+    debugPrint('⏰ Showing time suggestion bottom sheet...');
+
+    Get.bottomSheet(
+      TimeSuggestBottomSheet(controller: this),
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  /// ✅ Dismiss time suggestion bottom sheet
+  void _dismissTimeSuggestionSheet() {
+    debugPrint('❌ Dismissing time suggestion sheet...');
+
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back();
+    }
+  }
+
   /// ✅ Show payment bottom sheet
   void _showPaymentBottomSheet() {
+    debugPrint('💳 Showing payment bottom sheet...');
+
     Get.bottomSheet(
-      PaymentBottomSheet(controller: this),
+      ResponsivePaymentBottomSheet(controller: this),
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
     );
@@ -763,7 +1076,11 @@ class OrderConfirmationController extends GetxController {
   void _showErrorMessage(String title, String message) {
     if (Get.context != null) {
       ScaffoldMessenger.of(Get.context!).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red.withOpacity(0.8), duration: Duration(seconds: 3)),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red.withOpacity(0.8),
+          duration: const Duration(seconds: 3),
+        ),
       );
     } else {
       try {
@@ -773,7 +1090,7 @@ class OrderConfirmationController extends GetxController {
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.red.withOpacity(0.8),
           colorText: Colors.white,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         );
       } catch (e) {
         debugPrint('⚠️ Could not show snackbar: $message');
@@ -788,7 +1105,7 @@ class OrderConfirmationController extends GetxController {
         SnackBar(
           content: Text(message),
           backgroundColor: Colors.green.withOpacity(0.8),
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
     } else {
@@ -799,7 +1116,7 @@ class OrderConfirmationController extends GetxController {
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green.withOpacity(0.8),
           colorText: Colors.white,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         );
       } catch (e) {
         debugPrint('⚠️ Could not show snackbar: $message');

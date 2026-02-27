@@ -1,9 +1,9 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../../core/util/app_color.dart';
-import '../../../../../core/util/common_widgets.dart';
+import '../../../../core/util/app_color.dart';
+import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
 import '../../model/restaurent_details_model.dart';
 import 'quantity_control_widget.dart';
@@ -15,27 +15,29 @@ class FoodBottomSheetAddOnsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     if (foodItem.addOns == null || foodItem.addOns!.isEmpty) {
       return SizedBox();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [_buildAddOnsHeader(), 20.h, _buildAddOnsList()],
+      children: [_buildAddOnsHeader(responsive), SizedBox(height: responsive.spacing20), _buildAddOnsList(responsive)],
     );
   }
 
-  Widget _buildAddOnsHeader() {
+  Widget _buildAddOnsHeader(ResponsiveHelper responsive) {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          text(text: 'Add Ons', size: 18, fontWeight: FontWeight.w600),
-          3.h,
+          text(text: 'Add Ons', size: responsive.fontSize18, fontWeight: FontWeight.w600),
+          SizedBox(height: responsive.spacing3),
           text(
             text: 'Make your meal better with these add-ons.',
-            size: 12,
+            size: responsive.fontSize12,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),
           ),
@@ -44,7 +46,7 @@ class FoodBottomSheetAddOnsSection extends StatelessWidget {
     );
   }
 
-  Widget _buildAddOnsList() {
+  Widget _buildAddOnsList(ResponsiveHelper responsive) {
     return GetBuilder<RestaurantDetailViewController>(
       id: 'addons_list',
       builder: (controller) {
@@ -53,47 +55,52 @@ class FoodBottomSheetAddOnsSection extends StatelessWidget {
           shrinkWrap: true,
           itemBuilder: (context, index) {
             final addOn = foodItem.addOns![index];
-            return _buildAddOnTile(controller, addOn);
+            return _buildAddOnTile(controller, addOn, responsive);
           },
-          separatorBuilder: (context, index) => 16.h,
+          separatorBuilder: (context, index) => SizedBox(height: responsive.spacing16),
           itemCount: foodItem.addOns!.length,
         );
       },
     );
   }
 
-  Widget _buildAddOnTile(RestaurantDetailViewController controller, AddOn addOn) {
+  Widget _buildAddOnTile(RestaurantDetailViewController controller, AddOn addOn, ResponsiveHelper responsive) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(responsive.spacing8),
         color: AppColor.white,
         boxShadow: [BoxShadow(color: Color(0xff000000).withOpacity(0.04), blurRadius: 14, offset: Offset(0, 0))],
       ),
-      margin: EdgeInsets.symmetric(horizontal: 16),
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: responsive.spacing16),
+      padding: EdgeInsets.symmetric(horizontal: responsive.spacing12, vertical: responsive.spacing10),
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: image(url: addOn.image ?? '', height: 40, width: 40, borderRadius: BorderRadius.circular(4)),
+            borderRadius: BorderRadius.circular(responsive.spacing4),
+            child: image(
+              url: addOn.image ?? '',
+              height: responsive.spacing40,
+              width: responsive.spacing40,
+              borderRadius: BorderRadius.circular(responsive.spacing4),
+            ),
           ),
-          16.w,
+          SizedBox(width: responsive.spacing16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 text(
                   text: addOn.name ?? '',
-                  size: 14,
+                  size: responsive.fontSize14,
                   fontWeight: FontWeight.w600,
                   color: AppColor.black,
                   maxLines: 1,
                   overFlow: TextOverflow.ellipsis,
                 ),
-                4.h,
+                SizedBox(height: responsive.spacing4),
                 text(
                   text: '₹ ${addOn.price?.toInt() ?? 0}',
-                  size: 12,
+                  size: responsive.fontSize12,
                   fontWeight: FontWeight.w500,
                   color: AppColor.black.withOpacity(0.6),
                 ),
@@ -109,9 +116,9 @@ class FoodBottomSheetAddOnsSection extends StatelessWidget {
                 onIncrease: () => controller.toggleAddOn(addOn.addOnId ?? ''),
                 onDecrease: () => controller.decreaseAddOn(addOn.addOnId ?? ''),
                 showRemoveButton: quantity > 0,
-                buttonSize: 28,
-                iconSize: 12,
-                isCompactMode: true, // ✅ NEW: Enable compact mode with square buttons
+                buttonSize: responsive.spacing28,
+                iconSize: responsive.fontSize12,
+                isCompactMode: true,
               );
             },
           ),

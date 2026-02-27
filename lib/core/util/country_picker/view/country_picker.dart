@@ -61,7 +61,7 @@ class _CountryPickerState extends State<CountryPicker> {
                 decoration: InputDecoration(
                   prefixIcon: const Icon(Icons.search, color: AppColor.black),
                   hintText: 'Search country...',
-                  hintStyle: TextStyle(color: AppColor.black, fontFamily: GoogleFonts.poppins().fontFamily),
+                  hintStyle: TextStyle(color: AppColor.black, fontFamily: GoogleFonts.urbanist().fontFamily),
                   border: InputBorder.none,
                 ),
               ),

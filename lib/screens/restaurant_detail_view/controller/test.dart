@@ -42,9 +42,7 @@ class RestaurantDetailViewController extends GetxController {
   String? restaurantId;
 
   Timer? _quantityDebounceTimer;
-  Timer? _autoRemoveCheckTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
-  static const Duration _autoRemoveCheckDuration = Duration(milliseconds: 800);
 
   DateTime _lastLocalApiUpdate = DateTime.now();
 
@@ -58,7 +56,6 @@ class RestaurantDetailViewController extends GetxController {
   @override
   void onClose() {
     _quantityDebounceTimer?.cancel();
-    _autoRemoveCheckTimer?.cancel();
     super.onClose();
   }
 
@@ -544,9 +541,6 @@ class RestaurantDetailViewController extends GetxController {
       if (currentQty > 0) {
         bsItemQuantity[foodId] = currentQty - 1;
         update(['total_price']);
-
-        // ✅ NEW: Check if should auto-remove item when quantity reaches 0
-        _scheduleAutoRemoveCheckForScenario1And2();
       }
     } else {
       if (currentQty > 1) {
@@ -579,9 +573,6 @@ class RestaurantDetailViewController extends GetxController {
         'bottom_sheet_content',
         'total_price',
       ]);
-
-      // ✅ NEW: Check if should auto-remove item when all customizations are zero
-      _scheduleAutoRemoveCheckForScenario3And4();
     }
   }
 
@@ -617,136 +608,12 @@ class RestaurantDetailViewController extends GetxController {
       bsAddOnQuantity[addOnId] = currentQty - 1;
 
       update(['addons_list', 'bottom_sheet_content', 'total_price']);
-
-      // ✅ NEW: Check if should auto-remove item in edit mode when quantity is zero
-      _scheduleAutoRemoveCheckForScenario1And2();
     }
   }
 
   int getAddOnCount(String addOnId) {
     return bsAddOnQuantity[addOnId] ?? 0;
   }
-
-  // ============================================================================
-  // ✅ NEW METHODS: INSTANT REMOVAL LOGIC
-  // ============================================================================
-
-  /// ✅ Schedule auto-remove check for Scenario 1 & 2 (Food with/without add-ons, no customizations)
-  void _scheduleAutoRemoveCheckForScenario1And2() {
-    debugPrint('🔴 Scheduling auto-remove check for Scenario 1 & 2');
-
-    _autoRemoveCheckTimer?.cancel();
-    _autoRemoveCheckTimer = Timer(_autoRemoveCheckDuration, () {
-      if (selectedFoodItem?.foodId == null) return;
-
-      final foodId = selectedFoodItem!.foodId!;
-      final currentQty = getBottomSheetItemQuantity();
-
-      debugPrint(
-        '🔴 Auto-remove check - foodId: $foodId, qty: $currentQty, isEditMode: $isEditMode',
-      );
-
-      if (isEditMode && currentQty == 0) {
-        debugPrint('🔴 Scenario 1 & 2: Auto-removing item - quantity is 0');
-        _removeItemFromCartDirectly(foodId);
-      }
-    });
-  }
-
-  /// ✅ Schedule auto-remove check for Scenario 3 & 4 (Food with customizations)
-  void _scheduleAutoRemoveCheckForScenario3And4() {
-    debugPrint('🟣 Scheduling auto-remove check for Scenario 3 & 4');
-
-    _autoRemoveCheckTimer?.cancel();
-    _autoRemoveCheckTimer = Timer(_autoRemoveCheckDuration, () {
-      if (selectedFoodItem?.foodId == null) return;
-
-      final foodId = selectedFoodItem!.foodId!;
-      final totalCustomQty = getTotalCustomizationQuantity();
-
-      debugPrint(
-        '🟣 Auto-remove check - foodId: $foodId, totalCustomQty: $totalCustomQty, isEditMode: $isEditMode',
-      );
-
-      if (isEditMode && totalCustomQty == 0) {
-        debugPrint(
-          '🟣 Scenario 3 & 4: All customizations are zero - Auto-removing item and clearing add-ons',
-        );
-        _validateCustomizationsAndCleanAddOns(foodId);
-      }
-    });
-  }
-
-  /// ✅ Validate customizations and clean up add-ons if all customizations are zero
-  void _validateCustomizationsAndCleanAddOns(String foodId) {
-    final totalCustomQty = getTotalCustomizationQuantity();
-
-    if (totalCustomQty == 0) {
-      debugPrint('🟣 Clearing add-ons for foodId: $foodId');
-      bsAddOnQuantity.clear();
-      update(['addons_list', 'bottom_sheet_content', 'total_price']);
-
-      // ✅ Auto-remove item immediately
-      _removeItemFromCartDirectly(foodId);
-    }
-  }
-
-  /// ✅ Instantly remove item from cart without waiting for button press
-  Future<void> _removeItemFromCartDirectly(String foodId) async {
-    try {
-      debugPrint('🟠 Removing item directly from cart: $foodId');
-
-      final requestBody = {
-        'foodId': foodId,
-        'quantity': 0,
-        'serviceType': _getCleanServiceType(Store.deliveryPreference),
-      };
-
-      _lastLocalApiUpdate = DateTime.now();
-
-      final response = await _apiClient.post(
-        endpoint: Urls.addOrUpdateCartUrl,
-        data: requestBody,
-      );
-
-      if (response != null && response is Map<String, dynamic>) {
-        if (response['success'] == true && response['data'] != null) {
-          final cartData = response['data'];
-
-          debugPrint('🟠 Item successfully removed - updating cart state');
-
-          // ✅ Update all cart state
-          _updateCartFromApiResponse(cartData);
-
-          // ✅ Update CartService
-          final cartService = Get.find<CartService>();
-          cartService.updateCartFromApi(cartData);
-
-          // ✅ Reset bottom sheet and close
-          resetBottomSheetState();
-
-          // ✅ Close bottom sheet with a slight delay to allow state updates
-          Future.delayed(Duration(milliseconds: 200), () {
-            if (Get.context != null) {
-              Navigator.pop(Get.context!);
-            }
-          });
-
-          debugPrint('🟠 Bottom sheet closed after item removal');
-        } else {
-          debugPrint('🟠 Failed to remove item: ${response['message']}');
-          Get.snackbar('Error', response['message'] ?? 'Failed to remove item');
-        }
-      }
-    } catch (e) {
-      debugPrint('🟠 Error removing item directly: $e');
-      Get.snackbar('Error', 'Failed to remove item from cart');
-    }
-  }
-
-  // ============================================================================
-  // EXISTING SCENARIO 1 QUANTITY METHODS (Keep as-is)
-  // ============================================================================
 
   void increaseScenario1Quantity(String foodId) {
     final currentQty = cartFoodQuantity[foodId] ?? 0;
@@ -879,10 +746,6 @@ class RestaurantDetailViewController extends GetxController {
     }
   }
 
-  // ============================================================================
-  // ADD/UPDATE TO CART (Keep existing logic but integrated with new removal)
-  // ============================================================================
-
   Future<void> addOrUpdateItemToCart() async {
     if (selectedFoodItem?.foodId == null) return;
 
@@ -892,6 +755,11 @@ class RestaurantDetailViewController extends GetxController {
       final hasAddOns =
           selectedFoodItem?.addOns != null &&
           selectedFoodItem!.addOns!.isNotEmpty;
+
+      // if (isEditMode && hasCustomizations && getTotalCustomizationQuantity() == 0) {
+      //   await _callRemoveItemWithQtyZero(foodId);
+      //   return;
+      // }
 
       final requestBody = _buildAddToCartRequestBody();
 

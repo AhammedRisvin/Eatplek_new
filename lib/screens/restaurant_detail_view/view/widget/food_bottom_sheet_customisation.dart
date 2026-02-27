@@ -1,11 +1,11 @@
 import 'dart:developer';
 
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../../core/util/app_color.dart';
-import '../../../../../core/util/common_widgets.dart';
+import '../../../../core/util/app_color.dart';
+import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/responsive_helper.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
 import '../../model/restaurent_details_model.dart';
 import 'quantity_control_widget.dart';
@@ -17,6 +17,8 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     if (foodItem.customizations == null || foodItem.customizations!.isEmpty) {
       return SizedBox();
     }
@@ -27,27 +29,27 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
         final customizations = foodItem.customizations!;
 
         return Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              text(text: 'Customize Your Food', size: 18, fontWeight: FontWeight.w600),
-              3.h,
+              text(text: 'Customize Your Food', size: responsive.fontSize18, fontWeight: FontWeight.w600),
+              SizedBox(height: responsive.spacing3),
               text(
                 text: 'Choose your preferred size or variant.',
-                size: 12,
+                size: responsive.fontSize12,
                 fontWeight: FontWeight.w400,
                 color: AppColor.black.withOpacity(0.6),
               ),
-              20.h,
+              SizedBox(height: responsive.spacing20),
               ListView.separated(
                 physics: NeverScrollableScrollPhysics(),
                 shrinkWrap: true,
                 itemBuilder: (context, index) {
                   final customization = customizations[index];
-                  return _buildCustomizationTile(controller, customization);
+                  return _buildCustomizationTile(controller, customization, responsive);
                 },
-                separatorBuilder: (context, index) => 16.h,
+                separatorBuilder: (context, index) => SizedBox(height: responsive.spacing16),
                 itemCount: customizations.length,
               ),
             ],
@@ -57,14 +59,18 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
     );
   }
 
-  Widget _buildCustomizationTile(RestaurantDetailViewController controller, Customization customization) {
+  Widget _buildCustomizationTile(
+    RestaurantDetailViewController controller,
+    Customization customization,
+    ResponsiveHelper responsive,
+  ) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(responsive.spacing8),
         color: AppColor.white,
         boxShadow: [BoxShadow(color: Color(0xff000000).withOpacity(0.04), blurRadius: 14, offset: Offset(0, 0))],
       ),
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: responsive.spacing16, vertical: responsive.spacing12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -72,11 +78,16 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                text(text: customization.name ?? '', size: 14, fontWeight: FontWeight.w600, color: AppColor.black),
-                4.h,
+                text(
+                  text: customization.name ?? '',
+                  size: responsive.fontSize14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColor.black,
+                ),
+                SizedBox(height: responsive.spacing4),
                 text(
                   text: '₹ ${customization.price?.toInt() ?? 0}',
-                  size: 12,
+                  size: responsive.fontSize12,
                   fontWeight: FontWeight.w500,
                   color: AppColor.black.withOpacity(0.6),
                 ),
@@ -95,9 +106,9 @@ class FoodBottomSheetCustomizationSection extends StatelessWidget {
                 },
                 onDecrease: () => controller.decreaseCustomization(customization.customizationId ?? ''),
                 showRemoveButton: quantity > 0,
-                buttonSize: 28,
-                iconSize: 12,
-                isCompactMode: true, // ✅ NEW: Enable compact mode with square buttons
+                buttonSize: responsive.spacing28,
+                iconSize: responsive.fontSize12,
+                isCompactMode: true,
               );
             },
           ),

@@ -1,6 +1,6 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
-import 'package:fittor/fittor.dart';
+import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
 import '../../controller/auth_controller.dart';
@@ -13,6 +13,8 @@ class ProfileCompletionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return Positioned(
       bottom: 0,
       left: 0,
@@ -24,29 +26,38 @@ class ProfileCompletionWidget extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))],
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(responsive.largeBorderRadius),
+              topRight: Radius.circular(responsive.largeBorderRadius),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: responsive.spacing10,
+                offset: const Offset(0, -5),
+              ),
+            ],
           ),
           child: SingleChildScrollView(
             child: Padding(
               padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 24,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                left: responsive.spacing16,
+                right: responsive.spacing16,
+                top: responsive.spacing24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + responsive.spacing16,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
-                  24.h,
-                  _buildNameSection(context),
-                  16.h,
-                  _buildLocationSection(),
-                  24.h,
-                  _buildCompleteButton(),
-                  12.h,
+                  _buildHeader(responsive),
+                  SizedBox(height: responsive.spacing24),
+                  _buildNameSection(context, responsive),
+                  SizedBox(height: responsive.spacing16),
+                  _buildLocationSection(responsive),
+                  SizedBox(height: responsive.spacing24),
+                  _buildCompleteButton(responsive),
+                  SizedBox(height: responsive.spacing12),
                 ],
               ),
             ),
@@ -56,24 +67,25 @@ class ProfileCompletionWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ResponsiveHelper responsive) {
     return Column(
       children: [
         Center(
-          child: text(
-            text: 'Complete Your Profile',
-            size: 24,
-            fontWeight: FontWeight.w700,
+          child: Text(
+            'Complete Your Profile',
+            style: TextStyle(fontSize: responsive.fontSize24, fontWeight: FontWeight.w700, color: Colors.black),
             textAlign: TextAlign.center,
           ),
         ),
-        6.h,
+        SizedBox(height: responsive.spacing6),
         Center(
-          child: text(
-            text: 'Please provide your name and location to continue',
-            size: 14,
-            fontWeight: FontWeight.w400,
-            color: AppColor.black.withOpacity(0.6),
+          child: Text(
+            'Please provide your name and location to continue',
+            style: TextStyle(
+              fontSize: responsive.fontSize14,
+              fontWeight: FontWeight.w400,
+              color: AppColor.black.withOpacity(0.6),
+            ),
             textAlign: TextAlign.center,
           ),
         ),
@@ -81,12 +93,15 @@ class ProfileCompletionWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildNameSection(BuildContext context) {
+  Widget _buildNameSection(BuildContext context, ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        text(text: 'Full Name', size: 16, fontWeight: FontWeight.w500),
-        10.h,
+        Text(
+          'Full Name',
+          style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: Colors.black),
+        ),
+        SizedBox(height: responsive.spacing10),
         buildCommonTextFormField(
           hintText: 'Enter your full name',
           keyboardType: TextInputType.name,
@@ -98,24 +113,27 @@ class ProfileCompletionWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildLocationSection() {
+  Widget _buildLocationSection(ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        text(text: 'Location', size: 16, fontWeight: FontWeight.w500),
-        10.h,
+        Text(
+          'Location',
+          style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: Colors.black),
+        ),
+        SizedBox(height: responsive.spacing10),
         LocationStatusWidget(controller: controller),
       ],
     );
   }
 
-  Widget _buildCompleteButton() {
+  Widget _buildCompleteButton(ResponsiveHelper responsive) {
     final isDisabled = controller.isLoading || controller.latitude == null || controller.longitude == null;
 
     return button(
       name: 'Complete Profile',
-      borderRadius: BorderRadius.circular(50),
-      height: 60,
+      borderRadius: BorderRadius.circular(responsive.spacing40),
+      height: responsive.buttonHeight,
       isLoading: controller.isLoading,
       onTap: isDisabled ? () {} : controller.handleProfileCompletion,
     );
