@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "659627785158",
+    "project_id": "eatplek-app",
+    "storage_bucket": "eatplek-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:659627785158:android:bcbd4729e94b8c160ad0c7",
+        "android_client_info": {
+          "package_name": "com.example.eatplek_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOH7HLC-QMMta8_wB0sZ80nZx8B1vGPnM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

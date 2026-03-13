@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/service/notification_services.dart';
 
 enum AuthStep { form, otp }
 
@@ -39,7 +40,9 @@ class AuthController extends GetxController {
   // Device info
   late String _deviceOs = '';
   late String _deviceName = '';
-  final String _firebaseToken = 'fcm_token_placeholder';
+
+  // ✅ FIX: real FCM token from NotificationService instead of placeholder
+  String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
 
   // API
   late FittorConnect _apiClient;
@@ -63,20 +66,27 @@ class AuthController extends GetxController {
   bool get isLocationPermissionGranted => _isLocationPermissionGranted;
 
   // Dynamic Content Getters
-  String get title => _currentStep == AuthStep.otp ? 'Verify Your Mobile Number' : 'Let\'s Get You Started!';
+  String get title =>
+      _currentStep == AuthStep.otp
+          ? 'Verify Your Mobile Number'
+          : 'Let\'s Get You Started!';
 
   String get subtitle =>
       _currentStep == AuthStep.otp
           ? 'We\'ve sent a 6-digit OTP to $maskedPhoneNumber. Please enter it below.'
           : 'Login to explore delicious meals and exclusive offers.';
 
-  String get buttonText => _currentStep == AuthStep.otp ? 'Verify OTP' : 'Send OTP';
+  String get buttonText =>
+      _currentStep == AuthStep.otp ? 'Verify OTP' : 'Send OTP';
 
-  String get switchText => _currentStep == AuthStep.otp ? 'Didn\'t receive the code?' : '';
+  String get switchText =>
+      _currentStep == AuthStep.otp ? 'Didn\'t receive the code?' : '';
 
   String get switchActionText {
     if (_currentStep == AuthStep.otp) {
-      return canResend ? 'Resend OTP' : 'Resend in ${_formatTime(_remainingTime)}';
+      return canResend
+          ? 'Resend OTP'
+          : 'Resend in ${_formatTime(_remainingTime)}';
     }
     return '';
   }
@@ -164,7 +174,7 @@ class AuthController extends GetxController {
 
   void startTimer() {
     _remainingTime = 45;
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingTime > 0) {
         _remainingTime--;
         update(['auth_screen']);
@@ -201,7 +211,10 @@ class AuthController extends GetxController {
         'deviceName': _deviceName,
       };
 
-      await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.login, data: body);
+      await _apiClient.post<Map<String, dynamic>>(
+        endpoint: Urls.login,
+        data: body,
+      );
 
       Get.snackbar('Success', 'OTP sent successfully!');
       startTimer();
@@ -230,7 +243,10 @@ class AuthController extends GetxController {
     }
 
     if (phoneController.text.length != 10) {
-      _showErrorSnackbar('Error', 'Please enter a valid 10-digit mobile number');
+      _showErrorSnackbar(
+        'Error',
+        'Please enter a valid 10-digit mobile number',
+      );
       return;
     }
 
@@ -249,15 +265,19 @@ class AuthController extends GetxController {
         'deviceName': _deviceName,
       };
 
-      final response = await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.login, data: body);
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        endpoint: Urls.login,
+        data: body,
+      );
+
       if (response['success'] == true) {
         _goToOtpStep();
       } else {
-        log('error  11');
+        log('error 11');
         _showErrorSnackbar('Error', response['message'] ?? 'OTP sent failed');
       }
     } catch (e) {
-      log('error  22');
+      log('error 22');
       _showErrorSnackbar('Error', e.toString());
     } finally {
       _setLoading(false);
@@ -287,32 +307,37 @@ class AuthController extends GetxController {
         'firebaseToken': _firebaseToken,
       };
 
-      final response = await _apiClient.post<Map<String, dynamic>>(endpoint: Urls.verifyOtp, data: body);
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        endpoint: Urls.verifyOtp,
+        data: body,
+      );
 
       if (response['success'] == true) {
         final status = response['status'] as String?;
         debugPrint('OTP Verification Response: $response');
 
         if (status == 'pending') {
-          // User needs to complete profile
+          // New user — show profile completion bottom sheet
           if (response.containsKey('token')) {
             Store.userToken = response['token'];
           }
           _showProfileBottomSheet = true;
           update(['auth_screen']);
 
-          // Request location with delay
-          Future.delayed(Duration(milliseconds: 500), () {
+          Future.delayed(const Duration(milliseconds: 500), () {
             _requestLocationPermission();
           });
         } else if (status == 'registered') {
-          // Registered user - login immediately
+          // Existing user — go straight to home
           _storeUserData(response);
           Get.snackbar('Success', response['message'] ?? 'Login successful!');
           Get.offAllNamed(Routes.bottomNav);
         }
       } else {
-        _showErrorSnackbar('Error', response['message'] ?? 'OTP verification failed');
+        _showErrorSnackbar(
+          'Error',
+          response['message'] ?? 'OTP verification failed',
+        );
       }
     } catch (e) {
       _showErrorSnackbar('Error', e.toString());
@@ -336,7 +361,8 @@ class AuthController extends GetxController {
         return;
       }
 
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
         _isLocationPermissionGranted = true;
         update(['auth_screen']);
         await _fetchCurrentLocation();
@@ -394,7 +420,6 @@ class AuthController extends GetxController {
 
       debugPrint('✓ Location fetched: $_latitude, $_longitude');
 
-      // Fetch place name asynchronously (don't wait if slow)
       _getPlaceNameFromCoordinates(position.latitude, position.longitude)
           .timeout(
             const Duration(seconds: 10),
@@ -411,18 +436,26 @@ class AuthController extends GetxController {
       update(['auth_screen']);
     } catch (e) {
       debugPrint('❌ Error fetching location: $e');
-      _showErrorSnackbar('Error', 'Failed to fetch location. Please try again.');
+      _showErrorSnackbar(
+        'Error',
+        'Failed to fetch location. Please try again.',
+      );
     } finally {
       _setLocationLoading(false);
     }
   }
 
-  Future<void> _getPlaceNameFromCoordinates(double latitude, double longitude) async {
+  Future<void> _getPlaceNameFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
       debugPrint('Starting reverse geocoding for: $latitude, $longitude');
 
-      // Add timeout to prevent hanging
-      final placemarks = await placemarkFromCoordinates(latitude, longitude).timeout(
+      final placemarks = await placemarkFromCoordinates(
+        latitude,
+        longitude,
+      ).timeout(
         const Duration(seconds: 8),
         onTimeout: () {
           debugPrint('Reverse geocoding timeout - using coordinates');
@@ -447,18 +480,16 @@ class AuthController extends GetxController {
     }
   }
 
-  /// Set fallback place name when reverse geocoding fails
   void _setFallbackPlaceName(double latitude, double longitude) {
-    _placeName = 'Lat: ${latitude.toStringAsFixed(4)}, Long: ${longitude.toStringAsFixed(4)}';
+    _placeName =
+        'Lat: ${latitude.toStringAsFixed(4)}, Long: ${longitude.toStringAsFixed(4)}';
     debugPrint('Using fallback place name: $_placeName');
     update(['auth_screen']);
   }
 
-  /// Build a readable place name from Placemark
   String _buildPlaceNameString(Placemark placemark) {
     List<String> addressParts = [];
 
-    // Add components in order of preference
     if (placemark.locality?.isNotEmpty == true) {
       addressParts.add(placemark.locality!);
     }
@@ -469,13 +500,14 @@ class AuthController extends GetxController {
       addressParts.add(placemark.country!);
     }
 
-    return addressParts.isNotEmpty ? addressParts.join(', ') : 'Current Location';
+    return addressParts.isNotEmpty
+        ? addressParts.join(', ')
+        : 'Current Location';
   }
 
   // ==================== Profile Completion ====================
 
   Future<void> handleProfileCompletion() async {
-    // Validate name
     if (nameController.text.trim().isEmpty) {
       _showErrorSnackbar('Error', 'Please enter your name');
       return;
@@ -486,7 +518,6 @@ class AuthController extends GetxController {
       return;
     }
 
-    // Validate location
     if (_latitude == null || _longitude == null) {
       _showErrorSnackbar('Error', 'Location is required. Please try again.');
       return;
@@ -512,14 +543,19 @@ class AuthController extends GetxController {
 
       if (response['success'] == true) {
         _storeUserData(response);
-        Get.snackbar('Success', response['message'] ?? 'Profile updated successfully!');
+        Get.snackbar(
+          'Success',
+          response['message'] ?? 'Profile updated successfully!',
+        );
 
-        // Navigate away
         _showProfileBottomSheet = false;
         _reset();
         Get.offAllNamed(Routes.bottomNav);
       } else {
-        _showErrorSnackbar('Error', response['message'] ?? 'Failed to update profile');
+        _showErrorSnackbar(
+          'Error',
+          response['message'] ?? 'Failed to update profile',
+        );
       }
     } catch (e) {
       _showErrorSnackbar('Error', e.toString());
@@ -532,19 +568,16 @@ class AuthController extends GetxController {
 
   void _storeUserData(Map<String, dynamic> response) {
     try {
-      // Store token
       if (response.containsKey('token')) {
         Store.userToken = response['token'];
         log('Token updated: ${Store.userToken}');
       }
 
-      // Store status
       if (response.containsKey('status')) {
         Store.status = response['status'];
         log('Status updated: ${Store.status}');
       }
 
-      // Store user details
       final data = response['data'] as Map<String, dynamic>?;
       if (data != null) {
         Store.id = data['id'] ?? '';
@@ -570,6 +603,11 @@ class AuthController extends GetxController {
   }
 
   void _showErrorSnackbar(String title, String message) {
-    Get.snackbar(title, message, backgroundColor: Colors.red, colorText: Colors.white);
+    Get.snackbar(
+      title,
+      message,
+      backgroundColor: Colors.red,
+      colorText: Colors.white,
+    );
   }
 }

@@ -29,11 +29,18 @@ class LoginFormWidget extends StatelessWidget {
   Widget _buildPhoneLabel(ResponsiveHelper responsive) {
     return Text(
       'Mobile Number',
-      style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: Colors.black),
+      style: TextStyle(
+        fontSize: responsive.fontSize16,
+        fontWeight: FontWeight.w500,
+        color: Colors.black,
+      ),
     );
   }
 
-  Widget _buildPhoneInputField(BuildContext context, ResponsiveHelper responsive) {
+  Widget _buildPhoneInputField(
+    BuildContext context,
+    ResponsiveHelper responsive,
+  ) {
     return buildCommonTextFormField(
       hintText: '9876543210',
       keyboardType: const TextInputType.numberWithOptions(decimal: false),
@@ -41,12 +48,35 @@ class LoginFormWidget extends StatelessWidget {
       controller: controller.phoneController,
       context: context,
       maxLength: 10,
-      prefixIcon: Padding(
-        padding: EdgeInsets.only(top: responsive.spacing13, left: responsive.spacing10),
-        child: Text(
-          '+91',
-          style: TextStyle(fontSize: responsive.fontSize16, fontWeight: FontWeight.w500, color: AppColor.hintTextColor),
+      // ✅ FIX: use Center instead of manual top padding
+      prefixIcon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '+91',
+              style: TextStyle(
+                fontSize: responsive.fontSize16,
+                fontWeight: FontWeight.w500,
+                color: AppColor.hintTextColor,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Subtle divider between +91 and input
+            Container(width: 1, height: 20, color: Colors.black12),
+          ],
         ),
+      ),
+      // ✅ Pass center alignment explicitly
+      textAlignVertical: TextAlignVertical.center,
+      // Adjust left padding since prefixIcon handles its own spacing
+      contentPadding: const EdgeInsets.only(
+        left: 8,
+        top: 18,
+        bottom: 18,
+        right: 10,
       ),
     );
   }

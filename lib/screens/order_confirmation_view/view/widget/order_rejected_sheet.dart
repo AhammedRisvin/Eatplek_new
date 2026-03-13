@@ -8,7 +8,11 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
   final dynamic selectedPaymentMethod;
   final String? rejectionReason;
 
-  const ResponsiveOrderRejectedSheet({super.key, required this.selectedPaymentMethod, this.rejectionReason});
+  const ResponsiveOrderRejectedSheet({
+    super.key,
+    required this.selectedPaymentMethod,
+    this.rejectionReason,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,11 +21,17 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
     return Container(
       width: responsive.widthPercent(100),
       padding: responsive.bottomSheetPadding,
+      decoration: BoxDecoration(
+        color: AppColor.scaffoldColor,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(responsive.extraLargeBorderRadius),
+        ),
+      ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ✅ Drag indicator
+            // ── Drag indicator ───────────────────────────────────────────
             Align(
               alignment: Alignment.center,
               child: Container(
@@ -30,22 +40,37 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
                 margin: EdgeInsets.only(bottom: responsive.spacing10),
                 decoration: BoxDecoration(
                   color: const Color(0XFFD9D9D9),
-                  borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+                  borderRadius: BorderRadius.circular(
+                    responsive.extraLargeBorderRadius,
+                  ),
                 ),
               ),
             ),
             SizedBox(height: responsive.spacing30),
 
-            // ✅ Payment method image
-            image(
-              url: selectedPaymentMethod['imageUrl'],
-              width: responsive.iconSizeXXL,
-              height: responsive.iconSizeXXL,
-              borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
+            // ── Rejection icon ───────────────────────────────────────────
+            Container(
+              width: responsive.spacing80,
+              height: responsive.spacing80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.withOpacity(0.1),
+                border: Border.all(
+                  color: Colors.red.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.cancel_rounded,
+                  color: Colors.red,
+                  size: responsive.iconSizeLarge,
+                ),
+              ),
             ),
-            SizedBox(height: responsive.spacing30),
+            SizedBox(height: responsive.spacing20),
 
-            // ✅ Title
+            // ── Title ────────────────────────────────────────────────────
             text(
               text: 'Order Rejected',
               size: responsive.fontSize22,
@@ -54,23 +79,30 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
             ),
             SizedBox(height: responsive.spacing10),
 
-            // ✅ Description
-            text(
-              text: 'Unfortunately, the restaurant has rejected your order. Please try another restaurant.',
-              size: responsive.fontSize16,
-              fontWeight: FontWeight.w400,
-              color: AppColor.black.withOpacity(0.4),
-              textAlign: TextAlign.center,
+            // ── Description ──────────────────────────────────────────────
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: responsive.spacing12),
+              child: text(
+                text:
+                    'Unfortunately, the restaurant has rejected your order. '
+                    'Please try another restaurant.',
+                size: responsive.fontSize14,
+                fontWeight: FontWeight.w400,
+                color: AppColor.black.withOpacity(0.5),
+                textAlign: TextAlign.center,
+              ),
             ),
             SizedBox(height: responsive.spacing20),
 
-            // ✅ Rejection Reason Box (if reason exists)
-            if (rejectionReason != null && rejectionReason!.isNotEmpty)
+            // ── Rejection reason box (only when a reason is provided) ────
+            if (rejectionReason != null && rejectionReason!.isNotEmpty) ...[
               Container(
                 width: responsive.widthPercent(100),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-                  border: Border.all(color: AppColor.black.withOpacity(0.1)),
+                  borderRadius: BorderRadius.circular(
+                    responsive.largeBorderRadius,
+                  ),
+                  border: Border.all(color: Colors.red.withOpacity(0.2)),
                   color: Colors.red.withOpacity(0.05),
                 ),
                 padding: responsive.containerPaddingSmall,
@@ -81,11 +113,15 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, size: responsive.iconSizeSmall, color: Colors.red),
+                        Icon(
+                          Icons.info_outline,
+                          size: responsive.iconSizeSmall,
+                          color: Colors.red,
+                        ),
                         SizedBox(width: responsive.spacing10),
                         text(
                           text: 'Rejection Reason',
-                          size: responsive.fontSize16,
+                          size: responsive.fontSize14,
                           fontWeight: FontWeight.w600,
                           color: AppColor.black,
                         ),
@@ -102,19 +138,19 @@ class ResponsiveOrderRejectedSheet extends StatelessWidget {
                   ],
                 ),
               ),
+            ],
 
-            // ✅ Order Again Button
+            // ── Order Again button ───────────────────────────────────────
             button(
-              name: 'Order Again',
+              name: 'Back',
               width: responsive.widthPercent(100),
               height: responsive.formFieldHeight,
-              borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+              borderRadius: BorderRadius.circular(
+                responsive.extraLargeBorderRadius,
+              ),
               fontSize: responsive.fontSize18,
               fontWeight: FontWeight.w600,
-              onTap: () {
-                // ✅ Handle order again - navigate back to cart or home
-                Navigator.of(context).pop();
-              },
+              onTap: () => Navigator.of(context).pop(),
             ),
             SizedBox(height: responsive.spacing10),
           ],

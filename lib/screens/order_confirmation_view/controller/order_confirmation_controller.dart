@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
@@ -66,31 +68,34 @@ class OrderConfirmationController extends GetxController {
   int? suggestedHour; // 12-hour format
   int? suggestedMinute;
   String? suggestedPeriod;
-  bool isTimeSuggestionTimePickerVisible = false; // Toggle time picker visibility in suggestion sheet
+
+  // ✅ Holds the parsed DateTime of the restaurant's suggested time — used for
+  //    validation when the user picks a custom alternative time.
+  DateTime? _suggestedDateTime;
+
+  bool isTimeSuggestionTimePickerVisible = false;
 
   // ========== SERVICE TYPE CHECKING METHODS ==========
 
-  /// ✅ Check if service type is DELIVERY
   bool isDelivery() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
     return cleanedType.toLowerCase() == 'delivery';
   }
 
-  /// ✅ Check if service type is TAKEAWAY
   bool isTakeaway() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
     final type = cleanedType.toLowerCase();
     return type == 'takeaway' || type == 'take away';
   }
 
-  /// ✅ Check if service type is DINE-IN
   bool isDineIn() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
     final type = cleanedType.toLowerCase();
-    return (type.contains('dine') && type.contains('in') && !type.contains('car'));
+    return (type.contains('dine') &&
+        type.contains('in') &&
+        !type.contains('car'));
   }
 
-  /// ✅ Check if service type is CAR DINE-IN
   bool isCarDineIn() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
     final type = cleanedType.toLowerCase();
@@ -129,67 +134,38 @@ class OrderConfirmationController extends GetxController {
     _setupFormFieldListeners();
   }
 
-  /// ✅ Setup listeners on all form fields to update button state dynamically
   void _setupFormFieldListeners() {
-    fullNameController.addListener(() {
-      update(['place_order_button']);
-    });
-
-    phoneController.addListener(() {
-      update(['place_order_button']);
-    });
-
-    addressController.addListener(() {
-      update(['place_order_button']);
-    });
-
-    guestCountController.addListener(() {
-      update(['place_order_button']);
-    });
-
-    vehicleDetailsController.addListener(() {
-      update(['place_order_button']);
-    });
+    fullNameController.addListener(() => update(['place_order_button']));
+    phoneController.addListener(() => update(['place_order_button']));
+    addressController.addListener(() => update(['place_order_button']));
+    guestCountController.addListener(() => update(['place_order_button']));
+    vehicleDetailsController.addListener(() => update(['place_order_button']));
   }
 
-  /// ✅ Initialize cart data from arguments passed from CartView
   void _initializeCartData() {
     try {
       final arguments = Get.arguments as Map<String, dynamic>?;
 
       if (arguments != null) {
-        // Extract cart items
-        final itemsList = arguments['cartItems'] as List<CartItem>?;
-        cartItems = itemsList ?? [];
-
-        // ✅ FIX: Extract vendor data properly
+        cartItems = arguments['cartItems'] as List<CartItem>? ?? [];
         vendor = arguments['vendor'] as Vendor?;
-
-        // Extract totals
         subtotal = arguments['subtotal'] as double? ?? 0.0;
         taxAmount = arguments['taxAmount'] as double? ?? 0.0;
         packingCharge = arguments['packingCharge'] as double? ?? 0.0;
         totalAmount = arguments['totalAmount'] as double? ?? 0.0;
-
-        // Extract instructions and promo
         instructions = arguments['instructions'] as String? ?? '';
         appliedPromoCode = arguments['appliedPromoCode'] as String? ?? '';
         promoDiscount = arguments['promoDiscount'] as double? ?? 0.0;
 
-        // ✅ DEBUG LOGS
         debugPrint('═══════════════════════════════════════════');
         debugPrint('✅ Order Data Initialized Successfully');
-        debugPrint('═══════════════════════════════════════════');
         debugPrint('📦 Cart Items: ${cartItems?.length}');
-        debugPrint('🏪 Vendor: ${vendor?.name}');
-        debugPrint('🏪 Vendor ID: ${vendor?.id}');
+        debugPrint('🏪 Vendor: ${vendor?.name} (${vendor?.id})');
         debugPrint('💵 Total Amount: $totalAmount');
         debugPrint('Service Type: ${Store.deliveryPreference}');
         debugPrint('═══════════════════════════════════════════');
 
-        // Convert cart items to order items for UI display
         _convertCartToOrderItems();
-
         update(['restaurant_widget', 'order_summary', 'service_type_layout']);
       }
     } catch (e) {
@@ -198,7 +174,6 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  /// ✅ Convert CartItem to OrderItem for display
   void _convertCartToOrderItems() {
     mainDishes.clear();
     addOns.clear();
@@ -206,7 +181,6 @@ class OrderConfirmationController extends GetxController {
     if (cartItems == null) return;
 
     for (var cartItem in cartItems!) {
-      // Main dish
       mainDishes.add(
         OrderItem(
           id: cartItem.id ?? cartItem.foodId ?? '',
@@ -218,8 +192,8 @@ class OrderConfirmationController extends GetxController {
         ),
       );
 
-      // Add customizations as separate items if they exist
-      if (cartItem.customizations != null && cartItem.customizations!.isNotEmpty) {
+      if (cartItem.customizations != null &&
+          cartItem.customizations!.isNotEmpty) {
         for (var custom in cartItem.customizations!) {
           addOns.add(
             OrderItem(
@@ -234,7 +208,6 @@ class OrderConfirmationController extends GetxController {
         }
       }
 
-      // Add add-ons if they exist
       if (cartItem.addOns != null && cartItem.addOns!.isNotEmpty) {
         for (var addOn in cartItem.addOns!) {
           addOns.add(
@@ -250,26 +223,20 @@ class OrderConfirmationController extends GetxController {
         }
       }
     }
-
-    debugPrint('📊 Main Dishes: ${mainDishes.length}, Add-ons: ${addOns.length}');
   }
 
   // ========== VALIDATION METHODS ==========
 
   String? validateFullName(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Full name is required';
-    }
-    if (value.trim().length < 2) {
+    if (value == null || value.trim().isEmpty) return 'Full name is required';
+    if (value.trim().length < 2)
       return 'Full name must be at least 2 characters';
-    }
     return null;
   }
 
   String? validatePhoneNumber(String? value) {
-    if (value == null || value.trim().isEmpty) {
+    if (value == null || value.trim().isEmpty)
       return 'Phone number is required';
-    }
     final cleanedPhone = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(cleanedPhone)) {
       return 'Please enter a valid 10-digit Indian phone number';
@@ -278,9 +245,7 @@ class OrderConfirmationController extends GetxController {
   }
 
   String? validateAddress(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Address is required';
-    }
+    if (value == null || value.trim().isEmpty) return 'Address is required';
     if (value.trim().length < 10) {
       return 'Please enter a complete address (minimum 10 characters)';
     }
@@ -289,22 +254,15 @@ class OrderConfirmationController extends GetxController {
 
   String? validateGuestCount(String? value) {
     final count = int.tryParse(value ?? '');
-    if (count == null) {
-      return 'Please enter a valid number';
-    }
-    if (count < minGuests) {
-      return 'Minimum $minGuests guest required';
-    }
-    if (count > maxGuests) {
-      return 'Maximum $maxGuests guests allowed';
-    }
+    if (count == null) return 'Please enter a valid number';
+    if (count < minGuests) return 'Minimum $minGuests guest required';
+    if (count > maxGuests) return 'Maximum $maxGuests guests allowed';
     return null;
   }
 
   String? validateVehicleDetails(String? value) {
-    if (value == null || value.trim().isEmpty) {
+    if (value == null || value.trim().isEmpty)
       return 'Vehicle details are required';
-    }
     if (value.trim().length < 5) {
       return 'Please enter valid vehicle details (e.g., KL-07-AB-1234 White Swift)';
     }
@@ -317,10 +275,14 @@ class OrderConfirmationController extends GetxController {
     final now = DateTime.now();
     final minimum30MinLater = now.add(const Duration(minutes: 30));
 
-    if (minimum30MinLater.hour >= restaurantOpenHour && minimum30MinLater.hour < restaurantCloseHour) {
+    if (minimum30MinLater.hour >= restaurantOpenHour &&
+        minimum30MinLater.hour < restaurantCloseHour) {
       final futureHour = minimum30MinLater.hour;
       final futureMinute = minimum30MinLater.minute;
-      selectedHour = futureHour > 12 ? futureHour - 12 : (futureHour == 0 ? 12 : futureHour);
+      selectedHour =
+          futureHour > 12
+              ? futureHour - 12
+              : (futureHour == 0 ? 12 : futureHour);
       selectedMinute = ((futureMinute + 14) ~/ 15) * 15;
 
       if (selectedMinute >= 60) {
@@ -348,26 +310,31 @@ class OrderConfirmationController extends GetxController {
   }
 
   String _formatDate(DateTime date) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
   void incrementHour() {
-    if (selectedHour == 12) {
-      selectedHour = 1;
-    } else {
-      selectedHour++;
-    }
+    selectedHour = selectedHour == 12 ? 1 : selectedHour + 1;
     _validateTime();
     update(['time_widget']);
   }
 
   void decrementHour() {
-    if (selectedHour == 1) {
-      selectedHour = 12;
-    } else {
-      selectedHour--;
-    }
+    selectedHour = selectedHour == 1 ? 12 : selectedHour - 1;
     _validateTime();
     update(['time_widget']);
   }
@@ -400,24 +367,55 @@ class OrderConfirmationController extends GetxController {
     update(['time_widget']);
   }
 
+  // ========== TIME VALIDATION ==========
+
+  /// ✅ Standard validation — used on the main order confirmation screen.
+  ///    Rules: inside restaurant hours + at least 30 min from now.
   void _validateTime() {
+    _validateTimeWithMinimum(minimumDateTime: null);
+  }
+
+  /// ✅ Extended validation — used in the time suggestion sheet when user picks
+  ///    a custom alternative time.
+  ///    Rules: inside restaurant hours + at least 30 min from now
+  ///           + must be AFTER or EQUAL TO the restaurant's suggested time.
+  void _validateTimeForSuggestionFlow() {
+    _validateTimeWithMinimum(minimumDateTime: _suggestedDateTime);
+  }
+
+  void _validateTimeWithMinimum({DateTime? minimumDateTime}) {
     final currentTime = DateTime.now();
     final selectedDateTime = _getSelectedDateTime();
-    final minimumTime = currentTime.add(const Duration(minutes: 30));
+    final minimumBy30Min = currentTime.add(const Duration(minutes: 30));
     final selectedHour24 = _convertTo24Hour();
 
-    timeErrorMessage = null;
-
-    if (selectedHour24 < restaurantOpenHour || selectedHour24 >= restaurantCloseHour) {
-      timeErrorMessage = 'Restaurant is closed. Restaurant hours: 9:00 AM - 11:00 PM';
-    } else if (selectedDateTime.isBefore(minimumTime)) {
-      timeErrorMessage = 'Please select a time at least 30 minutes from current time';
+    // 1️⃣ Restaurant hours check
+    if (selectedHour24 < restaurantOpenHour ||
+        selectedHour24 >= restaurantCloseHour) {
+      timeErrorMessage =
+          'Restaurant is closed. Restaurant hours: 9:00 AM - 11:00 PM';
+    }
+    // 2️⃣ 30-minute-from-now check
+    else if (selectedDateTime.isBefore(minimumBy30Min)) {
+      timeErrorMessage =
+          'Please select a time at least 30 minutes from current time';
+    }
+    // 3️⃣ Must be after restaurant's suggested time (only in suggestion flow)
+    else if (minimumDateTime != null &&
+        selectedDateTime.isBefore(minimumDateTime)) {
+      final suggestedFormatted = getFormattedSuggestedTime();
+      timeErrorMessage =
+          "Please select a time after the restaurant's suggested time ($suggestedFormatted)";
     } else {
       timeErrorMessage = null;
     }
 
-    // ✅ Update button state when time validation changes
-    update(['place_order_button']);
+    // ✅ Defer update to avoid calling setState/markNeedsBuild during build
+    //    (this method is called from onInit → _setDefaultTime, which runs
+    //     before the first frame is rendered).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      update(['time_widget', 'place_order_button']);
+    });
   }
 
   int _convertTo24Hour() {
@@ -430,7 +428,13 @@ class OrderConfirmationController extends GetxController {
 
   DateTime _getSelectedDateTime() {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, _convertTo24Hour(), selectedMinute);
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _convertTo24Hour(),
+      selectedMinute,
+    );
   }
 
   String getFormattedTime() {
@@ -442,63 +446,77 @@ class OrderConfirmationController extends GetxController {
     return timeErrorMessage == null;
   }
 
+  /// ✅ Used specifically inside the time suggestion sheet to validate against
+  ///    restaurant's suggested time as the new floor.
+  bool isTimeValidForSuggestionFlow() {
+    _validateTimeForSuggestionFlow();
+    return timeErrorMessage == null;
+  }
+
   // ========== TIME CONVERSION TO ISO 8601 ==========
 
-  /// ✅ Convert 12-hour time to ISO 8601 datetime string with Z suffix
   String _convertTimeToISO8601() {
     final hour24 = _convertTo24Hour();
     final now = DateTime.now();
-
-    final selectedDateTime = DateTime(now.year, now.month, now.day, hour24, selectedMinute, 0);
+    final selectedDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      hour24,
+      selectedMinute,
+      0,
+    );
     final isoString = '${selectedDateTime.toIso8601String()}Z';
 
-    debugPrint('⏰ TIME CONVERSION TO ISO 8601:');
-    debugPrint('   12-hour format: ${getFormattedTime()}');
-    debugPrint('   24-hour format: ${hour24.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}');
-    debugPrint('   ISO 8601 format (with Z): $isoString');
-    debugPrint('   ✅ READY FOR API');
-
+    debugPrint('⏰ TIME → ISO 8601: ${getFormattedTime()} → $isoString');
     return isoString;
   }
 
-  // ========== RESTAURANT SUGGESTED TIME CONVERSION ==========
+  // ========== RESTAURANT SUGGESTED TIME PARSING ==========
 
-  /// ✅ Parse ISO 8601 time from restaurant to 12-hour format
   void _parseSuggestedTime(String isoTimeString) {
     try {
-      debugPrint('⏰ PARSING RESTAURANT SUGGESTED TIME:');
-      debugPrint('   ISO String: $isoTimeString');
-
+      debugPrint('⏰ Parsing suggested time: $isoTimeString');
       final dateTime = DateTime.parse(isoTimeString);
       final hour24 = dateTime.hour;
       final minute = dateTime.minute;
 
-      // Convert to 12-hour format
       suggestedHour = hour24 > 12 ? hour24 - 12 : (hour24 == 0 ? 12 : hour24);
       suggestedMinute = minute;
       suggestedPeriod = hour24 >= 12 ? 'PM' : 'AM';
 
-      debugPrint('   Parsed Hour: $suggestedHour');
-      debugPrint('   Parsed Minute: $suggestedMinute');
-      debugPrint('   Parsed Period: $suggestedPeriod');
-      debugPrint('   ✅ PARSING COMPLETE');
+      // ✅ Store as DateTime for use in validation comparisons
+      final now = DateTime.now();
+      _suggestedDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        hour24,
+        minute,
+      );
+
+      debugPrint(
+        '   → ${suggestedHour.toString().padLeft(2, '0')}:${suggestedMinute.toString().padLeft(2, '0')} $suggestedPeriod',
+      );
     } catch (e) {
       debugPrint('❌ Error parsing suggested time: $e');
       suggestedHour = null;
       suggestedMinute = null;
       suggestedPeriod = null;
+      _suggestedDateTime = null;
     }
   }
 
-  /// ✅ Format suggested time for display
   String getFormattedSuggestedTime() {
-    if (suggestedHour == null || suggestedMinute == null || suggestedPeriod == null) {
+    if (suggestedHour == null ||
+        suggestedMinute == null ||
+        suggestedPeriod == null) {
       return '--:-- --';
     }
     return '${suggestedHour.toString().padLeft(2, '0')}:${suggestedMinute.toString().padLeft(2, '0')} $suggestedPeriod';
   }
 
-  // ========== GUEST COUNT METHODS ==========
+  // ========== GUEST COUNT ==========
 
   void updateGuestCount(String value) {
     final count = int.tryParse(value) ?? minGuests;
@@ -513,129 +531,113 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  // ========== PAYMENT METHODS ==========
+  // ========== PAYMENT ==========
 
   void selectPaymentMethod(int index) {
     selectedPaymentMethodIndex = index;
     update(['payment_method']);
   }
 
-  // ========== TIME SUGGESTION SHEET METHODS ==========
+  // ========== TIME SUGGESTION SHEET ==========
 
-  /// ✅ Toggle time picker visibility in suggestion sheet
   void toggleTimeSuggestionTimePicker() {
     isTimeSuggestionTimePickerVisible = !isTimeSuggestionTimePickerVisible;
+    // ✅ When the time picker becomes visible, re-validate against the
+    //    restaurant's suggested time as the new minimum.
+    if (isTimeSuggestionTimePickerVisible) {
+      _validateTimeForSuggestionFlow();
+    }
     update(['time_suggestion_sheet']);
   }
 
-  /// ✅ Reset time selection to user's original selected time when toggling time picker
   void resetTimeToOriginalSelection() {
     isTimeSuggestionTimePickerVisible = false;
+    _validateTime(); // revert to normal validation
     update(['time_suggestion_sheet']);
   }
 
   // ========== ORDER CONFIRMATION ==========
 
-  /// ✅ Validate all fields based on service type
   Future<void> confirmOrder() async {
-    // Validate required fields based on service type
-    if (!_validateServiceTypeFields()) {
-      return;
-    }
+    if (!_validateServiceTypeFields()) return;
 
-    // ✅ SHOW WAITING SHEET IMMEDIATELY AFTER VALIDATION
-    debugPrint('═════════════════════════════════════════════');
-    debugPrint('📋 SHOWING WAITING SHEET');
-    debugPrint('═════════════════════════════════════════════');
     _showWaitingBottomSheet();
-
-    // Then place the order
     await _placeOrder();
   }
 
-  /// ✅ Validate fields based on service type AND API body requirements
   bool _validateServiceTypeFields() {
-    // ✅ DELIVERY
     if (isDelivery()) {
       if (fullNameController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Full name is required');
         return false;
       }
-
       if (phoneController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Phone number is required');
         return false;
       }
-
       if (addressController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Delivery address is required');
         return false;
       }
-
       return true;
     }
 
-    // ✅ DINE-IN
     if (isDineIn()) {
       if (guestCountController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Number of guests is required');
         return false;
       }
-
-      final guestCount = int.tryParse(guestCountController.text.trim());
-      if (guestCount == null || guestCount < minGuests || guestCount > maxGuests) {
-        _showErrorMessage('Validation Error', 'Please enter valid number of guests (1-30)');
+      final count = int.tryParse(guestCountController.text.trim());
+      if (count == null || count < minGuests || count > maxGuests) {
+        _showErrorMessage(
+          'Validation Error',
+          'Please enter valid number of guests (1-30)',
+        );
         return false;
       }
-
       if (!isTimeValid()) {
-        _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
+        _showErrorMessage(
+          'Invalid Time',
+          timeErrorMessage ?? 'Please select a valid time',
+        );
         return false;
       }
-
       return true;
     }
 
-    // ✅ TAKEAWAY
     if (isTakeaway()) {
       if (!isTimeValid()) {
-        _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid pickup time');
+        _showErrorMessage(
+          'Invalid Time',
+          timeErrorMessage ?? 'Please select a valid pickup time',
+        );
         return false;
       }
-
       return true;
     }
 
-    // ✅ CAR DINE-IN
     if (isCarDineIn()) {
       if (!isTimeValid()) {
-        _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
+        _showErrorMessage(
+          'Invalid Time',
+          timeErrorMessage ?? 'Please select a valid time',
+        );
         return false;
       }
-
       if (vehicleDetailsController.text.trim().isEmpty) {
         _showErrorMessage('Validation Error', 'Vehicle details are required');
         return false;
       }
-
       return true;
     }
 
     return true;
   }
 
-  /// ✅ Build dynamic request body based on serviceType
   Map<String, dynamic> _buildOrderRequestBody() {
     final cleanedServiceType = _cleanServiceType(Store.deliveryPreference);
-
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('📤 BUILDING ORDER REQUEST BODY');
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('Service Type: $cleanedServiceType');
-
     final baseOrderData = <String, dynamic>{};
 
-    // Handle different service types
     switch (cleanedServiceType.toLowerCase()) {
       case 'delivery':
         baseOrderData.addAll({
@@ -646,91 +648,64 @@ class OrderConfirmationController extends GetxController {
           "name": fullNameController.text.trim(),
           "phoneNumber": "+91${phoneController.text.trim()}",
         });
-
-        if (instructions.isNotEmpty && instructions.trim().isNotEmpty) {
+        if (instructions.trim().isNotEmpty) {
           baseOrderData['notes'] = instructions.trim();
         }
-
-        debugPrint('✅ Delivery Request:');
-        debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
-        debugPrint('  address: ${baseOrderData["address"]}');
-        debugPrint('  name: ${baseOrderData["name"]}');
-        debugPrint('  phoneNumber: ${baseOrderData["phoneNumber"]}');
         break;
 
       case 'dine-in':
       case 'dine_in':
-        final reachTimeISO = _convertTimeToISO8601();
-        baseOrderData.addAll({"serviceType": "Dine in", "personCount": guestCount, "reachTime": reachTimeISO});
-
-        debugPrint('✅ Dine-in Request:');
-        debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
-        debugPrint('  personCount: ${baseOrderData["personCount"]}');
-        debugPrint('  reachTime: ${baseOrderData["reachTime"]}');
+        baseOrderData.addAll({
+          "serviceType": "Dine in",
+          "personCount": guestCount,
+          "reachTime": _convertTimeToISO8601(),
+        });
         break;
 
       case 'takeaway':
-        final reachTimeISO = _convertTimeToISO8601();
-        baseOrderData.addAll({"serviceType": "Takeaway", "reachTime": reachTimeISO});
-
-        if (instructions.isNotEmpty && instructions.trim().isNotEmpty) {
+        baseOrderData.addAll({
+          "serviceType": "Takeaway",
+          "reachTime": _convertTimeToISO8601(),
+        });
+        if (instructions.trim().isNotEmpty) {
           baseOrderData['notes'] = instructions.trim();
         }
-
-        debugPrint('✅ Takeaway Request:');
-        debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
-        debugPrint('  reachTime: ${baseOrderData["reachTime"]}');
         break;
 
       case 'car-dine-in':
       case 'car_dine_in':
-        final reachTimeISO = _convertTimeToISO8601();
         baseOrderData.addAll({
           "serviceType": "Car Dine in",
-          "reachTime": reachTimeISO,
+          "reachTime": _convertTimeToISO8601(),
           "vehicleDetails": vehicleDetailsController.text.trim(),
         });
-
-        debugPrint('✅ Car Dine-in Request:');
-        debugPrint('  serviceType: ${baseOrderData["serviceType"]}');
-        debugPrint('  reachTime: ${baseOrderData["reachTime"]}');
-        debugPrint('  vehicleDetails: ${baseOrderData["vehicleDetails"]}');
         break;
 
       default:
-        baseOrderData.addAll({"serviceType": cleanedServiceType});
+        baseOrderData['serviceType'] = cleanedServiceType;
     }
 
-    debugPrint('═════════════════════════════════════════════════════════');
+    debugPrint('📤 Order Request Body: $baseOrderData');
     return baseOrderData;
   }
 
-  /// ✅ Clean serviceType by removing emojis and extra spaces
   String _cleanServiceType(String serviceType) {
     String cleaned = serviceType.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-    cleaned = cleaned.toLowerCase();
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
 
-    debugPrint('🧹 Cleaned serviceType: "$serviceType" → "$cleaned"');
-
-    if (cleaned.isEmpty) {
-      return 'delivery';
-    }
-
-    if (cleaned.contains('takeaway') || cleaned.contains('take away')) {
+    if (cleaned.isEmpty) return 'delivery';
+    if (cleaned.contains('takeaway') || cleaned.contains('take away'))
       return 'takeaway';
-    } else if (cleaned.contains('dine') && cleaned.contains('in')) {
-      return 'dine-in';
-    } else if (cleaned.contains('car') && cleaned.contains('dine')) {
+    if (cleaned.contains('car') && cleaned.contains('dine'))
       return 'car-dine-in';
-    } else if (cleaned.contains('delivery')) {
-      return 'delivery';
-    }
+    if (cleaned.contains('dine') && cleaned.contains('in')) return 'dine-in';
+    if (cleaned.contains('delivery')) return 'delivery';
 
     return cleaned.length > 50 ? 'delivery' : cleaned;
   }
 
-  /// ✅ Place order API call with dynamic request body
+  // ========== PLACE ORDER ==========
+
   Future<void> _placeOrder() async {
     try {
       isLoading = true;
@@ -738,59 +713,28 @@ class OrderConfirmationController extends GetxController {
 
       final orderData = _buildOrderRequestBody();
 
-      debugPrint('═════════════════════════════════════════════════════════');
-      debugPrint('🚀 SENDING ORDER TO API');
-      debugPrint('═════════════════════════════════════════════════════════');
+      debugPrint('🚀 Sending order to API...');
       debugPrint('Full Body: $orderData');
-      debugPrint('═════════════════════════════════════════════════════════');
 
-      // Make API call
       final response = await _apiClient.post(
         endpoint: Urls.placeOrderUrl,
         data: orderData,
         timeout: const Duration(seconds: 120),
       );
 
+      log('response $response');
+
       if (response != null && response is Map<String, dynamic>) {
-        if (response['success'] == true) {
-          debugPrint('✅ ORDER PLACED SUCCESSFULLY');
-
-          // ✅ WAITING SHEET ALREADY SHOWN IN confirmOrder()
-          // ✅ START POLLING FOR RESTAURANT RESPONSE (2 minutes timeout)
-          await _waitForRestaurantResponse();
-        } else {
-          errorMessage = response['message'] ?? 'Failed to place order';
-
-          // ✅ DISMISS WAITING SHEET ON ERROR
-          _dismissWaitingSheet();
-
-          if (response['errors'] != null && response['errors'] is List) {
-            final errors = response['errors'] as List;
-            String errorDetails = errors
-                .map((e) {
-                  if (e is Map<String, dynamic>) {
-                    return e['msg'] ?? 'Unknown error';
-                  }
-                  return e.toString();
-                })
-                .join('\n');
-
-            debugPrint('❌ VALIDATION ERRORS: $errorDetails');
-            _showErrorMessage('Validation Error', errorDetails);
-          } else {
-            _showErrorMessage('Error', errorMessage);
-          }
-        }
+        // ✅ Handle the response directly — no polling required.
+        //    The API returns the final status (accepted / rejected / time suggestion)
+        //    in the same response.
+        _handleApiResponse(response);
       } else {
-        errorMessage = 'Invalid response from server';
-        // ✅ DISMISS WAITING SHEET ON ERROR
         _dismissWaitingSheet();
-        _showErrorMessage('Error', errorMessage);
+        _showErrorMessage('Error', 'Invalid response from server');
       }
     } catch (e) {
-      errorMessage = 'Error placing order: $e';
-      debugPrint('❌ EXCEPTION: $e');
-      // ✅ DISMISS WAITING SHEET ON EXCEPTION
+      debugPrint('❌ Exception placing order: $e');
       _dismissWaitingSheet();
       _showErrorMessage('Error', 'Failed to place order. Please try again.');
     } finally {
@@ -799,215 +743,175 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  // ========== RESTAURANT RESPONSE POLLING ==========
+  // ========== SINGLE-RESPONSE HANDLER ==========
 
-  /// ✅ Wait for restaurant response with 2-minute timeout
-  Future<void> _waitForRestaurantResponse() async {
-    const maxWaitTime = Duration(minutes: 2);
-    const pollInterval = Duration(seconds: 3);
-    final startTime = DateTime.now();
+  /// ✅ Central handler for every place-order API response.
+  ///    Reads `data.orderStatus` and routes to the correct UI flow.
+  void _handleApiResponse(Map<String, dynamic> response) {
+    debugPrint('═══════════════════════════════════════════');
+    debugPrint('🎯 Handling API Response');
+    debugPrint('success: ${response['success']}');
 
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('⏳ WAITING FOR RESTAURANT RESPONSE (Max 2 minutes)');
-    debugPrint('═════════════════════════════════════════════════════════');
+    if (response['success'] != true) {
+      // ✅ API returned success:false — show validation errors if present
+      final msg = response['message'] ?? 'Failed to place order';
 
-    while (true) {
-      final elapsedTime = DateTime.now().difference(startTime);
+      if (response['errors'] != null && response['errors'] is List) {
+        final errors = response['errors'] as List;
+        final errorDetails = errors
+            .map((e) {
+              if (e is Map<String, dynamic>) return e['msg'] ?? 'Unknown error';
+              return e.toString();
+            })
+            .join('\n');
+        _dismissWaitingSheet();
+        _showErrorMessage('Validation Error', errorDetails);
+      } else {
+        _dismissWaitingSheet();
+        _showErrorMessage('Error', msg);
+      }
+      return;
+    }
 
-      // ✅ Check timeout
-      if (elapsedTime > maxWaitTime) {
-        debugPrint('⏰ TIMEOUT: No response from restaurant after 2 minutes');
-        _handleRestaurantTimeout();
+    final data = response['data'] as Map<String, dynamic>?;
+    if (data == null) {
+      _dismissWaitingSheet();
+      _showErrorMessage('Error', 'Unexpected response format from server');
+      return;
+    }
+
+    final orderStatusRaw = data['orderStatus'] as String? ?? '';
+    debugPrint('orderStatus: $orderStatusRaw');
+
+    switch (orderStatusRaw.toLowerCase()) {
+      case 'accepted':
+        _handleOrderAccepted(data);
         break;
-      }
 
-      // ✅ Simulate polling (in real app, call API to check order status)
-      // For now, this is a placeholder - replace with actual API call
-      await Future.delayed(pollInterval);
+      case 'rejected':
+        final rejectionDetails =
+            data['rejectionDetails'] as Map<String, dynamic>?;
+        final hasTimeSuggestion =
+            rejectionDetails?['hasTimeSuggestion'] == true;
 
-      // ✅ In production, make an API call here to check order status
-      // Example: final status = await _apiClient.get(endpoint: Urls.getOrderStatusUrl);
-      // Then handle the response accordingly
+        if (hasTimeSuggestion) {
+          _handleTimeSuggestion(rejectionDetails!);
+        } else {
+          _handleOrderRejected(rejectionDetails);
+        }
+        break;
 
-      debugPrint('🔄 Polling... (${elapsedTime.inSeconds}s elapsed)');
+      default:
+        // Any other unexpected status — treat as error
+        debugPrint('⚠️ Unknown orderStatus: $orderStatusRaw');
+        _dismissWaitingSheet();
+        _showErrorMessage(
+          'Unexpected Status',
+          'Received unexpected order status: $orderStatusRaw',
+        );
     }
   }
 
-  /// ✅ Handle restaurant timeout (no response after 2 minutes)
-  void _handleRestaurantTimeout() {
-    debugPrint('❌ RESTAURANT RESPONSE TIMEOUT');
-    _dismissWaitingSheet();
-    _showErrorMessage('Timeout', 'Restaurant did not respond within 2 minutes. Please contact support.');
-  }
+  // ========== ACCEPTED ==========
 
-  /// ✅ Handle restaurant response (to be called from API polling)
-  void handleRestaurantResponse(Map<String, dynamic> response) {
-    try {
-      debugPrint('═════════════════════════════════════════════════════════');
-      debugPrint('🎯 RESTAURANT RESPONSE RECEIVED');
-      debugPrint('═════════════════════════════════════════════════════════');
-
-      if (response['success'] != true) {
-        _handleRestaurantTimeout();
-        return;
-      }
-
-      final data = response['data'] as Map<String, dynamic>?;
-      if (data == null) {
-        _handleRestaurantTimeout();
-        return;
-      }
-
-      final status = data['orderStatus'] as String?;
-      final rejectionDetails = data['rejectionDetails'] as Map<String, dynamic>?;
-
-      debugPrint('Order Status: $status');
-
-      switch (status?.toLowerCase()) {
-        case 'accepted':
-          _handleOrderAccepted(data);
-          break;
-
-        case 'rejected':
-          if (rejectionDetails?['hasTimeSuggestion'] == true) {
-            _handleTimeSuggestion(rejectionDetails!);
-          } else {
-            _handleOrderRejected(rejectionDetails);
-          }
-          break;
-
-        default:
-          _handleRestaurantTimeout();
-      }
-    } catch (e) {
-      debugPrint('❌ Error handling restaurant response: $e');
-      _handleRestaurantTimeout();
-    }
-  }
-
-  /// ✅ Handle order accepted by restaurant
   void _handleOrderAccepted(Map<String, dynamic> data) {
-    debugPrint('✅ ORDER ACCEPTED BY RESTAURANT');
-
+    debugPrint('✅ Order ACCEPTED');
     orderStatus = 'accepted';
+
     _dismissWaitingSheet();
 
-    // ✅ Show accepted sheet for 2 seconds
+    // Show accepted sheet for 2 seconds, then show payment sheet
     _showAcceptedBottomSheet();
-
     Future.delayed(const Duration(seconds: 2), () {
       _dismissAcceptedSheet();
-      // ✅ Then show payment sheet
       _showPaymentBottomSheet();
     });
   }
 
-  /// ✅ Handle order rejected by restaurant
-  void _handleOrderRejected(Map<String, dynamic>? rejectionDetails) {
-    debugPrint('❌ ORDER REJECTED BY RESTAURANT');
+  // ========== REJECTED (no time suggestion) ==========
 
+  void _handleOrderRejected(Map<String, dynamic>? rejectionDetails) {
+    debugPrint('❌ Order REJECTED (no time suggestion)');
     orderStatus = 'rejected';
-    rejectionReason = rejectionDetails?['rejectionReason'] as String? ?? 'Order rejected by restaurant';
+    rejectionReason =
+        rejectionDetails?['rejectionReason'] as String? ??
+        'Order rejected by restaurant';
 
     _dismissWaitingSheet();
     _showRejectedBottomSheet();
   }
 
-  /// ✅ Handle time suggestion from restaurant
-  void _handleTimeSuggestion(Map<String, dynamic> rejectionDetails) {
-    debugPrint('⏰ TIME SUGGESTION FROM RESTAURANT');
+  // ========== TIME SUGGESTION ==========
 
+  void _handleTimeSuggestion(Map<String, dynamic> rejectionDetails) {
+    debugPrint('⏰ Order REJECTED with TIME SUGGESTION');
     orderStatus = 'time_suggestion';
     rejectionReason = rejectionDetails['rejectionReason'] as String?;
     suggestedTime = rejectionDetails['suggestedTime'] as String?;
 
-    // Parse suggested time
     if (suggestedTime != null) {
       _parseSuggestedTime(suggestedTime!);
     }
 
-    // Reset UI state
     isTimeSuggestionTimePickerVisible = false;
 
     _dismissWaitingSheet();
     _showTimeSuggestionBottomSheet();
   }
 
-  /// ✅ Accept restaurant's suggested time
-  Future<void> acceptSuggestedTime() async {
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('✅ ACCEPTING RESTAURANT SUGGESTED TIME');
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('Suggested Time: ${getFormattedSuggestedTime()}');
-    debugPrint('═════════════════════════════════════════════════════════');
+  // ========== ACCEPT SUGGESTED TIME ==========
 
-    // Update user's selected time to suggested time
-    if (suggestedHour != null && suggestedMinute != null && suggestedPeriod != null) {
+  /// ✅ User taps "Accept Suggestion" — update selected time to the
+  ///    restaurant's suggestion and re-submit the order.
+  Future<void> acceptSuggestedTime() async {
+    debugPrint(
+      '✅ User accepting restaurant suggested time: ${getFormattedSuggestedTime()}',
+    );
+
+    if (suggestedHour != null &&
+        suggestedMinute != null &&
+        suggestedPeriod != null) {
       selectedHour = suggestedHour!;
       selectedMinute = suggestedMinute!;
       selectedPeriod = suggestedPeriod!;
     }
 
     _dismissTimeSuggestionSheet();
-
-    // ✅ Show waiting sheet again and wait for confirmation
     _showWaitingBottomSheet();
-    await _waitForRestaurantResponse();
+    await _placeOrder();
   }
 
-  /// ✅ Submit custom time selection from time picker
-  Future<void> submitCustomTimeSelection() async {
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('📤 SUBMITTING CUSTOM TIME SELECTION');
-    debugPrint('═════════════════════════════════════════════════════════');
-    debugPrint('Selected Time: ${getFormattedTime()}');
-    debugPrint('═════════════════════════════════════════════════════════');
+  // ========== SUBMIT CUSTOM TIME (from time picker in suggestion sheet) ==========
 
-    if (!isTimeValid()) {
-      _showErrorMessage('Invalid Time', timeErrorMessage ?? 'Please select a valid time');
+  /// ✅ User taps "Submit" after picking a custom alternative time.
+  ///    The time must satisfy: restaurant hours + 30-min-from-now + after suggested time.
+  Future<void> submitCustomTimeSelection() async {
+    debugPrint('📤 Submitting custom time: ${getFormattedTime()}');
+
+    // ✅ Use the stricter suggestion-flow validation
+    if (!isTimeValidForSuggestionFlow()) {
+      _showErrorMessage(
+        'Invalid Time',
+        timeErrorMessage ?? 'Please select a valid time',
+      );
+      update(['time_suggestion_sheet']);
       return;
     }
 
     _dismissTimeSuggestionSheet();
-
-    // ✅ Show waiting sheet and place order with new time
     _showWaitingBottomSheet();
     await _placeOrder();
   }
 
   // ========== BOTTOM SHEET MANAGEMENT ==========
 
-  /// ✅ Show waiting bottom sheet (non-dismissible)
   void _showWaitingBottomSheet() {
-    debugPrint('📋 Showing waiting bottom sheet...');
-
+    debugPrint('📋 Showing waiting sheet...');
     Get.bottomSheet(
       WillPopScope(
-        onWillPop: () async => false, // Prevent dismissal
+        onWillPop: () async => false,
         child: const ResponsiveWaitingFormConfirmationSheet(),
       ),
-      isScrollControlled: true,
-      isDismissible: false, // Non-dismissible
-      enableDrag: false, // Prevent swipe down
-      backgroundColor: Colors.transparent,
-    );
-  }
-
-  /// ✅ Dismiss waiting bottom sheet
-  void _dismissWaitingSheet() {
-    debugPrint('❌ Dismissing waiting sheet...');
-
-    if (Get.isBottomSheetOpen ?? false) {
-      Get.back();
-    }
-  }
-
-  /// ✅ Show accepted bottom sheet
-  void _showAcceptedBottomSheet() {
-    debugPrint('✅ Showing accepted bottom sheet...');
-
-    Get.bottomSheet(
-      ResponsiveOrderAcceptedSheet(selectedPaymentMethod: paymentMethods[selectedPaymentMethodIndex]),
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
@@ -1015,19 +919,31 @@ class OrderConfirmationController extends GetxController {
     );
   }
 
-  /// ✅ Dismiss accepted bottom sheet
-  void _dismissAcceptedSheet() {
-    debugPrint('❌ Dismissing accepted sheet...');
-
-    if (Get.isBottomSheetOpen ?? false) {
-      Get.back();
-    }
+  void _dismissWaitingSheet() {
+    debugPrint('❌ Dismissing waiting sheet...');
+    if (Get.isBottomSheetOpen ?? false) Get.back();
   }
 
-  /// ✅ Show rejected bottom sheet
-  void _showRejectedBottomSheet() {
-    debugPrint('❌ Showing rejected bottom sheet...');
+  void _showAcceptedBottomSheet() {
+    debugPrint('✅ Showing accepted sheet...');
+    Get.bottomSheet(
+      ResponsiveOrderAcceptedSheet(
+        selectedPaymentMethod: paymentMethods[selectedPaymentMethodIndex],
+      ),
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+    );
+  }
 
+  void _dismissAcceptedSheet() {
+    debugPrint('❌ Dismissing accepted sheet...');
+    if (Get.isBottomSheetOpen ?? false) Get.back();
+  }
+
+  void _showRejectedBottomSheet() {
+    debugPrint('❌ Showing rejected sheet...');
     Get.bottomSheet(
       ResponsiveOrderRejectedSheet(
         selectedPaymentMethod: paymentMethods[selectedPaymentMethodIndex],
@@ -1035,36 +951,28 @@ class OrderConfirmationController extends GetxController {
       ),
       isScrollControlled: true,
       isDismissible: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
     );
   }
 
-  /// ✅ Show time suggestion bottom sheet
   void _showTimeSuggestionBottomSheet() {
-    debugPrint('⏰ Showing time suggestion bottom sheet...');
-
+    debugPrint('⏰ Showing time suggestion sheet...');
     Get.bottomSheet(
       TimeSuggestBottomSheet(controller: this),
       isScrollControlled: true,
       isDismissible: false,
       enableDrag: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.white,
     );
   }
 
-  /// ✅ Dismiss time suggestion bottom sheet
   void _dismissTimeSuggestionSheet() {
     debugPrint('❌ Dismissing time suggestion sheet...');
-
-    if (Get.isBottomSheetOpen ?? false) {
-      Get.back();
-    }
+    if (Get.isBottomSheetOpen ?? false) Get.back();
   }
 
-  /// ✅ Show payment bottom sheet
   void _showPaymentBottomSheet() {
-    debugPrint('💳 Showing payment bottom sheet...');
-
+    debugPrint('💳 Showing payment sheet...');
     Get.bottomSheet(
       ResponsivePaymentBottomSheet(controller: this),
       isScrollControlled: true,
@@ -1072,7 +980,8 @@ class OrderConfirmationController extends GetxController {
     );
   }
 
-  /// ✅ Show error message
+  // ========== SNACKBAR HELPERS ==========
+
   void _showErrorMessage(String title, String message) {
     if (Get.context != null) {
       ScaffoldMessenger.of(Get.context!).showSnackBar(
@@ -1098,7 +1007,6 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  /// ✅ Show success message
   void _showSuccessMessage(String title, String message) {
     if (Get.context != null) {
       ScaffoldMessenger.of(Get.context!).showSnackBar(
@@ -1124,19 +1032,11 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  // ========== UTILITY METHODS ==========
+  // ========== UTILITY ==========
 
-  double getTotalPrice() {
-    return totalAmount;
-  }
-
-  List<OrderItem> getMainDishes() {
-    return mainDishes;
-  }
-
-  List<OrderItem> getAddOns() {
-    return addOns;
-  }
+  double getTotalPrice() => totalAmount;
+  List<OrderItem> getMainDishes() => mainDishes;
+  List<OrderItem> getAddOns() => addOns;
 
   @override
   void onClose() {
@@ -1151,6 +1051,7 @@ class OrderConfirmationController extends GetxController {
 }
 
 // ========== ORDER ITEM MODEL ==========
+
 class OrderItem {
   final String id;
   final String name;
@@ -1179,14 +1080,12 @@ class OrderItem {
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'price': price,
-      'quantity': quantity,
-      'is_main_dish': isMainDish,
-      'image_url': imageUrl,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'price': price,
+    'quantity': quantity,
+    'is_main_dish': isMainDish,
+    'image_url': imageUrl,
+  };
 }

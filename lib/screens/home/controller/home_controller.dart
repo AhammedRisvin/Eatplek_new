@@ -1,6 +1,8 @@
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
-import 'package:flutter/widgets.dart';
+import 'package:eatplek_app/screens/cart/controller/cart_service.dart';
+import 'package:eatplek_app/screens/profile/controller/profile_controller.dart';
+import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -17,16 +19,25 @@ class HomeController extends GetxController {
   List<BannerData> banners = [];
 
   // User data
-  String userName = 'Ashkar';
   String userCity = 'Kannur';
   double userLatitude = 0.0;
   double userLongitude = 0.0;
   String orderPreference = '';
 
+  // Derived from ProfileController — no duplicate API call
+  String get userName {
+    try {
+      final profileController = Get.find<ProfileController>();
+      final name = profileController.userData.value?.name;
+      if (name != null && name.isNotEmpty) return name.split(' ').first;
+    } catch (_) {}
+    return '';
+  }
+
   // Service data from API
   List<String> availableServices = [];
 
-  // Prebook data from API [NEW]
+  // Prebook data from API
   List<PrebookList> prebookList = [];
 
   // Vendor data from API
@@ -50,6 +61,7 @@ class HomeController extends GetxController {
   static const String vendorsId = 'vendors';
 
   late FittorConnect _apiClient;
+  late CartService _cartService;
   late ScrollController scrollController;
 
   bool _isFetching = false;
@@ -77,12 +89,33 @@ class HomeController extends GetxController {
       Get.put<FittorConnect>(_apiClient);
     }
 
+    _cartService = Get.find<CartService>();
+
     scrollController = ScrollController();
     scrollController.addListener(_onScroll);
+
+    // Listen to profile data changes and refresh the greeting when name loads
+    _listenToProfileUpdates();
 
     debugPrint('🚀 HomeController initialized');
 
     _initializeHomeScreen();
+  }
+
+  /// Re-trigger userGreeting update whenever profile data arrives
+  void _listenToProfileUpdates() {
+    try {
+      final profileController = Get.find<ProfileController>();
+      ever(profileController.userData, (_) {
+        debugPrint('👤 Profile data updated — refreshing greeting');
+        update([userGreetingId]);
+      });
+    } catch (_) {
+      // ProfileController not yet registered — greeting will fall back to ''
+      debugPrint(
+        '⚠️ ProfileController not found during greeting listener setup',
+      );
+    }
   }
 
   @override
@@ -93,17 +126,10 @@ class HomeController extends GetxController {
   }
 
   /// Initialize home screen with unified flow
-  /// Flow:
-  /// 1. Show overlay → Fetch location
-  /// 2. Check saved preference
-  /// 3. If preference exists → Call API with serviceType → Load vendors
-  /// 4. If no preference → Call API without serviceType → Get services only
-  ///    Show dialog → User selects → Call API with serviceType → Load vendors
   Future<void> _initializeHomeScreen() async {
     try {
       debugPrint('🔄 Starting initialization sequence...');
 
-      // ✅ Check if this is first-time setup (location not fetched)
       _isFirstTimeSetup = userLatitude == 0.0 && userLongitude == 0.0;
       String? savedPreference = Store.deliveryPreference;
 
@@ -111,7 +137,6 @@ class HomeController extends GetxController {
         '📊 Initial State - Location: ($userLatitude, $userLongitude) | Preference: "$savedPreference" | FirstTimeSetup: $_isFirstTimeSetup',
       );
 
-      // ✅ ALWAYS: Show overlay and fetch location first
       isLoadingServices = true;
       _locationFetching = true;
       update([carouselId]);
@@ -119,47 +144,48 @@ class HomeController extends GetxController {
       await _fetchUserLocation();
       _locationFetching = false;
 
-      // ✅ Check preference after location is fetched
       if (savedPreference.isNotEmpty) {
-        // ✅ HAS PREFERENCE: Call API with serviceType
         debugPrint('✅ Using saved preference: $savedPreference');
         orderPreference = savedPreference;
         update([orderPreferenceId]);
 
-        // Hide overlay and fetch vendors with service type
         isLoadingServices = false;
         update([carouselId]);
 
         String serviceType = _extractServiceType(savedPreference);
         await _fetchHomeData(serviceType: serviceType, isRefresh: true);
       } else {
-        // ❌ NO PREFERENCE: Call API without serviceType to get available services
         debugPrint('📋 No preference saved - fetching available services...');
 
-        final success = await _fetchHomeData(serviceType: null, isRefresh: true);
+        final success = await _fetchHomeData(
+          serviceType: null,
+          isRefresh: true,
+        );
 
         if (success && availableServices.isNotEmpty) {
-          // Hide overlay and show dialog
           isLoadingServices = false;
           update([carouselId]);
 
           debugPrint('✅ Services loaded, showing dialog now');
           _showOrderPreferenceDialog();
         } else {
-          // API failed or no services available
           isLoadingServices = false;
           update([carouselId]);
 
           if (availableServices.isEmpty && !hasError) {
-            // No services available - ask user to change location
             hasError = true;
-            errorMessage = 'No services available in your location. Please change your location.';
-            debugPrint('❌ No services available - show location change message');
+            errorMessage =
+                'No services available in your location. Please change your location.';
+            debugPrint(
+              '❌ No services available - show location change message',
+            );
             update([vendorsId]);
           }
-          // If hasError is true, error screen will show automatically
         }
       }
+
+      // Populate cart badge regardless of preference outcome
+      await _cartService.fetchCartItemCount();
 
       debugPrint('✅ Initialization complete');
     } catch (e) {
@@ -171,12 +197,11 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Unified API call to fetch home data (services, vendors, and prebooks)
-  /// If serviceType is null: Returns only services (for preference selection)
-  /// If serviceType is provided: Returns services + vendors + prebooks
-  ///
-  /// ServiceType values: 'delivery', 'takeaway', 'dine-in', 'car-dine-in'
-  Future<bool> _fetchHomeData({String? serviceType, required bool isRefresh}) async {
+  /// Unified API call to fetch home data
+  Future<bool> _fetchHomeData({
+    String? serviceType,
+    required bool isRefresh,
+  }) async {
     if (_isFetching) {
       debugPrint('⚠️ Already fetching - ignoring duplicate request');
       return false;
@@ -203,10 +228,11 @@ class HomeController extends GetxController {
       }
 
       String formattedDateTime = DateTime.now().toUtc().toIso8601String();
+      String cleanDateTime =
+          '${formattedDateTime.substring(0, formattedDateTime.indexOf('.'))}Z';
 
-      String cleanDateTime = '${formattedDateTime.substring(0, formattedDateTime.indexOf('.'))}Z';
-
-      String endpoint = "${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime";
+      String endpoint =
+          "${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime";
 
       if (serviceType != null && serviceType.isNotEmpty) {
         endpoint += "&serviceType=$serviceType";
@@ -216,14 +242,16 @@ class HomeController extends GetxController {
       }
 
       debugPrint('🔗 API Endpoint: $endpoint');
-      debugPrint('📍 Location: ($userLatitude, $userLongitude) | DateTime: $cleanDateTime');
 
-      // Make API call with timeout
       final response = await _apiClient
           .get(endpoint: endpoint)
           .timeout(
             const Duration(seconds: 30),
-            onTimeout: () => throw TimeoutException('API request timeout after 30 seconds'),
+            onTimeout:
+                () =>
+                    throw TimeoutException(
+                      'API request timeout after 30 seconds',
+                    ),
           );
 
       if (response != null) {
@@ -232,14 +260,13 @@ class HomeController extends GetxController {
         final newHomeModel = NewHomeModel.fromJson(response);
 
         if (newHomeModel.success == true && newHomeModel.data != null) {
-          // Extract available services (always present)
           availableServices = newHomeModel.data!.availableServices ?? [];
           banners = newHomeModel.data!.banners ?? [];
 
-          debugPrint('✅ Services loaded: ${availableServices.length} services, ${banners.length} banners');
-          debugPrint('📋 Available Services: $availableServices');
+          debugPrint(
+            '✅ Services loaded: ${availableServices.length} services, ${banners.length} banners',
+          );
 
-          // Extract vendors and prebooks if serviceType was provided
           if (serviceType != null) {
             final newVendors = newHomeModel.data!.vendors ?? [];
             final newPrebooks = newHomeModel.data!.prebookList ?? [];
@@ -254,16 +281,6 @@ class HomeController extends GetxController {
 
             debugPrint('✅ Vendors loaded: ${vendors.length} items');
             debugPrint('✅ Prebooks loaded: ${prebookList.length} items');
-
-            // Log prebook details
-            if (prebookList.isNotEmpty) {
-              debugPrint('📚 Prebook List Details:');
-              for (var prebook in prebookList) {
-                debugPrint(
-                  '  - ${prebook.foodName} (ID: ${prebook.foodId}) | Start: ${prebook.prebookStartDate} | End: ${prebook.prebookEndDate}',
-                );
-              }
-            }
           }
 
           isLoadingVendors = false;
@@ -282,7 +299,9 @@ class HomeController extends GetxController {
         return false;
       }
     } on TimeoutException catch (e) {
-      _handleApiError('Request timeout. Please check your internet connection.');
+      _handleApiError(
+        'Request timeout. Please check your internet connection.',
+      );
       debugPrint('⏱️ Timeout: $e');
       return false;
     } catch (e) {
@@ -302,19 +321,23 @@ class HomeController extends GetxController {
 
       LocationPermission permission = await Geolocator.checkPermission();
 
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
       }
 
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        final Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        final Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
 
-        // userLatitude = position.latitude;
-        // userLongitude = position.longitude;
         userLatitude = STATIC_LATITUDE;
         userLongitude = STATIC_LONGITUDE;
 
-        debugPrint('✅ Location fetched: Lat=$userLatitude, Long=$userLongitude');
+        debugPrint(
+          '✅ Location fetched: Lat=$userLatitude, Long=$userLongitude',
+        );
 
         await _getCityFromCoordinates(position.latitude, position.longitude);
 
@@ -336,12 +359,19 @@ class HomeController extends GetxController {
   }
 
   /// Get city name from latitude and longitude
-  Future<void> _getCityFromCoordinates(double latitude, double longitude) async {
+  Future<void> _getCityFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     try {
-      List<Placemark> placemarks = await GeocodingPlatform.instance!.placemarkFromCoordinates(latitude, longitude);
+      List<Placemark> placemarks = await GeocodingPlatform.instance!
+          .placemarkFromCoordinates(latitude, longitude);
 
       if (placemarks.isNotEmpty) {
-        userCity = placemarks.first.locality ?? placemarks.first.administrativeArea ?? 'Unknown Location';
+        userCity =
+            placemarks.first.locality ??
+            placemarks.first.administrativeArea ??
+            'Unknown Location';
         debugPrint('✅ City resolved: $userCity');
         update([userGreetingId]);
       }
@@ -362,11 +392,7 @@ class HomeController extends GetxController {
         debugPrint('✅ Preference Selected from Dialog: $selectedPreference');
         _onPreferenceSelected(selectedPreference);
       },
-      onDialogDismissed: () {
-        debugPrint('⚠️ Dialog dismissed without selection');
-        // Optionally handle dismissal - e.g., show snackbar
-        Get.snackbar('Required', 'Please select a service type to continue');
-      },
+      onDialogDismissed: () {},
       title: 'How Would You Like to Order?',
       subtitle: 'Please choose your preferred service to continue.',
     );
@@ -381,13 +407,10 @@ class HomeController extends GetxController {
 
     debugPrint('💾 Saved to storage: $selectedPreference');
 
-    // Update UI immediately
     update([orderPreferenceId]);
 
-    // Extract service type and fetch vendors
     String serviceType = _extractServiceType(selectedPreference);
 
-    // Reset pagination
     currentPage = 1;
     vendors.clear();
     prebookList.clear();
@@ -402,9 +425,19 @@ class HomeController extends GetxController {
     update([carouselId]);
   }
 
-  /// Navigation methods
+  // ─── Navigation ───────────────────────────────────────────────────────────
+
   void onSearchTapped() {
-    Get.toNamed(Routes.searchView);
+    Get.toNamed(
+      Routes.searchView,
+      arguments: {
+        'latitude': userLatitude,
+        'longitude': userLongitude,
+        'serviceType': _extractServiceType(orderPreference),
+        'serviceLabel':
+            orderPreference.isEmpty ? 'Select Service' : orderPreference,
+      },
+    );
   }
 
   void onNotificationTapped() {
@@ -413,23 +446,117 @@ class HomeController extends GetxController {
 
   void onLocationChangeTapped() {
     debugPrint('🔄 Location change tapped');
-    // TODO: Implement location change flow
     Get.snackbar('Location', 'Change location functionality');
   }
 
-  /// Change order preference - show dialog
+  /// Change order preference — shows cart-clear confirmation if cart has items
   void onOrderPreferenceChanged() {
     debugPrint('🔄 Change preference tapped');
-    _showOrderPreferenceDialog();
+
+    if (_cartService.itemCount.value > 0) {
+      _showClearCartConfirmationDialog();
+    } else {
+      _showOrderPreferenceDialog();
+    }
+  }
+
+  /// Confirmation dialog shown when user has cart items and taps change preference
+  void _showClearCartConfirmationDialog() {
+    final count = _cartService.itemCount.value;
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Clear Cart?',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
+        content: Text(
+          'You have $count item${count > 1 ? 's' : ''} in your cart. '
+          'Changing your order preference will clear your cart. '
+          'Do you want to continue?',
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(Get.context!).pop(),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Get.theme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.of(Get.context!).pop();
+
+              try {
+                final response = await _apiClient.delete(
+                  endpoint: Urls.clearCartUrl,
+                );
+
+                if (response != null &&
+                    response is Map<String, dynamic> &&
+                    response['success'] == true) {
+                  _cartService.clearCart();
+                  debugPrint('✅ Cart cleared before preference change');
+                } else {
+                  Get.snackbar(
+                    'Error',
+                    'Failed to clear cart. Please try again.',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+              } catch (e) {
+                debugPrint('❌ Error clearing cart: $e');
+                Get.snackbar(
+                  'Error',
+                  'Failed to clear cart. Please try again.',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+                return;
+              }
+
+              _showOrderPreferenceDialog();
+            },
+            child: const Text(
+              'Yes, Clear & Change',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 
   void onViewAllRestaurants() {
-    Get.snackbar('Restaurants', 'Navigate to all restaurants');
+    Get.toNamed(
+      Routes.searchView,
+      arguments: {
+        'latitude': userLatitude,
+        'longitude': userLongitude,
+        'serviceType': _extractServiceType(orderPreference),
+        'serviceLabel':
+            orderPreference.isEmpty ? 'Select Service' : orderPreference,
+      },
+    );
   }
 
   /// Handle restaurant/vendor tap - check for multiple branches
   void onRestaurantTapped(Vendor restaurant) {
-    // Check if vendor has multiple branches
     final branches = restaurant.branchList ?? [];
 
     debugPrint('🏪 Restaurant tapped: ${restaurant.hotelName}');
@@ -447,8 +574,10 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Show bottom sheet when vendor has multiple branches
-  void _showMultipleBranchesBottomSheet(Vendor mainVendor, List<Vendor> branches) {
+  void _showMultipleBranchesBottomSheet(
+    Vendor mainVendor,
+    List<Vendor> branches,
+  ) {
     Get.bottomSheet(
       MultipleBranchBottomSheet(
         vendorName: mainVendor.hotelName ?? 'Restaurant',
@@ -459,22 +588,28 @@ class HomeController extends GetxController {
       ),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
       ),
     );
   }
 
-  /// Parse error messages for better UX
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
   String _parseError(String error) {
     debugPrint('🔍 Parsing error: $error');
 
     if (error.contains('Client is closed') || error.contains('Bad state')) {
       return 'Connection lost. Please try again.';
-    } else if (error.contains('SocketException') || error.contains('Failed host lookup')) {
+    } else if (error.contains('SocketException') ||
+        error.contains('Failed host lookup')) {
       return 'Network connection error. Please check your internet.';
     } else if (error.contains('Connection refused')) {
       return 'Could not connect to server. Please try again.';
-    } else if (error.contains('TimeoutException') || error.contains('timeout')) {
+    } else if (error.contains('TimeoutException') ||
+        error.contains('timeout')) {
       return 'Request took too long. Please try again.';
     } else if (error.contains('Connection reset')) {
       return 'Connection interrupted. Please try again.';
@@ -482,7 +617,6 @@ class HomeController extends GetxController {
     return 'Unable to load data. Please try again.';
   }
 
-  /// Handle API errors
   void _handleApiError(String message) {
     hasError = true;
     errorMessage = message;
@@ -493,19 +627,17 @@ class HomeController extends GetxController {
     debugPrint('🔴 Error: $message');
   }
 
-  /// Extract service type from order preference
-  /// Backend expects: 'delivery', 'takeaway', 'dine-in', 'car-dine-in'
   String _extractServiceType(String preference) {
     if (preference.contains('Delivery')) return 'delivery';
     if (preference.contains('Takeaway')) return 'takeaway';
     if (preference.contains('Dine-in')) return 'dine-in';
     if (preference.contains('Special Booking')) return 'car-dine-in';
-    return 'delivery'; // Default
+    return 'delivery';
   }
 
-  /// Scroll listener for pagination (90% threshold)
   void _onScroll() {
-    if (scrollController.position.pixels >= scrollController.position.maxScrollExtent * 0.9) {
+    if (scrollController.position.pixels >=
+        scrollController.position.maxScrollExtent * 0.9) {
       if (hasNextPage && !isLoadingMore && !isLoadingVendors && !_isFetching) {
         currentPage++;
         debugPrint('📜 Scroll trigger at 90%: Loading page $currentPage');
@@ -515,7 +647,6 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Retry fetching
   Future<void> retryFetchingVendors() async {
     debugPrint('🔄 RETRY: Resetting pagination and fetching');
     currentPage = 1;
@@ -526,7 +657,6 @@ class HomeController extends GetxController {
     await _fetchHomeData(serviceType: serviceType, isRefresh: true);
   }
 
-  /// Refresh vendors
   Future<void> refreshVendors() async {
     debugPrint('🔄 REFRESH: Fetching vendors');
     currentPage = 1;

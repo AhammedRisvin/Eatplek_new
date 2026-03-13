@@ -114,7 +114,8 @@ CachedNetworkImage image({
         width: width,
         decoration: BoxDecoration(
           color: AppColor.black,
-          borderRadius: borderRadius ?? BorderRadius.zero, // Default to no radius if null
+          borderRadius:
+              borderRadius ?? BorderRadius.zero, // Default to no radius if null
           image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
         ),
       );
@@ -124,7 +125,9 @@ CachedNetworkImage image({
           child: SizedBox(
             height: height,
             width: width,
-            child: Center(child: CircularProgressIndicator(color: AppColor.blueColor)),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColor.blueColor),
+            ),
           ),
         ),
     errorWidget: (context, url, error) {
@@ -133,7 +136,8 @@ CachedNetworkImage image({
         width: width,
         decoration: BoxDecoration(
           color: AppColor.black,
-          borderRadius: borderRadius ?? BorderRadius.zero, // Default to no radius if null
+          borderRadius:
+              borderRadius ?? BorderRadius.zero, // Default to no radius if null
         ),
         child: Image.network(
           height: height,
@@ -160,7 +164,12 @@ Widget buildCommonTextFormField({
   int? maxLength,
   required TextEditingController? controller,
   List<TextInputFormatter>? inputFormatters,
-  EdgeInsetsGeometry? contentPadding = const EdgeInsets.only(left: 20, top: 18, bottom: 18, right: 10),
+  EdgeInsetsGeometry? contentPadding = const EdgeInsets.only(
+    left: 20,
+    top: 18,
+    bottom: 18,
+    right: 10,
+  ),
   bool obscureText = false,
   Widget? suffixIcon,
   void Function()? onTap,
@@ -184,7 +193,11 @@ Widget buildCommonTextFormField({
     onFieldSubmitted: onFieldSubmitted,
     onTapOutside: (event) => FocusScope.of(context).unfocus(),
     onTap: onTap,
-    style: TextStyle(fontFamily: GoogleFonts.urbanist().fontFamily, color: color, fontSize: 14),
+    style: TextStyle(
+      fontFamily: GoogleFonts.urbanist().fontFamily,
+      color: color,
+      fontSize: 14,
+    ),
     expands: expands,
     keyboardType: keyboardType,
     obscureText: obscureText,
@@ -194,35 +207,41 @@ Widget buildCommonTextFormField({
     decoration: InputDecoration(
       prefixIcon: prefixIcon,
       counterText: '',
-      contentPadding: contentPadding, // Adjusts placement
+      contentPadding: contentPadding,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
+        borderSide:
+            isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
+        borderSide:
+            isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
+        borderSide:
+            isFromPhoneText ? BorderSide.none : BorderSide(color: borderColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: isFromPhoneText ? BorderSide.none : const BorderSide(color: Color(0x26000000)),
+        borderSide:
+            isFromPhoneText
+                ? BorderSide.none
+                : const BorderSide(color: Color(0x26000000)),
       ),
       floatingLabelBehavior: FloatingLabelBehavior.never,
       suffixIcon: suffixIcon,
       fillColor: bgColor,
       filled: true,
-      hintText: hintText, // **Use hintText instead of labelText**
+      hintText: hintText,
       hintStyle: TextStyle(
         color: hintTextColor,
         fontWeight: FontWeight.w400,
         fontSize: hintTextSize.toDouble(),
         fontFamily: GoogleFonts.urbanist().fontFamily,
       ),
-      alignLabelWithHint: true, // **Important: Moves hint to the top**
+      alignLabelWithHint: true,
     ),
     validator: validator,
     maxLength: maxLength,
@@ -230,6 +249,7 @@ Widget buildCommonTextFormField({
     readOnly: readOnly,
     minLines: minLine,
     maxLines: maxLine,
-    textAlignVertical: TextAlignVertical.top,
+    // ✅ FIX: use the parameter instead of hardcoded TextAlignVertical.top
+    textAlignVertical: textAlignVertical,
   );
 }

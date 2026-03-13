@@ -88,7 +88,7 @@ class CartController extends GetxController {
           data: CartData(
             items: convertedItems,
             vendor: cartModel?.data?.vendor,
-            couponCode: cartModel?.data?.couponCode, // ✅ preserve coupon code
+            couponCode: cartModel?.data?.couponCode,
             totals:
                 cartModel?.data?.totals != null
                     ? Totals(
@@ -272,7 +272,6 @@ class CartController extends GetxController {
           });
 
           // ── Restore coupon state from API ─────────────────────────────────
-          // couponCode from API is the source of truth — always sync local state
           final couponFromApi = cartModel!.data!.couponCode;
           if (couponFromApi != null && couponFromApi.isNotEmpty) {
             _appliedPromoCode = couponFromApi;
@@ -720,6 +719,47 @@ class CartController extends GetxController {
     }
   }
 
+  // ─── Clear Cart ───────────────────────────────────────────────────────────
+
+  /// Calls the clear-cart API then wipes local state.
+  /// Returns true on success so the caller can proceed with the next action.
+  Future<bool> clearCartApi({Function(String error)? onError}) async {
+    try {
+      final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
+
+      if (response != null && response is Map<String, dynamic>) {
+        if (response['success'] == true) {
+          // Wipe local state
+          cartModel = null;
+          _appliedPromoCode = '';
+          _promoCodeError = '';
+          promoCodeController.clear();
+          _cartService.clearCart();
+
+          update([
+            'cart_items',
+            'price_summary',
+            'empty_cart',
+            'promo_validation',
+          ]);
+          debugPrint('✅ Cart cleared via API');
+          return true;
+        } else {
+          final msg = response['message'] ?? 'Failed to clear cart';
+          onError?.call(msg);
+          debugPrint('❌ Clear cart API returned failure: $msg');
+        }
+      } else {
+        onError?.call('Failed to clear cart');
+      }
+    } catch (e) {
+      debugPrint('❌ Error clearing cart: $e');
+      final message = e.toString().replaceAll('Exception: ', '');
+      onError?.call(message);
+    }
+    return false;
+  }
+
   void formatPromoCode(String value) {
     final upperCaseValue = value.toUpperCase();
     if (promoCodeController.text != upperCaseValue) {
@@ -728,7 +768,6 @@ class CartController extends GetxController {
         selection: TextSelection.collapsed(offset: upperCaseValue.length),
       );
     }
-    // Always rebuild so button switches instantly on every keystroke
     update(['promo_validation']);
   }
 

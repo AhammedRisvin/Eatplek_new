@@ -545,7 +545,6 @@ class RestaurantDetailViewController extends GetxController {
         bsItemQuantity[foodId] = currentQty - 1;
         update(['total_price']);
 
-        // ✅ NEW: Check if should auto-remove item when quantity reaches 0
         _scheduleAutoRemoveCheckForScenario1And2();
       }
     } else {
@@ -580,7 +579,6 @@ class RestaurantDetailViewController extends GetxController {
         'total_price',
       ]);
 
-      // ✅ NEW: Check if should auto-remove item when all customizations are zero
       _scheduleAutoRemoveCheckForScenario3And4();
     }
   }
@@ -618,7 +616,6 @@ class RestaurantDetailViewController extends GetxController {
 
       update(['addons_list', 'bottom_sheet_content', 'total_price']);
 
-      // ✅ NEW: Check if should auto-remove item in edit mode when quantity is zero
       _scheduleAutoRemoveCheckForScenario1And2();
     }
   }
@@ -628,10 +625,9 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   // ============================================================================
-  // ✅ NEW METHODS: INSTANT REMOVAL LOGIC
+  // AUTO REMOVAL LOGIC
   // ============================================================================
 
-  /// ✅ Schedule auto-remove check for Scenario 1 & 2 (Food with/without add-ons, no customizations)
   void _scheduleAutoRemoveCheckForScenario1And2() {
     debugPrint('🔴 Scheduling auto-remove check for Scenario 1 & 2');
 
@@ -653,7 +649,6 @@ class RestaurantDetailViewController extends GetxController {
     });
   }
 
-  /// ✅ Schedule auto-remove check for Scenario 3 & 4 (Food with customizations)
   void _scheduleAutoRemoveCheckForScenario3And4() {
     debugPrint('🟣 Scheduling auto-remove check for Scenario 3 & 4');
 
@@ -677,7 +672,6 @@ class RestaurantDetailViewController extends GetxController {
     });
   }
 
-  /// ✅ Validate customizations and clean up add-ons if all customizations are zero
   void _validateCustomizationsAndCleanAddOns(String foodId) {
     final totalCustomQty = getTotalCustomizationQuantity();
 
@@ -686,12 +680,10 @@ class RestaurantDetailViewController extends GetxController {
       bsAddOnQuantity.clear();
       update(['addons_list', 'bottom_sheet_content', 'total_price']);
 
-      // ✅ Auto-remove item immediately
       _removeItemFromCartDirectly(foodId);
     }
   }
 
-  /// ✅ Instantly remove item from cart without waiting for button press
   Future<void> _removeItemFromCartDirectly(String foodId) async {
     try {
       debugPrint('🟠 Removing item directly from cart: $foodId');
@@ -715,17 +707,13 @@ class RestaurantDetailViewController extends GetxController {
 
           debugPrint('🟠 Item successfully removed - updating cart state');
 
-          // ✅ Update all cart state
           _updateCartFromApiResponse(cartData);
 
-          // ✅ Update CartService
           final cartService = Get.find<CartService>();
           cartService.updateCartFromApi(cartData);
 
-          // ✅ Reset bottom sheet and close
           resetBottomSheetState();
 
-          // ✅ Close bottom sheet with a slight delay to allow state updates
           Future.delayed(Duration(milliseconds: 200), () {
             if (Get.context != null) {
               Navigator.pop(Get.context!);
@@ -745,12 +733,15 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   // ============================================================================
-  // EXISTING SCENARIO 1 QUANTITY METHODS (Keep as-is)
+  // SCENARIO 1 QUANTITY METHODS — with optimistic CartService update
   // ============================================================================
 
   void increaseScenario1Quantity(String foodId) {
     final currentQty = cartFoodQuantity[foodId] ?? 0;
     cartFoodQuantity[foodId] = currentQty + 1;
+
+    // ✅ Optimistic update — BottomCartBar appears immediately, no delay
+    _updateCartServiceOptimistically(foodId, cartFoodQuantity[foodId]!);
 
     _debouncedUpdateQuantity(foodId, cartFoodQuantity[foodId]!);
   }
@@ -760,10 +751,92 @@ class RestaurantDetailViewController extends GetxController {
 
     if (currentQty > 1) {
       cartFoodQuantity[foodId] = currentQty - 1;
+
+      // ✅ Optimistic update — BottomCartBar updates immediately
+      _updateCartServiceOptimistically(foodId, cartFoodQuantity[foodId]!);
+
       _debouncedUpdateQuantity(foodId, cartFoodQuantity[foodId]!);
     } else if (currentQty == 1) {
       cartFoodQuantity.remove(foodId);
+
+      // ✅ Optimistic update — BottomCartBar hides immediately when last item removed
+      _updateCartServiceOptimistically(foodId, 0);
+
       _callScenario1UpdateQuantityApi(foodId, 0);
+    }
+  }
+
+  /// ✅ NEW: Optimistically updates CartService so BottomCartBar reacts instantly.
+  ///
+  /// This runs BEFORE the debounce/API call so the UI is never waiting on the
+  /// network for a simple +/- tap. If the API later fails, [_revertScenario1Change]
+  /// corrects the state.
+  void _updateCartServiceOptimistically(String foodId, int newQty) {
+    try {
+      final cartService = Get.find<CartService>();
+
+      // Work on a mutable copy of current cart items
+      final List<Map<String, dynamic>> updatedItems = List.from(cartItems);
+
+      if (newQty == 0) {
+        // Remove the item entirely
+        updatedItems.removeWhere((item) => item['foodId'] == foodId);
+      } else {
+        final existingIndex = updatedItems.indexWhere(
+          (item) => item['foodId'] == foodId,
+        );
+
+        // Resolve base price from existing cart entry or restaurant data
+        final food = _getFoodById(foodId);
+        final basePrice =
+            (food?.discountPrice ?? food?.foodPrice ?? 0).toDouble();
+
+        if (existingIndex != -1) {
+          // Update quantity + itemTotal on existing entry
+          updatedItems[existingIndex] = {
+            ...updatedItems[existingIndex],
+            'quantity': newQty,
+            'itemTotal': basePrice * newQty,
+          };
+        } else {
+          // First tap — build a brand-new cart entry optimistically
+          updatedItems.add({
+            'foodId': foodId,
+            'foodName': food?.foodName ?? '',
+            'foodImage': food?.foodImage ?? '',
+            'quantity': newQty,
+            'basePrice': basePrice,
+            'effectivePrice': basePrice,
+            'customizations': [],
+            'addOns': [],
+            'itemTotal': basePrice * newQty,
+          });
+        }
+      }
+
+      // Recalculate totals from the optimistic list
+      int totalCount = 0;
+      double totalPrice = 0.0;
+      for (final item in updatedItems) {
+        totalCount += (item['quantity'] as int? ?? 0);
+        totalPrice += (item['itemTotal'] as double? ?? 0.0);
+      }
+
+      debugPrint(
+        '⚡ Optimistic cart update — foodId: $foodId, qty: $newQty, '
+        'totalItems: $totalCount, totalPrice: $totalPrice',
+      );
+
+      // Push to CartService — this triggers BottomCartBar via Obx immediately
+      cartService.updateCartFromApi({
+        'items': updatedItems,
+        'totals': {'itemCount': totalCount, 'grandTotal': totalPrice},
+      });
+
+      // Keep local cartItems in sync so subsequent optimistic updates are correct
+      cartItems.value = updatedItems;
+    } catch (e) {
+      debugPrint('❌ Error in optimistic cart update: $e');
     }
   }
 
@@ -805,6 +878,7 @@ class RestaurantDetailViewController extends GetxController {
           final cartService = Get.find<CartService>();
           cartService.updateCartFromApi(cartData);
         } else {
+          // API failed — revert the optimistic change
           _revertScenario1Change(foodId);
           Get.snackbar(
             'Error',
@@ -813,6 +887,7 @@ class RestaurantDetailViewController extends GetxController {
         }
       }
     } catch (e) {
+      // Network/parse error — revert the optimistic change
       _revertScenario1Change(foodId);
       Get.snackbar('Error', 'Failed to update quantity');
     }
@@ -861,6 +936,7 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   void _revertScenario1Change(String foodId) {
+    // Revert local maps back from the last known good cartItems list
     cartFoodQuantity.clear();
     cartAddOnQuantity.clear();
 
@@ -877,10 +953,19 @@ class RestaurantDetailViewController extends GetxController {
         }
       }
     }
+
+    // Also revert CartService to match
+    final cartService = Get.find<CartService>();
+    cartService.updateCartFromApi({
+      'items': cartItems.toList(),
+      'totals':
+          lastCartItemResponse?['totals'] ??
+          {'itemCount': 0, 'grandTotal': 0.0},
+    });
   }
 
   // ============================================================================
-  // ADD/UPDATE TO CART (Keep existing logic but integrated with new removal)
+  // ADD/UPDATE TO CART
   // ============================================================================
 
   Future<void> addOrUpdateItemToCart() async {
@@ -1088,7 +1173,6 @@ class RestaurantDetailViewController extends GetxController {
     final hasCustomizations = _isScenario3And4(selectedFoodItem!);
 
     if (!hasCustomizations) {
-      // ✅ SCENARIO 1 & 2: Food without customizations
       final quantity = getBottomSheetItemQuantity();
       final requestBody = {
         'foodId': foodId,
@@ -1114,17 +1198,12 @@ class RestaurantDetailViewController extends GetxController {
 
       return requestBody;
     } else {
-      // ✅ SCENARIO 3 & 4: Food with customizations
-      // Always send quantity: 1 for customization scenarios
       final requestBody = {
         'foodId': foodId,
         'quantity': 1,
         'serviceType': serviceType,
       };
 
-      // ✅ CRITICAL FIX: Always send customizations array in edit mode
-      // Even if ALL customizations are zero (user removed everything)
-      // This tells the API to update/remove all customizations
       if (bsCustomizationQuantity.isNotEmpty) {
         final customizationsToSend =
             isEditMode
@@ -1136,15 +1215,11 @@ class RestaurantDetailViewController extends GetxController {
                     .map((e) => {'customizationId': e.key, 'quantity': e.value})
                     .toList();
 
-        // ✅ IMPORTANT: Send customizations if:
-        // - Add mode: At least one customization selected (qty > 0)
-        // - Edit mode: ALWAYS send (even if all are zero)
         if (customizationsToSend.isNotEmpty || isEditMode) {
           requestBody['customizations'] = customizationsToSend;
         }
       }
 
-      // ✅ Send add-ons with same logic as customizations
       if (bsAddOnQuantity.isNotEmpty) {
         final addOnsToSend =
             isEditMode
@@ -1156,9 +1231,6 @@ class RestaurantDetailViewController extends GetxController {
                     .map((e) => {'addOnId': e.key, 'quantity': e.value})
                     .toList();
 
-        // ✅ IMPORTANT: Send add-ons if:
-        // - Add mode: At least one add-on selected (qty > 0)
-        // - Edit mode: ALWAYS send (even if all are zero)
         if (addOnsToSend.isNotEmpty || isEditMode) {
           requestBody['addOns'] = addOnsToSend;
         }

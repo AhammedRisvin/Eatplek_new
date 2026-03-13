@@ -18,12 +18,14 @@ import '../../screens/auth/view/login_view.dart';
 import '../../screens/bottom_nav/view/bottom_nav_view.dart';
 import '../../screens/coupons/view/coupons_view.dart';
 import '../../screens/on_boarding_view/view/on_boarding_view.dart';
+import '../../screens/refer_view/view/refer_view.dart';
 import '../../screens/splash_view/view/splash_screen.dart';
 import '../bindings/cart_bindings.dart';
 import '../bindings/home_bindings.dart';
 import '../bindings/order_confirmation_bindings.dart';
 import '../bindings/orders_bindings.dart';
 import '../bindings/pre_book_details_bindings.dart';
+import '../bindings/refer_bindings.dart';
 
 class Routes {
   static const splash = '/';
@@ -44,17 +46,36 @@ class Routes {
   static const profileView = '/profileView';
   static const searchView = '/searchView';
   static const couponsView = '/couponsView';
+  static const referScreen = '/referScreen';
 
-  //CouponsView
+  //referScreen
 
   static const String initialRoute = splash;
 
   static final routes = [
-    GetPage(name: initialRoute, page: () => const SplashScreen(), transition: Transition.fade),
+    GetPage(
+      name: initialRoute,
+      page: () => const SplashScreen(),
+      transition: Transition.fade,
+    ),
     // GetPage(name: bottomNav, page: () => const Example(), transition: Transition.circularReveal),
-    GetPage(name: login, page: () => const AuthView(), transition: Transition.fade, binding: AuthBindings()),
-    GetPage(name: onBoardingView, page: () => const OnBoardingView(), transition: Transition.circularReveal),
-    GetPage(name: home, page: () => const HomeView(), transition: Transition.circularReveal, binding: HomeBindings()),
+    GetPage(
+      name: login,
+      page: () => const AuthView(),
+      transition: Transition.fade,
+      binding: AuthBindings(),
+    ),
+    GetPage(
+      name: onBoardingView,
+      page: () => const OnBoardingView(),
+      transition: Transition.circularReveal,
+    ),
+    GetPage(
+      name: home,
+      page: () => const HomeView(),
+      transition: Transition.circularReveal,
+      binding: HomeBindings(),
+    ),
 
     GetPage(
       name: restaurantDetail,
@@ -80,7 +101,11 @@ class Routes {
       transition: Transition.circularReveal,
       binding: OrderConfirmationBindings(),
     ),
-    GetPage(name: orderSuccessView, page: () => const OrderSuccessView(), transition: Transition.circularReveal),
+    GetPage(
+      name: orderSuccessView,
+      page: () => const OrderSuccessView(),
+      transition: Transition.circularReveal,
+    ),
     GetPage(
       name: ordersView,
       page: () => const OrdersView(),
@@ -101,9 +126,9 @@ class Routes {
     ),
     GetPage(
       name: searchView,
-      page: () => const SearchView(),
+      page: () => const SearchVendorView(),
       transition: Transition.circularReveal,
-      binding: SearchBindings(),
+      binding: SearchVendorBinding(),
     ),
     GetPage(
       name: preBookDetailView,
@@ -111,8 +136,18 @@ class Routes {
       transition: Transition.circularReveal,
       binding: PreBookDetailsBindings(),
     ),
-    GetPage(name: couponsView, page: () => const CouponsView(), transition: Transition.circularReveal),
+    GetPage(
+      name: couponsView,
+      page: () => const CouponsView(),
+      transition: Transition.circularReveal,
+    ),
+    GetPage(
+      name: referScreen,
+      page: () => ReferScreen(),
+      transition: Transition.circularReveal,
+      binding: ReferBindings(),
+    ),
 
-    //CouponsView
+    //ReferScreen
   ];
 }

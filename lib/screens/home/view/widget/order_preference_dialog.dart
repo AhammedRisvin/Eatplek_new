@@ -12,7 +12,12 @@ class OrderPreferenceModel {
   final String emoji;
   final String value;
 
-  OrderPreferenceModel({required this.id, required this.title, required this.emoji, required this.value});
+  OrderPreferenceModel({
+    required this.id,
+    required this.title,
+    required this.emoji,
+    required this.value,
+  });
 }
 
 class OrderPreferenceDialog extends StatefulWidget {
@@ -109,7 +114,9 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
           ),
           SizedBox(height: responsive.spacing4),
           text(
-            text: widget.subtitle ?? 'Please choose your preferred service to continue.',
+            text:
+                widget.subtitle ??
+                'Please choose your preferred service to continue.',
             size: responsive.fontSize14,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),
@@ -131,12 +138,22 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
         preferences
             .where(
               (pref) => widget.availableServices.any(
-                (service) => service.toLowerCase() == pref.value.toLowerCase().replaceAll('-', '').replaceAll(' ', ''),
+                (service) =>
+                    service
+                        .toLowerCase()
+                        .replaceAll('-', '')
+                        .replaceAll(' ', '') ==
+                    pref.value
+                        .toLowerCase()
+                        .replaceAll('-', '')
+                        .replaceAll(' ', ''),
               ),
             )
             .toList();
 
-    debugPrint('📋 Filtered preferences: ${filteredPreferences.map((p) => p.value).toList()}');
+    debugPrint(
+      '📋 Filtered preferences: ${filteredPreferences.map((p) => p.value).toList()}',
+    );
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
@@ -151,13 +168,12 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
                 isSelected: widget.currentPreference.contains(preference.value),
                 onTap: () {
                   debugPrint('✅ Preference tapped: ${preference.value}');
-
-                  String fullPreference = "${preference.emoji}  ${preference.value}";
-
-                  debugPrint('📤 Closing dialog and calling callback with: $fullPreference');
-
+                  String fullPreference =
+                      "${preference.emoji}  ${preference.value}";
+                  debugPrint(
+                    '📤 Closing dialog and calling callback with: $fullPreference',
+                  );
                   Navigator.of(Get.context!).pop();
-
                   Future.delayed(const Duration(milliseconds: 200), () {
                     debugPrint('📞 Calling onPreferenceSelected callback');
                     widget.onPreferenceSelected(fullPreference);
@@ -198,10 +214,36 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
 
   List<OrderPreferenceModel> _getPreferenceOptions() {
     return [
-      OrderPreferenceModel(id: 'delivery', title: 'Delivery', emoji: '🛵', value: 'Delivery'),
-      OrderPreferenceModel(id: 'takeaway', title: 'Take Away', emoji: '🥡', value: 'Takeaway'),
-      OrderPreferenceModel(id: 'dining', title: 'Dine-in', emoji: '🍽️', value: 'Dine-in'),
-      OrderPreferenceModel(id: 'special', title: 'Special Booking', emoji: '🎉', value: 'SpecialBooking'),
+      OrderPreferenceModel(
+        id: 'delivery',
+        title: 'Delivery',
+        emoji: '🛵',
+        value: 'Delivery',
+      ),
+      OrderPreferenceModel(
+        id: 'takeaway',
+        title: 'Take Away',
+        emoji: '🥡',
+        value: 'Takeaway',
+      ),
+      OrderPreferenceModel(
+        id: 'dining',
+        title: 'Dine-in',
+        emoji: '🍽️',
+        value: 'Dine-in',
+      ),
+      OrderPreferenceModel(
+        id: 'special',
+        title: 'Special Booking',
+        emoji: '🎉',
+        value: 'SpecialBooking',
+      ),
+      OrderPreferenceModel(
+        id: 'pickup',
+        title: 'Pickup',
+        emoji: '🏃',
+        value: 'Pickup',
+      ),
     ];
   }
 }
@@ -229,17 +271,32 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         width: double.infinity,
-        padding: EdgeInsets.symmetric(vertical: responsive.spacing15, horizontal: responsive.spacing20),
+        padding: EdgeInsets.symmetric(
+          vertical: responsive.spacing15,
+          horizontal: responsive.spacing20,
+        ),
         decoration: BoxDecoration(
-          color: isSelected ? AppColor.appPrimary.withOpacity(0.15) : AppColor.scaffoldColor,
+          color:
+              isSelected
+                  ? AppColor.appPrimary.withOpacity(0.15)
+                  : AppColor.scaffoldColor,
           borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
           border: Border.all(
-            color: isSelected ? AppColor.appPrimary.withOpacity(0.5) : AppColor.black.withOpacity(0.08),
+            color:
+                isSelected
+                    ? AppColor.appPrimary.withOpacity(0.5)
+                    : AppColor.black.withOpacity(0.08),
             width: isSelected ? 2 : 1,
           ),
           boxShadow:
               isSelected
-                  ? [BoxShadow(color: AppColor.appPrimary.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 2))]
+                  ? [
+                    BoxShadow(
+                      color: AppColor.appPrimary.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
                   : [],
         ),
         child: Row(
@@ -261,7 +318,11 @@ class OrderPreferenceOptionWidget extends StatelessWidget {
               child: AnimatedScale(
                 scale: isSelected ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
-                child: Icon(Icons.check_circle, color: AppColor.appPrimary, size: responsive.iconSizeMedium),
+                child: Icon(
+                  Icons.check_circle,
+                  color: AppColor.appPrimary,
+                  size: responsive.iconSizeMedium,
+                ),
               ),
             ),
           ],

@@ -60,6 +60,9 @@ dependencies:
   path: ^1.9.1
   stack_trace: ^1.12.1
   web: ^1.1.1
+  firebase_core: ^4.5.0
+  firebase_messaging: ^16.1.2
+  awesome_notifications: ^0.11.0
 
 dev_dependencies:
   flutter_test:

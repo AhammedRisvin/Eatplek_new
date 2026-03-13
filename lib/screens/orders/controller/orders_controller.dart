@@ -1,136 +1,189 @@
-import 'package:eatplek_app/core/routes/routes.dart';
+import 'dart:developer';
+
+import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../model/orders_model.dart';
+import '../../../core/network/api_client.dart';
+import '../../../core/routes/routes.dart';
+import '../model/orders_api_model.dart';
 
-class OrdersController extends GetxController with GetSingleTickerProviderStateMixin {
+// ─── Per-tab pagination + cache state ────────────────────────────────────────
+class TabOrderState {
+  List<SingleOrder> orders = [];
+  int currentPage = 0;
+  int totalPages = 1;
+
+  bool isInitialLoading = false;
+  bool isLoadingMore = false;
+  bool hasError = false;
+  String errorMessage = '';
+
+  bool get hasMore => currentPage < totalPages;
+  bool get isFetched => currentPage > 0;
+  bool get isEmpty =>
+      !isInitialLoading && !hasError && orders.isEmpty && isFetched;
+}
+
+class OrdersController extends GetxController
+    with GetSingleTickerProviderStateMixin {
+  final FittorConnect _apiClient = FittorConnect();
+
+  static const int _pageLimit = 10;
+
+  // ── Tab definitions (display order as requested) ──────────────────────────
+  final List<Map<String, String>> tabs = const [
+    {'label': 'Dine In', 'serviceType': 'dine_in'},
+    {'label': 'Takeaway', 'serviceType': 'takeaway'},
+    {'label': 'Delivery', 'serviceType': 'delivery'},
+    {'label': 'Car Dine In', 'serviceType': 'car_dine_in'},
+    {'label': 'Prebook', 'serviceType': 'prebook'},
+  ];
+
   late TabController tabController;
+  late List<TabOrderState> tabStates;
+  late List<ScrollController> scrollControllers;
 
-  List<OrderModel> deliveryOrders = [];
-  List<OrderModel> takeawayOrders = [];
-  List<OrderModel> diningOrders = [];
+  // ── Per-tab accessors ─────────────────────────────────────────────────────
+  TabOrderState stateForTab(int index) => tabStates[index];
+  List<SingleOrder> ordersForTab(int index) => tabStates[index].orders;
+  bool isInitialLoadingForTab(int index) => tabStates[index].isInitialLoading;
+  bool isLoadingMoreForTab(int index) => tabStates[index].isLoadingMore;
+  bool hasErrorForTab(int index) => tabStates[index].hasError;
+  String errorMessageForTab(int index) => tabStates[index].errorMessage;
+  bool isEmptyForTab(int index) => tabStates[index].isEmpty;
 
   @override
   void onInit() {
     super.onInit();
-    tabController = TabController(length: 3, vsync: this);
-    _generateDummyData();
+
+    tabController = TabController(length: tabs.length, vsync: this);
+    tabStates = List.generate(tabs.length, (_) => TabOrderState());
+
+    // One ScrollController per tab with its own load-more listener
+    scrollControllers = List.generate(tabs.length, (index) {
+      final sc = ScrollController();
+      sc.addListener(() => _onScroll(index));
+      return sc;
+    });
+
+    // Lazy-fetch on tab switch (only if not yet cached)
+    tabController.addListener(() {
+      if (!tabController.indexIsChanging) {
+        final idx = tabController.index;
+        if (!tabStates[idx].isFetched && !tabStates[idx].isInitialLoading) {
+          _fetchOrders(idx);
+        }
+        update(['tab_bar']);
+      }
+    });
+
+    // Fetch first tab immediately
+    _fetchOrders(0);
   }
 
   @override
   void onClose() {
     tabController.dispose();
+    for (final sc in scrollControllers) {
+      sc.dispose();
+    }
     super.onClose();
   }
 
-  void _generateDummyData() {
-    // Generate delivery orders with mixed statuses
-    deliveryOrders = List.generate(10, (index) {
-      return OrderModel(
-        id: 'DEL${index + 1}',
-        hotelName: 'Restaurant ${index + 1}',
-        itemName: 'Classic Chicken Burger',
-        itemCategory: 'Burger',
-        imageUrl: 'https://picsum.photos/250?image=${30 + index}',
-        price: 180.0 + (index * 20),
-        quantity: 1,
-        status: index.isEven ? OrderStatus.pending : OrderStatus.outForDelivery,
-        orderType: 'Delivery',
-        addOns: ['Extra Cheese', 'Spicy Sauce'],
-        orderDate: DateTime.now().subtract(Duration(hours: index)),
-      );
-    });
-
-    // Generate takeaway orders
-    takeawayOrders = List.generate(8, (index) {
-      return OrderModel(
-        id: 'TAK${index + 1}',
-        hotelName: 'Restaurant ${index + 1}',
-        itemName: 'Grilled Chicken',
-        itemCategory: 'Main Course',
-        imageUrl: 'https://picsum.photos/250?image=${40 + index}',
-        price: 250.0 + (index * 15),
-        quantity: 1,
-        status: OrderStatus.readyForPickup,
-        orderType: 'Takeaway',
-        addOns: ['Garlic Bread'],
-        orderDate: DateTime.now().subtract(Duration(hours: index + 2)),
-      );
-    });
-
-    // Generate dining orders
-    diningOrders = List.generate(5, (index) {
-      return OrderModel(
-        id: 'DIN${index + 1}',
-        hotelName: 'Restaurant ${index + 1}',
-        itemName: 'Pasta Carbonara',
-        itemCategory: 'Pasta',
-        imageUrl: 'https://picsum.photos/250?image=${50 + index}',
-        price: 320.0 + (index * 25),
-        quantity: 1,
-        status: OrderStatus.reserved,
-        orderType: 'Dining',
-        addOns: ['Extra Parmesan', 'Garlic Bread'],
-        orderDate: DateTime.now().subtract(Duration(hours: index + 1)),
-      );
-    });
-  }
-
-  List<OrderModel> getOrdersByType(String type) {
-    switch (type.toLowerCase()) {
-      case 'delivery':
-        return deliveryOrders;
-      case 'takeaway':
-        return takeawayOrders;
-      case 'dining':
-        return diningOrders;
-      default:
-        return [];
+  // ── Scroll → load more ────────────────────────────────────────────────────
+  void _onScroll(int index) {
+    final sc = scrollControllers[index];
+    if (!sc.hasClients) return;
+    final nearBottom = sc.position.pixels >= sc.position.maxScrollExtent - 250;
+    if (nearBottom) {
+      _loadMore(index);
     }
   }
 
-  void refreshOrder(String orderId) {
-    debugPrint('Refreshing order: $orderId'); // Debug log
+  // ── Initial fetch (resets state, shows skeleton) ──────────────────────────
+  Future<void> _fetchOrders(int index) async {
+    final state = tabStates[index];
+    if (state.isInitialLoading) return;
 
-    // Find and update the order status in delivery orders
-    final deliveryIndex = deliveryOrders.indexWhere((order) => order.id == orderId);
-    if (deliveryIndex != -1) {
-      final currentOrder = deliveryOrders[deliveryIndex];
+    state
+      ..orders = []
+      ..currentPage = 0
+      ..totalPages = 1
+      ..isInitialLoading = true
+      ..isLoadingMore = false
+      ..hasError = false
+      ..errorMessage = '';
+    update(['orders_tab_$index']);
 
-      // Create new order with updated status
-      deliveryOrders[deliveryIndex] = OrderModel(
-        id: currentOrder.id,
-        hotelName: currentOrder.hotelName,
-        itemName: currentOrder.itemName,
-        itemCategory: currentOrder.itemCategory,
-        imageUrl: currentOrder.imageUrl,
-        price: currentOrder.price,
-        quantity: currentOrder.quantity,
-        status: OrderStatus.outForDelivery, // Update status from pending to out for delivery
-        orderType: currentOrder.orderType,
-        addOns: currentOrder.addOns,
-        orderDate: currentOrder.orderDate,
-      );
+    await _loadPage(index, page: 1);
 
-      debugPrint('Order status updated to: ${deliveryOrders[deliveryIndex].statusText}'); // Debug log
+    state.isInitialLoading = false;
+    update(['orders_tab_$index']);
+  }
 
-      // Update the specific order card and the entire delivery list
-      update(['order_card_$orderId', 'delivery_orders']);
+  // ── Load next page ────────────────────────────────────────────────────────
+  Future<void> _loadMore(int index) async {
+    final state = tabStates[index];
+    if (state.isLoadingMore || !state.hasMore || state.isInitialLoading) return;
 
-      // Show success message
-      Get.snackbar(
-        'Order Updated',
-        'Order status has been refreshed successfully!',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
-    } else {
-      debugPrint('Order not found: $orderId'); // Debug log
+    state.isLoadingMore = true;
+    update(['orders_tab_$index']);
+
+    await _loadPage(index, page: state.currentPage + 1);
+
+    state.isLoadingMore = false;
+    update(['orders_tab_$index']);
+  }
+
+  // ── Core API call ─────────────────────────────────────────────────────────
+  Future<void> _loadPage(int index, {required int page}) async {
+    final state = tabStates[index];
+    final serviceType = tabs[index]['serviceType']!;
+
+    try {
+      final endpoint =
+          '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=$serviceType';
+
+      debugPrint('📦 Fetching orders: $endpoint');
+      final response = await _apiClient.get(endpoint: endpoint);
+      log('Orders API [$serviceType] page $page: $response');
+
+      if (response != null && response is Map<String, dynamic>) {
+        final parsed = OrdersApiModel.fromJson(response);
+
+        if (parsed.success == true && parsed.data != null) {
+          final newOrders = parsed.data!.orders ?? [];
+          state.orders = [...state.orders, ...newOrders];
+          state.currentPage = parsed.data!.pagination?.page ?? page;
+          state.totalPages = parsed.data!.pagination?.totalPages ?? 1;
+          state.hasError = false;
+          state.errorMessage = '';
+          debugPrint(
+            '✅ [$serviceType] Loaded ${newOrders.length} orders '
+            '(page ${state.currentPage}/${state.totalPages})',
+          );
+        } else {
+          state.hasError = true;
+          state.errorMessage = parsed.message ?? 'Failed to load orders';
+        }
+      } else {
+        state.hasError = true;
+        state.errorMessage = 'Invalid response from server';
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching orders [$serviceType]: $e');
+      state.hasError = true;
+      state.errorMessage = e.toString().replaceAll('Exception: ', '');
     }
   }
 
-  void viewOrderDetails(String orderId) {
-    Get.toNamed(Routes.orderDetailsView);
+  // ── Retry on error ────────────────────────────────────────────────────────
+  void retryFetch(int index) => _fetchOrders(index);
+
+  // ── Navigate to details — passes full SingleOrder so details screen
+  //    doesn't need a second API call ──────────────────────────────────────
+  void viewOrderDetails(SingleOrder order) {
+    Get.toNamed(Routes.orderDetailsView, arguments: {'order': order});
   }
 }

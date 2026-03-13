@@ -10,8 +10,13 @@ import '../../controller/order_confirmation_controller.dart';
 
 class ResponsiveTimeSelectingWidget extends StatelessWidget {
   final OrderConfirmationController controller;
+  final VoidCallback? onTimeChanged;
 
-  const ResponsiveTimeSelectingWidget({super.key, required this.controller});
+  const ResponsiveTimeSelectingWidget({
+    super.key,
+    required this.controller,
+    this.onTimeChanged,
+  });
 
   Widget _buildTimePickerButton({
     required String value,
@@ -22,15 +27,27 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
     return Column(
       children: [
         GestureDetector(
-          onTap: onIncrement,
+          onTap: () {
+            onIncrement();
+            onTimeChanged?.call();
+          },
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: responsive.spacing9, horizontal: responsive.spacing9),
+            padding: EdgeInsets.symmetric(
+              vertical: responsive.spacing9,
+              horizontal: responsive.spacing9,
+            ),
             margin: EdgeInsets.only(bottom: responsive.spacing10),
             decoration: BoxDecoration(
               color: AppColor.white,
-              borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+              borderRadius: BorderRadius.circular(
+                responsive.extraLargeBorderRadius,
+              ),
               border: Border.all(color: AppColor.black.withOpacity(0.03)),
-              boxShadow: [responsive.responsiveBoxShadow(blurRadius: responsive.shadowBlurMedium)],
+              boxShadow: [
+                responsive.responsiveBoxShadow(
+                  blurRadius: responsive.shadowBlurMedium,
+                ),
+              ],
             ),
             child: Center(
               child: Icon(
@@ -41,17 +58,34 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
             ),
           ),
         ),
-        text(text: value, size: responsive.fontSize18, fontWeight: FontWeight.w400, color: AppColor.black),
+        text(
+          text: value,
+          size: responsive.fontSize18,
+          fontWeight: FontWeight.w400,
+          color: AppColor.black,
+        ),
         GestureDetector(
-          onTap: onDecrement,
+          onTap: () {
+            onDecrement();
+            onTimeChanged?.call();
+          },
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: responsive.spacing9, horizontal: responsive.spacing9),
+            padding: EdgeInsets.symmetric(
+              vertical: responsive.spacing9,
+              horizontal: responsive.spacing9,
+            ),
             margin: EdgeInsets.only(top: responsive.spacing10),
             decoration: BoxDecoration(
               color: AppColor.white,
-              borderRadius: BorderRadius.circular(responsive.extraLargeBorderRadius),
+              borderRadius: BorderRadius.circular(
+                responsive.extraLargeBorderRadius,
+              ),
               border: Border.all(color: AppColor.black.withOpacity(0.03)),
-              boxShadow: [responsive.responsiveBoxShadow(blurRadius: responsive.shadowBlurMedium)],
+              boxShadow: [
+                responsive.responsiveBoxShadow(
+                  blurRadius: responsive.shadowBlurMedium,
+                ),
+              ],
             ),
             child: Center(
               child: Icon(
@@ -79,12 +113,21 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              SvgPicture.string(dineTimeCalender, width: responsive.iconSizeMedium, height: responsive.iconSizeMedium),
+              SvgPicture.string(
+                dineTimeCalender,
+                width: responsive.iconSizeMedium,
+                height: responsive.iconSizeMedium,
+              ),
               SizedBox(width: responsive.spacing12),
-              text(text: 'Select Your Dining Time', size: responsive.fontSize16, fontWeight: FontWeight.w500),
+              text(
+                text: 'Select Your Dining Time',
+                size: responsive.fontSize16,
+                fontWeight: FontWeight.w500,
+              ),
             ],
           ),
           SizedBox(height: responsive.spacing30),
+
           GetBuilder<OrderConfirmationController>(
             id: 'time_widget',
             builder: (controller) {
@@ -99,8 +142,14 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
                     responsive: responsive,
                   ),
                   SizedBox(width: responsive.spacing24),
-                  text(text: ':', size: responsive.fontSize20, fontWeight: FontWeight.w400, color: AppColor.black),
+                  text(
+                    text: ':',
+                    size: responsive.fontSize20,
+                    fontWeight: FontWeight.w400,
+                    color: AppColor.black,
+                  ),
                   SizedBox(width: responsive.spacing24),
+
                   // Minute picker
                   _buildTimePickerButton(
                     value: controller.selectedMinute.toString().padLeft(2, '0'),
@@ -109,9 +158,15 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
                     responsive: responsive,
                   ),
                   SizedBox(width: responsive.spacing24),
-                  text(text: ':', size: responsive.fontSize20, fontWeight: FontWeight.w400, color: AppColor.black),
+                  text(
+                    text: ':',
+                    size: responsive.fontSize20,
+                    fontWeight: FontWeight.w400,
+                    color: AppColor.black,
+                  ),
                   SizedBox(width: responsive.spacing24),
-                  // Period picker (AM/PM)
+
+                  // AM/PM picker
                   _buildTimePickerButton(
                     value: controller.selectedPeriod,
                     onIncrement: controller.togglePeriod,
@@ -123,6 +178,7 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
             },
           ),
           SizedBox(height: responsive.spacing30),
+
           GetBuilder<OrderConfirmationController>(
             id: 'time_widget',
             builder: (controller) {
@@ -132,23 +188,34 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
                     text: 'Selected Time: ${controller.getFormattedTime()}',
                     size: responsive.fontSize16,
                     fontWeight: FontWeight.w600,
-                    color: controller.timeErrorMessage != null ? Colors.red : AppColor.appPrimary,
+                    color:
+                        controller.timeErrorMessage != null
+                            ? Colors.red
+                            : AppColor.appPrimary,
                   ),
 
-                  // Show error message if there's one
                   if (controller.timeErrorMessage != null) ...[
                     SizedBox(height: responsive.spacing8),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: responsive.spacing12, vertical: responsive.spacing8),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: responsive.spacing12,
+                        vertical: responsive.spacing8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(responsive.inputBorderRadius),
+                        borderRadius: BorderRadius.circular(
+                          responsive.inputBorderRadius,
+                        ),
                         border: Border.all(color: Colors.red.withOpacity(0.3)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.error_outline, size: responsive.iconSizeSmall, color: Colors.red),
+                          Icon(
+                            Icons.error_outline,
+                            size: responsive.iconSizeSmall,
+                            color: Colors.red,
+                          ),
                           SizedBox(width: responsive.spacing8),
                           Flexible(
                             child: text(
@@ -166,7 +233,8 @@ class ResponsiveTimeSelectingWidget extends StatelessWidget {
 
                   SizedBox(height: responsive.spacing8),
                   text(
-                    text: 'Please select a time that allows at least 30 minutes of preparation before arrival.',
+                    text:
+                        'Please select a time that allows at least 30 minutes of preparation before arrival.',
                     size: responsive.fontSize14,
                     fontWeight: FontWeight.w400,
                     color: AppColor.black.withOpacity(0.6),
