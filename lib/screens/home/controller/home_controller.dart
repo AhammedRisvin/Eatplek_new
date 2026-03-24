@@ -209,7 +209,11 @@ class HomeController extends GetxController {
       }
 
       // ── Step 7: Background tasks ──────────────────────────────────────────
-      await _cartService.fetchCartItemCount();
+      // NOTE: fetchCartItemCount() is intentionally NOT called here.
+      // It runs once at app startup in main.dart to populate the badge.
+      // Calling it here would re-hit the cart API on every location change /
+      // preference change / home refresh — unnecessary given CartService keeps
+      // itemCount in sync via its own polling when CartView is open.
       await _checkPendingInvites();
 
       debugPrint('✅ Initialization complete');

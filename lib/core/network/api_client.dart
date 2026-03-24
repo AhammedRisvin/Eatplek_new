@@ -34,7 +34,7 @@ class FittorConnect {
           return request;
         },
         onResponse: (response) async {
-          debugPrint("🟢 ${response.statusCode}");
+          debugPrint("🟢 ${response.statusCode} ${response.body} ");
           return response;
         },
         onError: (error, stack) async {
@@ -53,17 +53,6 @@ class FittorConnect {
         logTag: 'FittorConnect',
       ),
     );
-
-    // Retry disabled — was causing duplicate API calls and duplicate log entries.
-    // Re-enable only if specifically needed for a feature, with maxRetries: 0 default.
-    // _client.addInterceptor(
-    //   RetryInterceptor(
-    //     maxRetries: 1,
-    //     baseDelay: const Duration(milliseconds: 2000),
-    //     retryOnTimeout: true,
-    //     retryOnConnectionError: true,
-    //   ),
-    // );
 
     // Add common headers interceptor
     _client.addInterceptor(

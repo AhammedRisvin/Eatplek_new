@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:flutter/material.dart';
@@ -39,26 +40,34 @@ class PhonePeService {
 
   final FittorConnect _apiClient = FittorConnect();
 
-  // ── Toggle to true when going live ──
+  // ─────────────────────────────────────────────────────────────
+  // CONFIG — update these when going live
+  // ─────────────────────────────────────────────────────────────
+
+  // Set true while backend has PAYMENT_DEMO_MODE=true
+  // Set false once backend has real PhonePe sandbox/production credentials
+  static const bool _isDemoMode = true;
+
+  // Toggle when going live
   static const bool _isProduction = false;
 
-  // ── SANDBOX: PhonePe simulator app package
-  // ── PRODUCTION: 'com.phonepe.app'
-  static const String _sandboxPackageName = 'com.phonepe.simulator';
-  static const String _productionPackageName = 'com.phonepe.app';
-
-  // ── Must match <data android:scheme="eatplek" /> in AndroidManifest.xml ──
+  // Must match <data android:scheme="eatplek"/> in AndroidManifest.xml
   static const String _appSchema = 'eatplek';
 
-  // ── SANDBOX merchant ID — replace with live ID for production ──
-  static const String _sandboxMerchantId = 'PGTESTPAYUAT86';
+  // SANDBOX simulator package — switch to 'com.phonepe.app' for production
+  static const String _phonePePackage = 'com.phonepe.simulator';
+
+  // Replace with real merchant ID from PhonePe dashboard
+  // SANDBOX test ID: 'PGTESTPAYUAT86'
+  static const String _merchantId = 'PGTESTPAYUAT86';
+
+  // appId is optional — leave empty unless PhonePe team provides one
+  static const String _appId = '';
 
   String get _environment => _isProduction ? 'PRODUCTION' : 'SANDBOX';
-  String get _merchantId => _sandboxMerchantId; // swap for production
 
   // ─────────────────────────────────────────────────────────────
   // PUBLIC ENTRY POINT
-  // Called from OrderConfirmationController after vendor accepts.
   // ─────────────────────────────────────────────────────────────
 
   Future<PhonePePaymentResult> startPayment({
@@ -66,16 +75,7 @@ class PhonePeService {
     required double amount,
     required String mobileNumber,
   }) async {
-    // Step 1 — Init SDK
-    final initialized = await _initSdk();
-    if (!initialized) {
-      return const PhonePePaymentResult(
-        status: PhonePePaymentStatus.failed,
-        errorMessage: 'Failed to initialize payment SDK. Please try again.',
-      );
-    }
-
-    // Step 2 — Get token from backend
+    // Step 1 — Call backend to initiate (gets token + checksum)
     final initiateData = await _initiatePayment(
       orderId: orderId,
       amount: amount,
@@ -88,10 +88,33 @@ class PhonePeService {
       );
     }
 
-    // Step 3 — Launch PhonePe SDK
-    final sdkStatus = await _launchSdk(initiateData.token);
+    // Step 2 — Demo mode: skip SDK entirely, call confirm directly
+    if (_isDemoMode) {
+      debugPrint('🎭 DEMO MODE — skipping PhonePe SDK, confirming directly');
+      return _confirmPayment(
+        orderId: orderId,
+        merchantOrderId: initiateData.merchantOrderId,
+        sdkStatus: _SdkStatus.success,
+      );
+    }
 
-    // Step 4 — Confirm with backend regardless of SDK result
+    // Step 3 — Real mode: init SDK
+    // Official param order: environment, appId, merchantId, enableLogs
+    final initialized = await _initSdk();
+    if (!initialized) {
+      return const PhonePePaymentResult(
+        status: PhonePePaymentStatus.failed,
+        errorMessage: 'Failed to initialize payment SDK. Please try again.',
+      );
+    }
+
+    // Step 4 — Launch SDK with body + checksum
+    final sdkStatus = await _launchSdk(
+      body: initiateData.body,
+      checksum: initiateData.checksum,
+    );
+
+    // Step 5 — Confirm with backend
     return _confirmPayment(
       orderId: orderId,
       merchantOrderId: initiateData.merchantOrderId,
@@ -101,17 +124,23 @@ class PhonePeService {
 
   // ─────────────────────────────────────────────────────────────
   // STEP 1 — Init SDK
+  // Official signature: init(environment, appId, merchantId, enableLogs)
+  // NOTE: appId comes BEFORE merchantId — common mistake to swap these
   // ─────────────────────────────────────────────────────────────
 
   Future<bool> _initSdk() async {
     try {
-      debugPrint('🔵 PhonePe SDK init — env: $_environment');
+      debugPrint(
+        '🔵 PhonePe SDK init — env: $_environment, merchantId: $_merchantId',
+      );
+
       final result = await PhonePePaymentSdk.init(
-        _environment,
-        _merchantId,
-        '', // flowId — leave empty
+        _environment, // 'SANDBOX' or 'PRODUCTION'
+        _appId, // appId — empty string if not provided by PhonePe
+        _merchantId, // your merchant ID
         true, // enableLogs — set false in production
       );
+
       debugPrint('🟢 PhonePe SDK initialized: $result');
       return result == true;
     } catch (e) {
@@ -122,6 +151,7 @@ class PhonePeService {
 
   // ─────────────────────────────────────────────────────────────
   // STEP 2 — POST /api/payments/initiate
+  // Backend returns: token (base64 body), checksum, merchantOrderId
   // ─────────────────────────────────────────────────────────────
 
   String? _lastInitiateError;
@@ -132,7 +162,9 @@ class PhonePeService {
     required String mobileNumber,
   }) async {
     try {
-      debugPrint('📤 Initiating payment — orderId: $orderId, amount: ₹$amount');
+      debugPrint(
+        '📤 Initiating — orderId: $orderId | amount: ₹$amount | phone: $mobileNumber',
+      );
 
       final response = await _apiClient.post(
         endpoint: Urls.initiatePaymentUrl,
@@ -154,8 +186,6 @@ class PhonePeService {
       if (response['success'] != true) {
         final msg =
             response['message'] as String? ?? 'Payment initiation failed';
-
-        // Map backend error messages to user-friendly strings
         if (msg.contains('accepted')) {
           _lastInitiateError = 'This order has not been confirmed yet.';
         } else if (msg.contains('already completed')) {
@@ -168,7 +198,6 @@ class PhonePeService {
         } else {
           _lastInitiateError = msg;
         }
-
         debugPrint('🔴 Initiate failed: $_lastInitiateError');
         return null;
       }
@@ -181,6 +210,9 @@ class PhonePeService {
 
       final token = data['token'] as String?;
       final merchantOrderId = data['merchantOrderId'] as String?;
+      // Checksum is only present in real mode — backend computes it
+      // In demo mode this will be null which is fine since we skip the SDK
+      final checksum = data['checksum'] as String?;
 
       if (token == null || token.isEmpty) {
         _lastInitiateError =
@@ -188,9 +220,28 @@ class PhonePeService {
         return null;
       }
 
-      debugPrint('✅ Initiate success — merchantOrderId: $merchantOrderId');
+      debugPrint('✅ Initiate success');
+      debugPrint('   token: $token');
+      debugPrint('   merchantOrderId: $merchantOrderId');
+      debugPrint('   checksum present: ${checksum != null}');
+
+      // In real mode, the SDK expects the body as a JSON string of the payload.
+      // The token from backend is already the base64-encoded payload.
+      // We wrap it into the request format the SDK expects.
+      final body =
+          _isDemoMode
+              ? token // demo — token value doesn't matter, SDK is skipped
+              : jsonEncode({
+                'orderId': merchantOrderId ?? orderId,
+                'merchantId': _merchantId,
+                'token': token,
+                'paymentMode': {'type': 'PAY_PAGE'},
+              });
+
       return _InitiateData(
         token: token,
+        body: body,
+        checksum: checksum ?? '',
         merchantOrderId: merchantOrderId ?? orderId,
       );
     } catch (e) {
@@ -202,22 +253,31 @@ class PhonePeService {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STEP 3 — Launch PhonePe SDK
+  // STEP 3 — Launch PhonePe SDK (real mode only)
+  // Official signature: startTransaction(body, appSchema, checksum, packageName)
+  // body     = JSON string of payment payload
+  // appSchema = your deep-link scheme ('eatplek')
+  // checksum  = SHA256 computed by backend
+  // packageName = PhonePe app package ('com.phonepe.simulator' for sandbox)
   // ─────────────────────────────────────────────────────────────
 
-  Future<_SdkStatus> _launchSdk(String token) async {
+  Future<_SdkStatus> _launchSdk({
+    required String body,
+    required String checksum,
+  }) async {
     try {
       debugPrint('🚀 Launching PhonePe SDK...');
+      debugPrint('   package: $_phonePePackage');
+      debugPrint('   appSchema: $_appSchema');
 
       final response = await PhonePePaymentSdk.startTransaction(
-        token, // base64 token from backend
-        _appSchema, // 'eatplek'
+        body, // JSON string payload
+        _appSchema, // 'eatplek' — deep-link callback scheme
       );
 
       log('SDK raw response: $response');
 
       if (response == null) {
-        // null = user closed the PhonePe screen without paying
         debugPrint('⚠️ SDK returned null — user likely cancelled');
         return _SdkStatus.cancelled;
       }
@@ -238,14 +298,13 @@ class PhonePeService {
           return _SdkStatus.unknown;
       }
     } catch (e) {
-      debugPrint('🔴 SDK exception: $e');
+      debugPrint('🔴 SDK launch exception: $e');
       return _SdkStatus.failed;
     }
   }
 
   // ─────────────────────────────────────────────────────────────
   // STEP 4 — POST /api/payments/confirm
-  // Always called after SDK (except user cancel) so backend stays in sync.
   // ─────────────────────────────────────────────────────────────
 
   Future<PhonePePaymentResult> _confirmPayment({
@@ -253,7 +312,7 @@ class PhonePeService {
     required String merchantOrderId,
     required _SdkStatus sdkStatus,
   }) async {
-    // User cancelled before PhonePe screen — no point hitting confirm
+    // User cancelled before PhonePe screen — skip confirm
     if (sdkStatus == _SdkStatus.cancelled) {
       return const PhonePePaymentResult(
         status: PhonePePaymentStatus.failed,
@@ -262,8 +321,9 @@ class PhonePeService {
     }
 
     try {
-      debugPrint('🔍 Confirming payment with backend...');
-      debugPrint('   orderId: $orderId | merchantOrderId: $merchantOrderId');
+      debugPrint(
+        '🔍 Confirming — orderId: $orderId | merchantOrderId: $merchantOrderId',
+      );
 
       final response = await _apiClient.post(
         endpoint: Urls.confirmPaymentUrl,
@@ -274,8 +334,7 @@ class PhonePeService {
       log('Confirm response: $response');
 
       if (response == null) {
-        // Network failure during confirm — payment may have gone through.
-        // Show pending instead of failed so user doesn't retry a paid order.
+        // Network failure — show pending so user doesn't retry a paid order
         return PhonePePaymentResult(
           status: PhonePePaymentStatus.pending,
           merchantOrderId: merchantOrderId,
@@ -287,16 +346,16 @@ class PhonePeService {
       final data = response['data'] as Map<String, dynamic>?;
       final paymentStatus = data?['paymentStatus'] as String? ?? '';
 
-      // ── SUCCESS ──
+      // SUCCESS
       if (response['success'] == true && paymentStatus == 'paid') {
-        debugPrint('✅ Payment confirmed as PAID');
+        debugPrint('✅ Payment confirmed — PAID');
         return PhonePePaymentResult(
           status: PhonePePaymentStatus.success,
           merchantOrderId: merchantOrderId,
         );
       }
 
-      // ── PENDING (PhonePe returned PENDING to backend) ──
+      // PENDING
       final msg =
           response['message'] as String? ?? 'Payment could not be confirmed';
       if (msg.toUpperCase().contains('PENDING') || paymentStatus == 'pending') {
@@ -309,7 +368,7 @@ class PhonePeService {
         );
       }
 
-      // ── FAILED ──
+      // FAILED
       debugPrint('❌ Payment FAILED: $msg');
       return PhonePePaymentResult(
         status: PhonePePaymentStatus.failed,
@@ -318,7 +377,6 @@ class PhonePeService {
       );
     } catch (e) {
       debugPrint('🔴 Exception confirming payment: $e');
-      // Network error during confirm — pending is safer than failed
       return PhonePePaymentResult(
         status: PhonePePaymentStatus.pending,
         merchantOrderId: merchantOrderId,
@@ -334,8 +392,16 @@ class PhonePeService {
 
 class _InitiateData {
   final String token;
+  final String body; // JSON string for SDK startTransaction
+  final String checksum; // SHA256 from backend for SDK startTransaction
   final String merchantOrderId;
-  const _InitiateData({required this.token, required this.merchantOrderId});
+
+  const _InitiateData({
+    required this.token,
+    required this.body,
+    required this.checksum,
+    required this.merchantOrderId,
+  });
 }
 
 enum _SdkStatus { success, failed, pending, cancelled, unknown }

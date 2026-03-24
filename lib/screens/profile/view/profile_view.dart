@@ -29,10 +29,23 @@ class _ProfileViewState extends State<ProfileView> {
   void initState() {
     super.initState();
     _controller = Get.find<ProfileController>();
-    // Fetch profile now that the user is on the profile tab
-    // Safe to call here — token is guaranteed to be set by this point
+    // ProfileView lives inside IndexedStack and mounts at app launch even when
+    // the profile tab is not visible. Guard the fetch so it only fires when the
+    // tab is actually active. BottomNavController.setBottomBarIndex() triggers
+    // fetchProfile() when the user taps the profile tab for the first time.
+    // The _hasFetched flag inside ProfileController prevents redundant re-fetches.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller.fetchProfile();
+      try {
+        final navCtrl = Get.find<BottomNavController>();
+        if (navCtrl.currentIndex == 3) {
+          // Profile tab is the active tab right now — fetch
+          _controller.fetchProfile();
+        }
+        // Otherwise do nothing — BottomNavController owns the trigger
+      } catch (_) {
+        // Fallback: not inside IndexedStack (e.g. pushed directly via /profileView)
+        _controller.fetchProfile();
+      }
     });
   }
 
@@ -449,7 +462,7 @@ class _ProfileViewState extends State<ProfileView> {
                     final updating = isUpdating.value;
                     return ValueListenableBuilder<TextEditingValue>(
                       valueListenable: nameCtrl,
-                      builder: (_, val, __) {
+                      builder: (_, val, _) {
                         final trimmed = val.text.trim();
                         final disabled =
                             trimmed.isEmpty || trimmed.length < 2 || updating;

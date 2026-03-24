@@ -1,7 +1,6 @@
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
-import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -79,10 +78,18 @@ class OrdersController extends GetxController
       }
     });
 
-    // ✅ Fetch first tab ONLY if token is present — guard against IndexedStack
-    // mounting this controller before the user has navigated to the orders tab.
-    // The tab listener below handles lazy-loading on first switch.
-    if (Store.userToken.isNotEmpty) {
+    // ✅ Do NOT call _fetchOrders(0) here.
+    // OrdersView is mounted inside IndexedStack at app start even when the
+    // orders tab is not visible. Fetching here fires the API on every app
+    // launch regardless of which tab the user is on.
+    // BottomNavController.setBottomBarIndex() calls fetchFirstTabIfNeeded()
+    // when the user actually taps the orders tab for the first time.
+  }
+
+  /// Called by BottomNavController when the orders tab becomes active.
+  /// Fetches the first tab only if it hasn't been loaded yet.
+  void fetchFirstTabIfNeeded() {
+    if (!tabStates[0].isFetched && !tabStates[0].isInitialLoading) {
       _fetchOrders(0);
     }
   }
