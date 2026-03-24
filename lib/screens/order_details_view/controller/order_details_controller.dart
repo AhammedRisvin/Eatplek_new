@@ -35,7 +35,7 @@ class OrderDetailsController extends GetxController {
   double get grandTotal => (totals?.grandTotal ?? 0).toDouble();
   double get subTotal => (totals?.subTotal ?? 0).toDouble();
   double get taxAmount => (totals?.taxAmount ?? 0).toDouble();
-  int get taxPercentage => totals?.taxPercentage ?? 0;
+  num get taxPercentage => totals?.taxPercentage ?? 0;
   double get packingCharge => (totals?.packingChargeTotal ?? 0).toDouble();
   double get discountTotal => (totals?.discountTotal ?? 0).toDouble();
   double get couponDiscount => (totals?.couponDiscount ?? 0).toDouble();

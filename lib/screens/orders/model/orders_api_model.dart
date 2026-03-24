@@ -118,16 +118,16 @@ class SingleOrder {
 }
 
 class AmountSummary {
-  int? subTotal;
-  int? addOnTotal;
-  int? customizationTotal;
-  int? packingChargeTotal;
-  int? discountTotal;
-  int? couponDiscount;
-  int? taxAmount;
-  int? taxPercentage;
-  int? grandTotal;
-  int? itemCount;
+  num? subTotal;
+  num? addOnTotal;
+  num? customizationTotal;
+  num? packingChargeTotal;
+  num? discountTotal;
+  num? couponDiscount;
+  num? taxAmount;
+  num? taxPercentage;
+  num? grandTotal;
+  num? itemCount;
 
   AmountSummary({
     this.subTotal,
@@ -179,15 +179,15 @@ class Item {
   String? foodName;
   String? foodImage;
   String? foodType;
-  int? quantity;
-  int? basePrice;
-  int? discountPrice;
-  int? effectivePrice;
+  num? quantity;
+  num? basePrice;
+  num? discountPrice;
+  num? effectivePrice;
   List<AddOn>? customizations;
   List<AddOn>? addOns;
   bool? isPrebook;
-  int? packingCharge;
-  int? itemTotal;
+  num? packingCharge;
+  num? itemTotal;
   dynamic notes;
 
   Item({
@@ -236,8 +236,8 @@ class Item {
 class AddOn {
   String? addOnId;
   String? name;
-  int? price;
-  int? quantity;
+  num? price;
+  num? quantity;
   String? customizationId;
 
   AddOn({
@@ -287,7 +287,7 @@ class Food {
 class PaymentDetails {
   dynamic transactionId;
   dynamic providerReferenceId;
-  int? amount;
+  num? amount;
   dynamic paymentMethod;
   dynamic paidAt;
 
@@ -418,7 +418,7 @@ class User {
 class Vendor {
   String? id;
   String? name;
-  int? gstPercentage;
+  num? gstPercentage;
 
   Vendor({this.id, this.name, this.gstPercentage});
 
@@ -430,9 +430,9 @@ class Vendor {
 }
 
 class Pagination {
-  int? total;
+  num? total;
   int? page;
-  int? limit;
+  num? limit;
   int? totalPages;
 
   Pagination({this.total, this.page, this.limit, this.totalPages});

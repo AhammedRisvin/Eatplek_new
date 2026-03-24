@@ -52,5 +52,9 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to show delivery location</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>EatPlek needs your location to show nearby restaurants.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>EatPlek needs your location to show nearby restaurants.</string>
 </dict>
 </plist>

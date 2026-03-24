@@ -4,7 +4,7 @@ import 'package:eatplek_app/screens/home/model/new_home_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../core/util/responsive_helper.dart' show ResponsiveHelper;
+import '../../../../core/util/responsive_helper.dart';
 
 class OrderPreferenceModel {
   final String id;
@@ -28,6 +28,10 @@ class OrderPreferenceDialog extends StatefulWidget {
   final String? title;
   final String? subtitle;
 
+  /// When false — no Cancel button shown, user MUST select a preference
+  /// When true — Cancel button shown (used when changing existing preference)
+  final bool canDismiss;
+
   const OrderPreferenceDialog({
     super.key,
     required this.currentPreference,
@@ -36,9 +40,9 @@ class OrderPreferenceDialog extends StatefulWidget {
     this.onDialogDismissed,
     this.title,
     this.subtitle,
+    this.canDismiss = true,
   });
 
-  /// Static method to show the dialog
   static Future<void> show({
     required String currentPreference,
     required List<String> availableServices,
@@ -47,13 +51,15 @@ class OrderPreferenceDialog extends StatefulWidget {
     VoidCallback? onDialogDismissed,
     String? title,
     String? subtitle,
+    bool canDismiss = true,
   }) async {
-    debugPrint('🎯 OrderPreferenceDialog.show() called');
+    debugPrint('🎯 OrderPreferenceDialog.show() | canDismiss: $canDismiss');
 
     showDialog(
       context: Get.context!,
       barrierColor: Colors.black.withOpacity(0.5),
-      barrierDismissible: false,
+      barrierDismissible:
+          false, // always false — we control dismiss via canDismiss param
       builder:
           (context) => OrderPreferenceDialog(
             currentPreference: currentPreference,
@@ -62,6 +68,7 @@ class OrderPreferenceDialog extends StatefulWidget {
             onDialogDismissed: onDialogDismissed,
             title: title,
             subtitle: subtitle,
+            canDismiss: canDismiss,
           ),
     );
   }
@@ -76,7 +83,13 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
     final responsive = ResponsiveHelper();
 
     return PopScope(
-      canPop: false,
+      // Prevent back button from dismissing when canDismiss is false
+      canPop: widget.canDismiss,
+      onPopInvoked: (didPop) {
+        if (didPop && widget.canDismiss) {
+          widget.onDialogDismissed?.call();
+        }
+      },
       child: Dialog(
         backgroundColor: Colors.transparent,
         insetAnimationDuration: const Duration(milliseconds: 300),
@@ -92,7 +105,9 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
               _buildHeader(responsive),
               _buildDivider(),
               _buildPreferenceOptions(responsive),
-              _buildCloseButton(responsive),
+              SizedBox(height: responsive.spacing10),
+              // Only show Cancel button when canDismiss is true
+              if (widget.canDismiss) _buildCancelButton(responsive),
               SizedBox(height: responsive.spacing20),
             ],
           ),
@@ -106,79 +121,115 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
       padding: EdgeInsets.all(responsive.spacing20),
       child: Column(
         children: [
+          // Icon indicator
+          Container(
+            width: responsive.spacing48,
+            height: responsive.spacing48,
+            decoration: BoxDecoration(
+              color: AppColor.appPrimary.withOpacity(0.10),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.restaurant_menu_rounded,
+              color: AppColor.appPrimary,
+              size: responsive.spacing24,
+            ),
+          ),
+          SizedBox(height: responsive.spacing12),
           text(
             text: widget.title ?? 'How Would You Like to Order?',
             size: responsive.fontSize20,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             textAlign: TextAlign.center,
+            color: AppColor.appPrimary,
           ),
-          SizedBox(height: responsive.spacing4),
+          SizedBox(height: responsive.spacing6),
           text(
             text:
                 widget.subtitle ??
                 'Please choose your preferred service to continue.',
-            size: responsive.fontSize14,
+            size: responsive.fontSize13,
             fontWeight: FontWeight.w400,
-            color: AppColor.black.withOpacity(0.6),
+            color: AppColor.black.withOpacity(0.55),
             textAlign: TextAlign.center,
           ),
+          // Mandatory hint when user cannot skip
+          if (!widget.canDismiss) ...[
+            SizedBox(height: responsive.spacing8),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.spacing12,
+                vertical: responsive.spacing6,
+              ),
+              decoration: BoxDecoration(
+                color: AppColor.appPrimary.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(
+                  responsive.cardBorderRadius,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: responsive.spacing14,
+                    color: AppColor.appPrimary,
+                  ),
+                  SizedBox(width: responsive.spacing6),
+                  text(
+                    text: 'Selection required to continue',
+                    size: responsive.fontSize11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColor.appPrimary,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildDivider() {
-    return Divider(color: AppColor.black.withOpacity(0.1), height: 1);
+    return Divider(color: AppColor.black.withOpacity(0.08), height: 1);
   }
 
   Widget _buildPreferenceOptions(ResponsiveHelper responsive) {
-    final preferences = _getPreferenceOptions();
+    final allPreferences = _getPreferenceOptions();
 
+    // Filter to only show services available at this location
     final filteredPreferences =
-        preferences
-            .where(
-              (pref) => widget.availableServices.any(
-                (service) =>
-                    service
-                        .toLowerCase()
-                        .replaceAll('-', '')
-                        .replaceAll(' ', '') ==
-                    pref.value
-                        .toLowerCase()
-                        .replaceAll('-', '')
-                        .replaceAll(' ', ''),
-              ),
-            )
-            .toList();
+        allPreferences.where((pref) {
+          return widget.availableServices.any(
+            (service) =>
+                service.toLowerCase().replaceAll('-', '').replaceAll(' ', '') ==
+                pref.value
+                    .toLowerCase()
+                    .replaceAll('-', '')
+                    .replaceAll(' ', ''),
+          );
+        }).toList();
 
     debugPrint(
-      '📋 Filtered preferences: ${filteredPreferences.map((p) => p.value).toList()}',
+      '📋 Available options: ${filteredPreferences.map((p) => p.value).toList()}',
     );
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
       child: Column(
         children: [
-          SizedBox(height: responsive.spacing20),
+          SizedBox(height: responsive.spacing16),
           ...filteredPreferences.map((preference) {
+            final bool isSelected = widget.currentPreference.contains(
+              preference.value,
+            );
             return Padding(
               padding: EdgeInsets.only(bottom: responsive.spacing10),
-              child: OrderPreferenceOptionWidget(
+              child: _buildPreferenceOptionTile(
+                responsive: responsive,
                 preference: preference,
-                isSelected: widget.currentPreference.contains(preference.value),
-                onTap: () {
-                  debugPrint('✅ Preference tapped: ${preference.value}');
-                  String fullPreference =
-                      "${preference.emoji}  ${preference.value}";
-                  debugPrint(
-                    '📤 Closing dialog and calling callback with: $fullPreference',
-                  );
-                  Navigator.of(Get.context!).pop();
-                  Future.delayed(const Duration(milliseconds: 200), () {
-                    debugPrint('📞 Calling onPreferenceSelected callback');
-                    widget.onPreferenceSelected(fullPreference);
-                  });
-                },
+                isSelected: isSelected,
               ),
             );
           }),
@@ -187,7 +238,91 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
     );
   }
 
-  Widget _buildCloseButton(ResponsiveHelper responsive) {
+  Widget _buildPreferenceOptionTile({
+    required ResponsiveHelper responsive,
+    required OrderPreferenceModel preference,
+    required bool isSelected,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        debugPrint('✅ Tapped: ${preference.value}');
+        final String fullPreference =
+            '${preference.emoji}  ${preference.value}';
+        Navigator.of(Get.context!).pop();
+        Future.delayed(const Duration(milliseconds: 200), () {
+          widget.onPreferenceSelected(fullPreference);
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          vertical: responsive.spacing15,
+          horizontal: responsive.spacing20,
+        ),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? AppColor.appPrimary.withOpacity(0.12)
+                  : AppColor.scaffoldColor,
+          borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+          border: Border.all(
+            color:
+                isSelected
+                    ? AppColor.appPrimary.withOpacity(0.5)
+                    : AppColor.black.withOpacity(0.08),
+            width: isSelected ? 1.5 : 1,
+          ),
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: AppColor.appPrimary.withOpacity(0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                  : [],
+        ),
+        child: Row(
+          children: [
+            Text(
+              preference.emoji,
+              style: TextStyle(fontSize: responsive.fontSize20),
+            ),
+            SizedBox(width: responsive.spacing12),
+            text(
+              text: preference.title,
+              size: responsive.fontSize15,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? AppColor.appPrimary : AppColor.black,
+            ),
+            const Spacer(),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child:
+                  isSelected
+                      ? Icon(
+                        Icons.check_circle_rounded,
+                        key: const ValueKey('checked'),
+                        color: AppColor.appPrimary,
+                        size: responsive.iconSizeMedium,
+                      )
+                      : Icon(
+                        Icons.radio_button_unchecked_rounded,
+                        key: const ValueKey('unchecked'),
+                        color: AppColor.black.withOpacity(0.25),
+                        size: responsive.iconSizeMedium,
+                      ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCancelButton(ResponsiveHelper responsive) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
       child: button(
@@ -198,15 +333,14 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
         fontSize: responsive.fontSize14,
         fontWeight: FontWeight.w600,
         onTap: () {
-          debugPrint('❌ Dialog closed without selection');
+          debugPrint('❌ Preference dialog cancelled');
           Navigator.of(Get.context!).pop();
-
           Future.delayed(const Duration(milliseconds: 200), () {
             widget.onDialogDismissed?.call();
           });
         },
         color: AppColor.scaffoldColor,
-        borderColor: AppColor.black.withOpacity(0.1),
+        borderColor: AppColor.black.withOpacity(0.10),
         textColor: AppColor.black,
       ),
     );
@@ -215,119 +349,29 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
   List<OrderPreferenceModel> _getPreferenceOptions() {
     return [
       OrderPreferenceModel(
+        id: 'dine-in',
+        title: 'Dine-in',
+        emoji: '🍽️',
+        value: 'Dine-in',
+      ),
+      OrderPreferenceModel(
+        id: 'takeaway',
+        title: 'Takeaway',
+        emoji: '🥡',
+        value: 'Takeaway',
+      ),
+      OrderPreferenceModel(
         id: 'delivery',
         title: 'Delivery',
         emoji: '🛵',
         value: 'Delivery',
       ),
       OrderPreferenceModel(
-        id: 'takeaway',
-        title: 'Take Away',
-        emoji: '🥡',
-        value: 'Takeaway',
-      ),
-      OrderPreferenceModel(
-        id: 'dining',
-        title: 'Dine-in',
-        emoji: '🍽️',
-        value: 'Dine-in',
-      ),
-      OrderPreferenceModel(
-        id: 'special',
-        title: 'Special Booking',
-        emoji: '🎉',
+        id: 'car-dine-in',
+        title: 'Car Dine-in',
+        emoji: '🚗',
         value: 'SpecialBooking',
       ),
-      OrderPreferenceModel(
-        id: 'pickup',
-        title: 'Pickup',
-        emoji: '🏃',
-        value: 'Pickup',
-      ),
     ];
-  }
-}
-
-/// Individual preference option widget
-class OrderPreferenceOptionWidget extends StatelessWidget {
-  final OrderPreferenceModel preference;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  const OrderPreferenceOptionWidget({
-    super.key,
-    required this.preference,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final responsive = ResponsiveHelper();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        width: double.infinity,
-        padding: EdgeInsets.symmetric(
-          vertical: responsive.spacing15,
-          horizontal: responsive.spacing20,
-        ),
-        decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? AppColor.appPrimary.withOpacity(0.15)
-                  : AppColor.scaffoldColor,
-          borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
-          border: Border.all(
-            color:
-                isSelected
-                    ? AppColor.appPrimary.withOpacity(0.5)
-                    : AppColor.black.withOpacity(0.08),
-            width: isSelected ? 2 : 1,
-          ),
-          boxShadow:
-              isSelected
-                  ? [
-                    BoxShadow(
-                      color: AppColor.appPrimary.withOpacity(0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                  : [],
-        ),
-        child: Row(
-          children: [
-            AnimatedScale(
-              scale: isSelected ? 1.2 : 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: text(
-                text: '${preference.emoji}   ${preference.title}',
-                size: responsive.fontSize16,
-                fontWeight: FontWeight.w500,
-                color: isSelected ? AppColor.appPrimary : AppColor.black,
-              ),
-            ),
-            const Spacer(),
-            AnimatedOpacity(
-              opacity: isSelected ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: AnimatedScale(
-                scale: isSelected ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Icon(
-                  Icons.check_circle,
-                  color: AppColor.appPrimary,
-                  size: responsive.iconSizeMedium,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

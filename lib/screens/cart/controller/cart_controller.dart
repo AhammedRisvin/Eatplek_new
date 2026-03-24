@@ -33,7 +33,6 @@ class CartController extends GetxController {
   final double _promoDiscount = 0.0;
   double get promoDiscount => _promoDiscount;
 
-  // Tracks whether a promo apply/remove API call is in flight
   bool isPromoApplying = false;
 
   Timer? _quantityDebounceTimer;
@@ -77,6 +76,59 @@ class CartController extends GetxController {
     });
   }
 
+  // ── Called by CartService._silentPoll() when a poll detects a change ──────
+  /// Re-parses the full API response into cartModel so CartView reflects
+  /// fresh vendor, coupon, items, and totals without a full isLoading cycle.
+  void syncFromPoll(Map<String, dynamic> freshResponse) {
+    try {
+      final fresh = CartModel.fromJson(freshResponse);
+      if (fresh.success != true || fresh.data == null) return;
+
+      // Preserve vendor if the fresh response omits it (shouldn't happen,
+      // but defensive)
+      cartModel = CartModel(
+        success: fresh.success,
+        message: fresh.message,
+        data: CartData(
+          id: fresh.data!.id,
+          cartCode: fresh.data!.cartCode,
+          user: fresh.data!.user,
+          serviceType: fresh.data!.serviceType,
+          isPrebookCart: fresh.data!.isPrebookCart,
+          vendor: fresh.data!.vendor ?? cartModel?.data?.vendor,
+          items: fresh.data!.items,
+          couponCode: fresh.data!.couponCode,
+          totals: fresh.data!.totals,
+          lastUpdatedAt: fresh.data!.lastUpdatedAt,
+          isCartOwner: fresh.data!.isCartOwner,
+          friendInvitations: fresh.data!.friendInvitations,
+        ),
+      );
+
+      // Sync coupon state
+      final freshCoupon = fresh.data!.couponCode;
+      if (freshCoupon != null && freshCoupon.isNotEmpty) {
+        _appliedPromoCode = freshCoupon;
+        promoCodeController.text = freshCoupon;
+      } else {
+        _appliedPromoCode = '';
+        promoCodeController.clear();
+      }
+
+      update([
+        'cart_items',
+        'price_summary',
+        'empty_cart',
+        'promo_validation',
+        'friend_invitations',
+      ]);
+
+      debugPrint('✅ CartController.syncFromPoll: cartModel updated from poll');
+    } catch (e) {
+      debugPrint('⚠️ CartController.syncFromPoll error (ignored): $e');
+    }
+  }
+
   void _syncCartModelWithService() {
     try {
       if (_cartService.cartItems.isNotEmpty) {
@@ -89,6 +141,8 @@ class CartController extends GetxController {
             items: convertedItems,
             vendor: cartModel?.data?.vendor,
             couponCode: cartModel?.data?.couponCode,
+            isCartOwner: cartModel?.data?.isCartOwner,
+            friendInvitations: cartModel?.data?.friendInvitations,
             totals:
                 cartModel?.data?.totals != null
                     ? Totals(
@@ -252,32 +306,35 @@ class CartController extends GetxController {
         );
 
         if (cartModel?.success == true && cartModel?.data != null) {
+          final snapshotItems =
+              cartModel!.data!.items
+                  ?.map((item) => _convertCartItemToMap(item))
+                  .toList() ??
+              [];
+          final snapshotTotals = cartModel!.data!.totals;
+          final snapshotCouponCode = cartModel!.data!.couponCode;
+
           _cartService.updateCartFromApi({
-            'items':
-                cartModel!.data!.items
-                    ?.map((item) => _convertCartItemToMap(item))
-                    .toList() ??
-                [],
+            'items': snapshotItems,
             'totals': {
-              'itemCount': cartModel!.data!.totals?.itemCount ?? 0,
-              'grandTotal': cartModel!.data!.totals?.grandTotal ?? 0,
-              'subTotal': cartModel!.data!.totals?.subTotal ?? 0,
-              'taxAmount': cartModel!.data!.totals?.taxAmount ?? 0,
-              'taxPercentage': cartModel!.data!.totals?.taxPercentage ?? 0,
-              'packingChargeTotal':
-                  cartModel!.data!.totals?.packingChargeTotal ?? 0,
-              'discountTotal': cartModel!.data!.totals?.discountTotal ?? 0,
-              'couponDiscount': cartModel!.data!.totals?.couponDiscount ?? 0,
+              'itemCount': snapshotTotals?.itemCount ?? 0,
+              'grandTotal': snapshotTotals?.grandTotal ?? 0,
+              'subTotal': snapshotTotals?.subTotal ?? 0,
+              'taxAmount': snapshotTotals?.taxAmount ?? 0,
+              'taxPercentage': snapshotTotals?.taxPercentage ?? 0,
+              'packingChargeTotal': snapshotTotals?.packingChargeTotal ?? 0,
+              'discountTotal': snapshotTotals?.discountTotal ?? 0,
+              'couponDiscount': snapshotTotals?.couponDiscount ?? 0,
             },
           });
 
-          // ── Restore coupon state from API ─────────────────────────────────
-          final couponFromApi = cartModel!.data!.couponCode;
-          if (couponFromApi != null && couponFromApi.isNotEmpty) {
-            _appliedPromoCode = couponFromApi;
-            promoCodeController.text = couponFromApi;
+          if (snapshotCouponCode != null && snapshotCouponCode.isNotEmpty) {
+            _appliedPromoCode = snapshotCouponCode;
+            promoCodeController.text = snapshotCouponCode;
             _promoCodeError = '';
-            debugPrint('🎟️ Restored applied coupon from API: $couponFromApi');
+            debugPrint(
+              '🎟️ Restored applied coupon from API: $snapshotCouponCode',
+            );
           } else {
             _appliedPromoCode = '';
             promoCodeController.clear();
@@ -297,7 +354,13 @@ class CartController extends GetxController {
         isLoading = false;
       }
 
-      update(['cart_items', 'price_summary', 'empty_cart', 'promo_validation']);
+      update([
+        'cart_items',
+        'price_summary',
+        'empty_cart',
+        'promo_validation',
+        'friend_invitations',
+      ]);
     } catch (e) {
       hasError = true;
       errorMessage = 'Error loading cart: $e';
@@ -307,7 +370,6 @@ class CartController extends GetxController {
     }
   }
 
-  // ── Public wrapper so CouponsController can trigger a cart refresh ─────────
   Future<void> fetchCartData() => _fetchCartData();
 
   Map<String, dynamic> _convertCartItemToMap(CartItem item) {
@@ -351,15 +413,14 @@ class CartController extends GetxController {
         item.customizations != null && item.customizations!.isNotEmpty;
     final hasAddOns = item.addOns != null && item.addOns!.isNotEmpty;
 
-    if (!hasCustomizations && !hasAddOns) {
+    if (!hasCustomizations && !hasAddOns)
       return 1;
-    } else if (!hasCustomizations && hasAddOns) {
+    else if (!hasCustomizations && hasAddOns)
       return 2;
-    } else if (hasCustomizations && !hasAddOns) {
+    else if (hasCustomizations && !hasAddOns)
       return 3;
-    } else {
+    else
       return 4;
-    }
   }
 
   Future<void> updateItemQuantity(
@@ -368,6 +429,7 @@ class CartController extends GetxController {
     String? customizationId,
     String? addOnId,
   }) async {
+    _cartService.localMutationInFlight = true;
     try {
       final itemIndex = cartItems.indexWhere((item) => item.foodId == foodId);
       if (itemIndex == -1) return;
@@ -414,6 +476,12 @@ class CartController extends GetxController {
                     cartModel?.data?.couponCode,
                 totals: updatedModel.data!.totals,
                 lastUpdatedAt: updatedModel.data!.lastUpdatedAt,
+                isCartOwner:
+                    updatedModel.data!.isCartOwner ??
+                    cartModel?.data?.isCartOwner, // ← add
+                friendInvitations:
+                    updatedModel.data!.friendInvitations ??
+                    cartModel?.data?.friendInvitations, // ← add
               ),
             );
           }
@@ -445,6 +513,8 @@ class CartController extends GetxController {
     } catch (e) {
       debugPrint('Exception while updating item: $e');
       Get.snackbar('Error', 'Failed to update cart');
+    } finally {
+      _cartService.localMutationInFlight = false;
     }
   }
 
@@ -588,70 +658,32 @@ class CartController extends GetxController {
   }
 
   // ─── Price getters ────────────────────────────────────────────────────────
-  double get subtotal {
-    if (cartModel?.data?.totals != null) {
-      return cartModel!.data!.totals!.subTotal ?? 0;
-    }
-    return 0;
-  }
-
+  double get subtotal => cartModel?.data?.totals?.subTotal ?? 0;
   double get deliveryFee => 0.0;
-
-  double get taxAmount {
-    if (cartModel?.data?.totals != null) {
-      return cartModel!.data!.totals!.taxAmount ?? 0;
-    }
-    return 0;
-  }
-
-  int get taxPercentageValue {
-    if (cartModel?.data?.totals != null) {
-      return cartModel!.data!.totals!.taxPercentage ?? 0;
-    }
-    return 0;
-  }
-
-  double get packingCharge {
-    if (cartModel?.data?.totals != null) {
-      return (cartModel!.data!.totals!.packingChargeTotal ?? 0).toDouble();
-    }
-    return 0;
-  }
-
-  double get discountAmount {
-    if (cartModel?.data?.totals != null) {
-      return (cartModel!.data!.totals!.discountTotal ?? 0).toDouble();
-    }
-    return 0;
-  }
-
-  double get couponDiscount {
-    if (cartModel?.data?.totals != null) {
-      return (cartModel!.data!.totals!.couponDiscount ?? 0).toDouble();
-    }
-    return 0;
-  }
-
+  double get taxAmount => cartModel?.data?.totals?.taxAmount ?? 0;
+  int get taxPercentageValue => cartModel?.data?.totals?.taxPercentage ?? 0;
+  double get packingCharge =>
+      (cartModel?.data?.totals?.packingChargeTotal ?? 0).toDouble();
+  double get discountAmount =>
+      (cartModel?.data?.totals?.discountTotal ?? 0).toDouble();
+  double get couponDiscount =>
+      (cartModel?.data?.totals?.couponDiscount ?? 0).toDouble();
   double get totalAmount => _cartService.totalPrice.value;
-
   int get itemCount => _cartService.itemCount.value;
 
   // ─── Instructions ─────────────────────────────────────────────────────────
   bool validateInstructions() {
     final instructions = instructionsController.text.trim();
-
     if (instructions.isNotEmpty && instructions.length < 10) {
       _instructionsError = 'Instructions must be at least 10 characters';
       update(['instructions_validation']);
       return false;
     }
-
     if (instructions.length > 200) {
       _instructionsError = 'Instructions cannot exceed 200 characters';
       update(['instructions_validation']);
       return false;
     }
-
     _instructionsError = '';
     update(['instructions_validation']);
     return true;
@@ -665,8 +697,6 @@ class CartController extends GetxController {
   }
 
   // ─── Promo / Coupon ───────────────────────────────────────────────────────
-
-  /// Called by CouponsController after successful apply
   void setAppliedPromoCode(String code) {
     _appliedPromoCode = code;
     promoCodeController.text = code;
@@ -675,14 +705,12 @@ class CartController extends GetxController {
     update(['promo_validation', 'price_summary']);
   }
 
-  /// Called to show inline error in PromoCodeWidget
   void setPromoError(String error) {
     _promoCodeError = error;
     isPromoApplying = false;
     update(['promo_validation']);
   }
 
-  /// Clears applied promo locally — used after successful remove API call
   void removePromoCode() {
     _appliedPromoCode = '';
     _promoCodeError = '';
@@ -691,8 +719,8 @@ class CartController extends GetxController {
     update(['promo_validation', 'price_summary']);
   }
 
-  /// DELETE coupon from cart API then refresh cart
   Future<void> removeCouponFromCart({Function(String error)? onError}) async {
+    _cartService.localMutationInFlight = true;
     try {
       final vendorId = cartModel?.data?.vendor?.id ?? '';
       final response = await _apiClient.delete(
@@ -716,26 +744,24 @@ class CartController extends GetxController {
       debugPrint('❌ Error removing coupon: $e');
       final message = e.toString().replaceAll('Exception: ', '');
       onError?.call(message);
+    } finally {
+      _cartService.localMutationInFlight = false;
     }
   }
 
   // ─── Clear Cart ───────────────────────────────────────────────────────────
-
-  /// Calls the clear-cart API then wipes local state.
-  /// Returns true on success so the caller can proceed with the next action.
   Future<bool> clearCartApi({Function(String error)? onError}) async {
+    _cartService.localMutationInFlight = true;
     try {
       final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
 
       if (response != null && response is Map<String, dynamic>) {
         if (response['success'] == true) {
-          // Wipe local state
           cartModel = null;
           _appliedPromoCode = '';
           _promoCodeError = '';
           promoCodeController.clear();
           _cartService.clearCart();
-
           update([
             'cart_items',
             'price_summary',
@@ -756,6 +782,8 @@ class CartController extends GetxController {
       debugPrint('❌ Error clearing cart: $e');
       final message = e.toString().replaceAll('Exception: ', '');
       onError?.call(message);
+    } finally {
+      _cartService.localMutationInFlight = false;
     }
     return false;
   }
@@ -778,24 +806,103 @@ class CartController extends GetxController {
     }
   }
 
+  // ─── Send Invite ──────────────────────────────────────────────────────────
+  Future<bool> sendInvite({required String phone}) async {
+    try {
+      debugPrint('📨 Sending invite to +91$phone...');
+
+      final response = await _apiClient.post(
+        endpoint: Urls.sendInivtesUrl,
+        data: {'phone': phone, 'dialCode': '+91'},
+      );
+
+      if (response == null) {
+        Get.snackbar(
+          'Error',
+          'Failed to send invitation. Please try again.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return false;
+      }
+
+      final success = response['success'] == true;
+      final message = (response['message'] ?? '').toString();
+
+      if (success) {
+        debugPrint('✅ Invite sent — re-fetching cart for updated invitations');
+        await _fetchCartData();
+        return true;
+      } else {
+        Get.snackbar(
+          'Error',
+          message.isNotEmpty ? message : 'Failed to send invitation.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Error sending invite: $e');
+      final message = e.toString().replaceAll('Exception: ', '');
+      Get.snackbar(
+        'Error',
+        message.isNotEmpty ? message : 'Failed to send invitation.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+  }
+
+  // ─── Remove Invite ────────────────────────────────────────────────────────
+  Future<void> removeInvite(String inviteId) async {
+    if (inviteId.isEmpty) return;
+    try {
+      debugPrint('🗑️ Removing invite: $inviteId');
+
+      final endpoint = Urls.removeInviteUrl.replaceAll('{inviteId}', inviteId);
+      final response = await _apiClient.delete(endpoint: endpoint);
+
+      if (response != null &&
+          response is Map<String, dynamic> &&
+          response['success'] == true) {
+        debugPrint('✅ Invite removed — re-fetching cart');
+        await _fetchCartData();
+      } else {
+        final msg =
+            (response is Map ? response['message'] : null) ??
+            'Failed to remove invite';
+        Get.snackbar('Error', msg, snackPosition: SnackPosition.BOTTOM);
+      }
+    } catch (e) {
+      debugPrint('❌ Error removing invite: $e');
+      final message = e.toString().replaceAll('Exception: ', '');
+      Get.snackbar(
+        'Error',
+        message.isNotEmpty ? message : 'Failed to remove invite.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  // ─── Friend invitation getters ────────────────────────────────────────────
+  bool get isCartOwner => cartModel?.data?.isCartOwner ?? true;
+  List<FriendInvitation> get friendInvitations =>
+      cartModel?.data?.friendInvitations ?? [];
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
   String _getCleanServiceType(String servicePreference) {
     String cleaned = servicePreference.toLowerCase().trim();
-
-    if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
+    if (cleaned.contains('delivery') || cleaned.contains('🛵'))
       return 'delivery';
-    } else if (cleaned.contains('dine-in') ||
+    if (cleaned.contains('dine-in') ||
         cleaned.contains('dine in') ||
-        cleaned.contains('🍽')) {
+        cleaned.contains('🍽'))
       return 'dine-in';
-    } else if (cleaned.contains('takeaway') || cleaned.contains('🎁')) {
+    if (cleaned.contains('takeaway') || cleaned.contains('🎁'))
       return 'takeaway';
-    } else if (cleaned.contains('car-dine') ||
+    if (cleaned.contains('car-dine') ||
         cleaned.contains('car dine') ||
-        cleaned.contains('🚗')) {
+        cleaned.contains('🚗'))
       return 'car-dine-in';
-    }
-
     return 'delivery';
   }
 
@@ -816,7 +923,6 @@ class CartController extends GetxController {
 
   void retryFetchCart() => _fetchCartData();
 
-  // ─── Dispose ──────────────────────────────────────────────────────────────
   @override
   void onClose() {
     _quantityDebounceTimer?.cancel();

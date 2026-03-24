@@ -50,19 +50,20 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDOH7HLC-QMMta8_wB0sZ80nZx8B1vGPnM',
-    appId: '1:659627785158:android:bcbd4729e94b8c160ad0c7',
-    messagingSenderId: '659627785158',
-    projectId: 'eatplek-app',
-    storageBucket: 'eatplek-app.firebasestorage.app',
+    apiKey: 'AIzaSyAHy5Uuf6HEX0BH1DgGmvHkQxnkDkRMzgg',
+    appId: '1:729633800126:android:299edbb2c6ed7bc83703ef',
+    messagingSenderId: '729633800126',
+    projectId: 'eatplek-6263a',
+    storageBucket: 'eatplek-6263a.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCH5vkjtut1CdZJS-cFj8KgNwiP1LO1TOs',
-    appId: '1:659627785158:ios:83857fdfa7236d750ad0c7',
-    messagingSenderId: '659627785158',
-    projectId: 'eatplek-app',
-    storageBucket: 'eatplek-app.firebasestorage.app',
+    apiKey: 'AIzaSyDgLSgUG355l8TgWnPROrQ_qMnUGWH-wB4',
+    appId: '1:729633800126:ios:07d6ba0d532c85ac3703ef',
+    messagingSenderId: '729633800126',
+    projectId: 'eatplek-6263a',
+    storageBucket: 'eatplek-6263a.firebasestorage.app',
     iosBundleId: 'com.example.eatplekApp',
   );
+
 }

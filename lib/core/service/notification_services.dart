@@ -197,19 +197,35 @@ class NotificationService {
   }
 
   Future<void> _fetchFcmToken() async {
-    fcmToken = await _fcm.getToken();
-    log('[FCM] token: $fcmToken');
+    const maxRetries = 3;
+    const retryDelay = Duration(seconds: 3);
 
-    // TODO: Send fcmToken to your backend so it can target this device.
-    // Example:
-    // final connect = Get.find<FittorConnect>();
-    // await connect.post('/user/fcm-token', body: {'fcmToken': fcmToken});
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        fcmToken = await _fcm.getToken();
+        log('[FCM] token: $fcmToken');
 
-    _fcm.onTokenRefresh.listen((token) {
-      fcmToken = token;
-      log('[FCM] token refreshed: $token');
-      // TODO: re-send refreshed token to backend
-    });
+        // TODO: Send fcmToken to your backend so it can target this device.
+        // Example:
+        // final connect = Get.find<FittorConnect>();
+        // await connect.post('/user/fcm-token', body: {'fcmToken': fcmToken});
+
+        _fcm.onTokenRefresh.listen((token) {
+          fcmToken = token;
+          log('[FCM] token refreshed: $token');
+          // TODO: re-send refreshed token to backend
+        });
+
+        return; // success
+      } catch (e) {
+        log('[FCM] Token fetch attempt $attempt/$maxRetries failed: $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(retryDelay);
+        } else {
+          log('[FCM] All retries exhausted. App will run without FCM token.');
+        }
+      }
+    }
   }
 
   /// Fires while the app is in the FOREGROUND

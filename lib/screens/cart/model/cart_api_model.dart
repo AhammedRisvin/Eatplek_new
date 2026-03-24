@@ -23,6 +23,8 @@ class CartData {
   String? couponCode;
   Totals? totals;
   DateTime? lastUpdatedAt;
+  bool? isCartOwner;
+  List<FriendInvitation>? friendInvitations;
 
   CartData({
     this.id,
@@ -35,6 +37,8 @@ class CartData {
     this.couponCode,
     this.totals,
     this.lastUpdatedAt,
+    this.isCartOwner,
+    this.friendInvitations,
   });
 
   factory CartData.fromJson(Map<String, dynamic> json) => CartData(
@@ -56,6 +60,15 @@ class CartData {
         json["lastUpdatedAt"] == null
             ? null
             : DateTime.parse(json["lastUpdatedAt"]),
+    isCartOwner: json["isCartOwner"],
+    friendInvitations:
+        json["friendInvitations"] == null
+            ? []
+            : List<FriendInvitation>.from(
+              json["friendInvitations"]!.map(
+                (x) => FriendInvitation.fromJson(x),
+              ),
+            ),
   );
 }
 
@@ -206,4 +219,35 @@ class Vendor {
     place: json["place"],
     gstPercentage: json["gstPercentage"],
   );
+}
+
+class FriendInvitation {
+  String? inviteId;
+  String? inviteeName;
+  String? inviteePhone;
+  String? inviteeProfileImage;
+  String? status;
+  DateTime? expiresAt;
+
+  FriendInvitation({
+    this.inviteId,
+    this.inviteeName,
+    this.inviteePhone,
+    this.inviteeProfileImage,
+    this.status,
+    this.expiresAt,
+  });
+
+  factory FriendInvitation.fromJson(Map<String, dynamic> json) =>
+      FriendInvitation(
+        inviteId: json["inviteId"],
+        inviteeName: json["inviteeName"],
+        inviteePhone: json["inviteePhone"],
+        inviteeProfileImage: json["inviteeProfileImage"],
+        status: json["status"],
+        expiresAt:
+            json["expiresAt"] == null
+                ? null
+                : DateTime.parse(json["expiresAt"]),
+      );
 }

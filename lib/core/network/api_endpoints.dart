@@ -1,6 +1,5 @@
 mixin Urls {
-  static const String baseUrl =
-      'https://eatplek-server-dev-production.up.railway.app/';
+  static const String baseUrl = 'https://eatplek-server-dev.onrender.com/';
 
   // Auth
   static const String login = 'api/users/send-otp';
@@ -36,5 +35,17 @@ mixin Urls {
 
   //referal
   static const String getReferralUrl = 'api/users/me/referral';
-  //api/users/me/referral
+
+  //Friends Cart
+  static const String checkInvitesUrl = 'api/cart/friend/invites';
+  static const String acceptOrRejectInvitesUrl = 'api/cart/friend/respond';
+  static const String sendInivtesUrl = 'api/cart/friend/invite';
+  static const String removeInviteUrl = 'api/cart/friend/invite/';
+
+  // Payments
+
+  static const String initiatePaymentUrl = 'api/payments/initiate';
+  static const String confirmPaymentUrl = 'api/payments/confirm';
+
+  //api/cart/friend/invite/{inviteId}
 }

@@ -9,9 +9,11 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/routes/routes.dart';
 import '../controller/cart_controller.dart';
+import 'widget/add_friend_bottom_sheet.dart';
 import 'widget/additional_notes_widget.dart';
 import 'widget/cart_food_list.dart';
 import 'widget/empty_cart.dart';
+import 'widget/friend_invitation_card.dart';
 import 'widget/price_summary_widget.dart';
 import 'widget/promo_code_widget.dart';
 
@@ -102,14 +104,26 @@ class _CartViewState extends State<CartView> {
               child: Column(
                 children: [
                   const CartFoodListWidget(),
+
+                  // ── Friend invitations (below cart items) ──────────────
+                  GetBuilder<CartController>(
+                    id: 'friend_invitations',
+                    builder:
+                        (ctrl) => FriendInvitationsSection(
+                          invitations: ctrl.friendInvitations,
+                          isCartOwner: ctrl.isCartOwner,
+                        ),
+                  ),
+
                   PromoCodeWidget(),
                   const AdditionalNotesWidget(),
+
                   GetBuilder<CartController>(
                     id: 'price_summary',
                     builder: (controller) {
                       final totals = controller.cartModel?.data?.totals;
 
-                      // ── Coupon discount ────────────────────────────────────
+                      // ── Coupon discount ──────────────────────────────────
                       final apiCouponDiscount =
                           (totals?.couponDiscount ?? 0).toDouble();
                       final effectiveDiscount =
@@ -117,7 +131,7 @@ class _CartViewState extends State<CartView> {
                               ? apiCouponDiscount
                               : controller.promoDiscount;
 
-                      // ── Coupon code label ──────────────────────────────────
+                      // ── Coupon code label ────────────────────────────────
                       final apiCouponCode =
                           controller.cartModel?.data?.couponCode;
                       final appliedCode =
@@ -170,6 +184,47 @@ class _CartViewState extends State<CartView> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // ── Add Friend to Order (cart owner only) ──────────────
+                  if (controller.isCartOwner)
+                    GestureDetector(
+                      onTap: () => AddFriendToCartBottomSheet.show(),
+                      child: Container(
+                        width: responsive.screenWidth,
+                        height: responsive.buttonHeight,
+                        margin: EdgeInsets.only(bottom: responsive.spacing12),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(
+                            responsive.spacing40,
+                          ),
+                          border: Border.all(
+                            color: Get.theme.primaryColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_add_alt_1_rounded,
+                              size: responsive.spacing20,
+                              color: Get.theme.primaryColor,
+                            ),
+                            SizedBox(width: responsive.spacing8),
+                            Text(
+                              'Add Friend to Order',
+                              style: TextStyle(
+                                fontSize: responsive.fontSize16,
+                                fontWeight: FontWeight.w600,
+                                color: Get.theme.primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // ── Place Order ────────────────────────────────────────
                   button(
                     name: 'Place Order',
                     width: responsive.screenWidth,
@@ -245,7 +300,6 @@ class _CartViewState extends State<CartView> {
         'packingCharge': cartController.packingCharge,
         'totalAmount': cartController.totalAmount,
         'instructions': cartController.instructionsController.text.trim(),
-        // ✅ Pass resolved effective values so OrderConfirmationView is always correct
         'appliedPromoCode': effectiveCode,
         'promoDiscount': effectiveDiscount,
       },

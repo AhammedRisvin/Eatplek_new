@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Store {
@@ -20,7 +21,8 @@ class Store {
   }
 
   static String get userToken => _preference.getString(_userToken) ?? '';
-  static set userToken(String value) => _preference.setString(_userToken, value);
+  static set userToken(String value) =>
+      _preference.setString(_userToken, value);
 
   static String get id => _preference.getString("id") ?? '';
   static set id(String value) => _preference.setString("id", value);
@@ -40,11 +42,49 @@ class Store {
   static String get status => _preference.getString("status") ?? '';
   static set status(String value) => _preference.setString("status", value);
 
-  static String get showedOnBoarding => _preference.getString("showedOnBoarding") ?? 'false';
-  static set showedOnBoarding(String value) => _preference.setString("showedOnBoarding", value);
+  static String get showedOnBoarding =>
+      _preference.getString("showedOnBoarding") ?? 'false';
+  static set showedOnBoarding(String value) =>
+      _preference.setString("showedOnBoarding", value);
 
-  static String get deliveryPreference => _preference.getString("deliveryPreference") ?? '';
-  static set deliveryPreference(String value) => _preference.setString("deliveryPreference", value);
+  static String get deliveryPreference =>
+      _preference.getString("deliveryPreference") ?? '';
+  static set deliveryPreference(String value) =>
+      _preference.setString("deliveryPreference", value);
 
-  //status
+  static double get userLatitude =>
+      _preference.getDouble("userLatitude") ?? 0.0;
+  static set userLatitude(double value) =>
+      _preference.setDouble("userLatitude", value);
+
+  static double get userLongitude =>
+      _preference.getDouble("userLongitude") ?? 0.0;
+  static set userLongitude(double value) =>
+      _preference.setDouble("userLongitude", value);
+
+  static String get userCity => _preference.getString("userCity") ?? '';
+  static set userCity(String value) => _preference.setString("userCity", value);
+
+  static bool get locationManuallyPicked =>
+      _preference.getBool("locationManuallyPicked") ?? false;
+  static set locationManuallyPicked(bool value) =>
+      _preference.setBool("locationManuallyPicked", value);
+
+  /// Atomically saves all manual location fields and sets the picked flag.
+  /// Must be awaited — guarantees everything is flushed to disk before returning.
+  static Future<void> saveManualLocation({
+    required double latitude,
+    required double longitude,
+    required String city,
+  }) async {
+    await Future.wait([
+      _preference.setDouble("userLatitude", latitude),
+      _preference.setDouble("userLongitude", longitude),
+      _preference.setString("userCity", city),
+      _preference.setBool("locationManuallyPicked", true),
+    ]);
+    debugPrint(
+      '💾 Manual location saved: $city ($latitude, $longitude) | manuallyPicked: true',
+    );
+  }
 }

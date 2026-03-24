@@ -172,8 +172,8 @@ class Vendor {
   });
 
   factory Vendor.fromJson(Map<String, dynamic> json) => Vendor(
-    hotelId: json["hotelId"],
-    hotelName: json["hotelName"],
+    hotelId: json["restaurantId"], // ← was "hotelId"
+    hotelName: json["restaurantName"], // ← was "hotelName"
     profileImage: json["profileImage"],
     coverImage: json["coverImage"],
     place: json["place"],

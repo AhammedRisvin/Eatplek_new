@@ -1,6 +1,10 @@
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/screens/cart/controller/cart_service.dart';
+import 'package:eatplek_app/screens/home/model/invite_model.dart';
+import 'package:eatplek_app/screens/home/view/widget/clear_cart_to_join_bottom_sheet.dart';
+import 'package:eatplek_app/screens/home/view/widget/invite_bottom_sheet.dart';
+import 'package:eatplek_app/screens/home/view/widget/outside_radius_bottom_sheet.dart';
 import 'package:eatplek_app/screens/profile/controller/profile_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -14,12 +18,12 @@ import '../view/widget/multiple_branch_bottom_sheet.dart';
 import '../view/widget/order_preference_dialog.dart';
 
 class HomeController extends GetxController {
-  // Carousel properties
+  // ─── Carousel ─────────────────────────────────────────────────────────────
   int currentCarouselIndex = 0;
   List<BannerData> banners = [];
 
-  // User data
-  String userCity = 'Kannur';
+  // ─── User data ────────────────────────────────────────────────────────────
+  String userCity = 'Locating...';
   double userLatitude = 0.0;
   double userLongitude = 0.0;
   String orderPreference = '';
@@ -34,27 +38,25 @@ class HomeController extends GetxController {
     return '';
   }
 
-  // Service data from API
+  // ─── API data ─────────────────────────────────────────────────────────────
   List<String> availableServices = [];
-
-  // Prebook data from API
   List<PrebookList> prebookList = [];
-
-  // Vendor data from API
   List<Vendor> vendors = [];
+
+  // ─── State flags ──────────────────────────────────────────────────────────
   bool isLoadingServices = false;
   bool isLoadingVendors = false;
   bool isLoadingMore = false;
   bool hasError = false;
   String errorMessage = '';
 
-  // Pagination
+  // ─── Pagination ───────────────────────────────────────────────────────────
   int currentPage = 1;
   int totalPages = 1;
   int limit = 10;
   bool hasNextPage = false;
 
-  // Update IDs for GetBuilder
+  // ─── GetBuilder update IDs ────────────────────────────────────────────────
   static const String carouselId = 'carousel';
   static const String userGreetingId = 'userGreeting';
   static const String orderPreferenceId = 'orderPreference';
@@ -67,10 +69,12 @@ class HomeController extends GetxController {
   bool _isFetching = false;
   bool _isInitialized = false;
   bool _locationFetching = false;
-  bool _isFirstTimeSetup = false;
 
-  static const double STATIC_LATITUDE = 11.8705;
-  static const double STATIC_LONGITUDE = 75.3679;
+  // Fallback only used when GPS fails AND no saved location exists
+  static const double _fallbackLatitude = 11.8705;
+  static const double _fallbackLongitude = 75.3679;
+
+  // ─── Lifecycle ────────────────────────────────────────────────────────────
 
   @override
   void onInit() {
@@ -94,7 +98,6 @@ class HomeController extends GetxController {
     scrollController = ScrollController();
     scrollController.addListener(_onScroll);
 
-    // Listen to profile data changes and refresh the greeting when name loads
     _listenToProfileUpdates();
 
     debugPrint('🚀 HomeController initialized');
@@ -102,7 +105,6 @@ class HomeController extends GetxController {
     _initializeHomeScreen();
   }
 
-  /// Re-trigger userGreeting update whenever profile data arrives
   void _listenToProfileUpdates() {
     try {
       final profileController = Get.find<ProfileController>();
@@ -111,7 +113,6 @@ class HomeController extends GetxController {
         update([userGreetingId]);
       });
     } catch (_) {
-      // ProfileController not yet registered — greeting will fall back to ''
       debugPrint(
         '⚠️ ProfileController not found during greeting listener setup',
       );
@@ -125,67 +126,91 @@ class HomeController extends GetxController {
     super.onClose();
   }
 
-  /// Initialize home screen with unified flow
+  // ─── Initialization ───────────────────────────────────────────────────────
+
   Future<void> _initializeHomeScreen() async {
     try {
       debugPrint('🔄 Starting initialization sequence...');
 
-      _isFirstTimeSetup = userLatitude == 0.0 && userLongitude == 0.0;
-      String? savedPreference = Store.deliveryPreference;
+      // ── Step 1: Restore saved location if available ──────────────────────
+      if (Store.userLatitude != 0.0 && Store.userLongitude != 0.0) {
+        userLatitude = Store.userLatitude;
+        userLongitude = Store.userLongitude;
+        userCity = Store.userCity.isNotEmpty ? Store.userCity : 'Locating...';
+        debugPrint(
+          '📍 Restored saved location: $userCity ($userLatitude, $userLongitude)',
+        );
+        update([userGreetingId]);
+      }
 
-      debugPrint(
-        '📊 Initial State - Location: ($userLatitude, $userLongitude) | Preference: "$savedPreference" | FirstTimeSetup: $_isFirstTimeSetup',
-      );
-
+      // ── Step 2: Show loading overlay ─────────────────────────────────────
       isLoadingServices = true;
       _locationFetching = true;
       update([carouselId]);
 
+      // ── Step 3: Fetch fresh GPS ───────────────────────────────────────────
       await _fetchUserLocation();
       _locationFetching = false;
 
+      // ── Step 4: Restore saved preference if any ───────────────────────────
+      final String savedPreference = Store.deliveryPreference;
       if (savedPreference.isNotEmpty) {
-        debugPrint('✅ Using saved preference: $savedPreference');
         orderPreference = savedPreference;
         update([orderPreferenceId]);
+        debugPrint('✅ Restored saved preference: $savedPreference');
+      }
 
-        isLoadingServices = false;
-        update([carouselId]);
+      // ── Step 5: Always fetch services first (no serviceType) ──────────────
+      // This tells us what's available at this location
+      debugPrint('📋 Fetching available services for current location...');
+      final bool servicesLoaded = await _fetchHomeData(
+        serviceType: null,
+        isRefresh: true,
+      );
 
-        String serviceType = _extractServiceType(savedPreference);
-        await _fetchHomeData(serviceType: serviceType, isRefresh: true);
-      } else {
-        debugPrint('📋 No preference saved - fetching available services...');
+      isLoadingServices = false;
+      update([carouselId]);
 
-        final success = await _fetchHomeData(
-          serviceType: null,
-          isRefresh: true,
+      if (!servicesLoaded || availableServices.isEmpty) {
+        // ── No services at this location ─────────────────────────────────
+        debugPrint('❌ No services available at this location');
+        hasError = true;
+        errorMessage =
+            'No services available in your area.\nTry changing your location.';
+        update([vendorsId]);
+        return;
+      }
+
+      // ── Step 6: Ensure valid preference is set ────────────────────────────
+      // If saved preference is no longer available at this location, clear it
+      if (orderPreference.isNotEmpty &&
+          !_isPreferenceAvailable(orderPreference)) {
+        debugPrint(
+          '⚠️ Saved preference "$orderPreference" not available here — clearing',
         );
+        orderPreference = '';
+        Store.deliveryPreference = '';
+        update([orderPreferenceId]);
+      }
 
-        if (success && availableServices.isNotEmpty) {
-          isLoadingServices = false;
-          update([carouselId]);
-
-          debugPrint('✅ Services loaded, showing dialog now');
-          _showOrderPreferenceDialog();
-        } else {
-          isLoadingServices = false;
-          update([carouselId]);
-
-          if (availableServices.isEmpty && !hasError) {
-            hasError = true;
-            errorMessage =
-                'No services available in your location. Please change your location.';
-            debugPrint(
-              '❌ No services available - show location change message',
-            );
-            update([vendorsId]);
-          }
+      if (orderPreference.isEmpty) {
+        // ── No preference — must show dialog, user cannot skip ────────────
+        debugPrint(
+          '📋 No preference set — showing mandatory preference dialog',
+        );
+        _showOrderPreferenceDialog(canDismiss: false);
+      } else {
+        // ── Preference exists and is valid — fetch vendors directly ───────
+        debugPrint('✅ Valid preference exists: $orderPreference');
+        final String? serviceType = _extractServiceType(orderPreference);
+        if (serviceType != null) {
+          await _fetchHomeData(serviceType: serviceType, isRefresh: true);
         }
       }
 
-      // Populate cart badge regardless of preference outcome
+      // ── Step 7: Background tasks ──────────────────────────────────────────
       await _cartService.fetchCartItemCount();
+      await _checkPendingInvites();
 
       debugPrint('✅ Initialization complete');
     } catch (e) {
@@ -197,18 +222,19 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Unified API call to fetch home data
+  // ─── API ──────────────────────────────────────────────────────────────────
+
   Future<bool> _fetchHomeData({
     String? serviceType,
     required bool isRefresh,
   }) async {
     if (_isFetching) {
-      debugPrint('⚠️ Already fetching - ignoring duplicate request');
+      debugPrint('⚠️ Already fetching — ignoring duplicate request');
       return false;
     }
 
     if (_locationFetching) {
-      debugPrint('⚠️ Location still fetching - waiting...');
+      debugPrint('⚠️ Location still fetching — waiting...');
       return false;
     }
 
@@ -220,28 +246,28 @@ class HomeController extends GetxController {
         hasError = false;
         errorMessage = '';
         update([vendorsId]);
-        debugPrint('🔄 Refreshing home data (page 1)...');
+        debugPrint('🔄 Refreshing home data...');
       } else {
         isLoadingMore = true;
         update([vendorsId]);
         debugPrint('📜 Loading more vendors (page $currentPage)...');
       }
 
-      String formattedDateTime = DateTime.now().toUtc().toIso8601String();
-      String cleanDateTime =
+      final String formattedDateTime = DateTime.now().toUtc().toIso8601String();
+      final String cleanDateTime =
           '${formattedDateTime.substring(0, formattedDateTime.indexOf('.'))}Z';
 
       String endpoint =
-          "${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime";
+          '${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime';
 
       if (serviceType != null && serviceType.isNotEmpty) {
-        endpoint += "&serviceType=$serviceType";
+        endpoint += '&serviceType=$serviceType';
         debugPrint('🔗 Fetching with serviceType: $serviceType');
       } else {
-        debugPrint('🔗 Fetching without serviceType (services only)');
+        debugPrint('🔗 Fetching without serviceType — services discovery only');
       }
 
-      debugPrint('🔗 API Endpoint: $endpoint');
+      debugPrint('🔗 Endpoint: $endpoint');
 
       final response = await _apiClient
           .get(endpoint: endpoint)
@@ -250,13 +276,11 @@ class HomeController extends GetxController {
             onTimeout:
                 () =>
                     throw TimeoutException(
-                      'API request timeout after 30 seconds',
+                      'API request timed out after 30 seconds',
                     ),
           );
 
       if (response != null) {
-        debugPrint('✅ API Response received');
-
         final newHomeModel = NewHomeModel.fromJson(response);
 
         if (newHomeModel.success == true && newHomeModel.data != null) {
@@ -264,7 +288,7 @@ class HomeController extends GetxController {
           banners = newHomeModel.data!.banners ?? [];
 
           debugPrint(
-            '✅ Services loaded: ${availableServices.length} services, ${banners.length} banners',
+            '✅ Services: ${availableServices.length} | Banners: ${banners.length}',
           );
 
           if (serviceType != null) {
@@ -279,8 +303,9 @@ class HomeController extends GetxController {
               prebookList.addAll(newPrebooks);
             }
 
-            debugPrint('✅ Vendors loaded: ${vendors.length} items');
-            debugPrint('✅ Prebooks loaded: ${prebookList.length} items');
+            debugPrint(
+              '✅ Vendors: ${vendors.length} | Prebooks: ${prebookList.length}',
+            );
           }
 
           isLoadingVendors = false;
@@ -288,7 +313,6 @@ class HomeController extends GetxController {
           hasError = false;
           update([vendorsId]);
 
-          debugPrint('✅ Home data loaded successfully');
           return true;
         } else {
           _handleApiError(newHomeModel.message ?? 'Unknown error from server');
@@ -299,14 +323,11 @@ class HomeController extends GetxController {
         return false;
       }
     } on TimeoutException catch (e) {
-      _handleApiError(
-        'Request timeout. Please check your internet connection.',
-      );
+      _handleApiError('Request timed out. Check your internet connection.');
       debugPrint('⏱️ Timeout: $e');
       return false;
     } catch (e) {
-      String errorMsg = _parseError(e.toString());
-      _handleApiError(errorMsg);
+      _handleApiError(_parseError(e.toString()));
       debugPrint('❌ API Error: $e');
       return false;
     } finally {
@@ -314,13 +335,22 @@ class HomeController extends GetxController {
     }
   }
 
-  /// Fetch user's current location
+  // ─── Location ─────────────────────────────────────────────────────────────
+
   Future<void> _fetchUserLocation() async {
     try {
-      debugPrint('📍 Starting location fetch...');
+      debugPrint('🚩 locationManuallyPicked = ${Store.locationManuallyPicked}');
+      debugPrint('📍 Fetching GPS location...');
+
+      // ── Manual pick check FIRST — before any GPS call ───────────────────
+      if (Store.locationManuallyPicked) {
+        debugPrint(
+          '📍 Manual location active — skipping GPS. Keeping: $userCity ($userLatitude, $userLongitude)',
+        );
+        return; // ← exits immediately, GPS never runs
+      }
 
       LocationPermission permission = await Geolocator.checkPermission();
-
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
         permission = await Geolocator.requestPermission();
@@ -332,39 +362,47 @@ class HomeController extends GetxController {
           desiredAccuracy: LocationAccuracy.high,
         );
 
-        userLatitude = STATIC_LATITUDE;
-        userLongitude = STATIC_LONGITUDE;
-
-        debugPrint(
-          '✅ Location fetched: Lat=$userLatitude, Long=$userLongitude',
-        );
+        userLatitude = position.latitude;
+        userLongitude = position.longitude;
+        debugPrint('✅ GPS applied: $userLatitude, $userLongitude');
 
         await _getCityFromCoordinates(position.latitude, position.longitude);
 
+        // Save to Store on very first launch only
+        if (Store.userLatitude == 0.0 && Store.userLongitude == 0.0) {
+          Store.userLatitude = userLatitude;
+          Store.userLongitude = userLongitude;
+          Store.userCity = userCity;
+          debugPrint('💾 Saved first-time GPS to Store');
+        }
+
         update([userGreetingId]);
       } else {
-        debugPrint('⚠️ Location permission denied - using default location');
-        userCity = 'Unknown Location';
-        userLatitude = STATIC_LATITUDE;
-        userLongitude = STATIC_LONGITUDE;
-        update([userGreetingId]);
+        debugPrint('⚠️ Location permission denied');
+        _useFallbackIfNeeded();
       }
     } catch (e) {
-      debugPrint('❌ Error fetching location: $e');
-      userCity = 'Unknown Location';
-      userLatitude = STATIC_LATITUDE;
-      userLongitude = STATIC_LONGITUDE;
-      update([userGreetingId]);
+      debugPrint('❌ GPS error: $e');
+      _useFallbackIfNeeded();
     }
   }
 
-  /// Get city name from latitude and longitude
+  void _useFallbackIfNeeded() {
+    if (userLatitude == 0.0 && userLongitude == 0.0) {
+      userLatitude = _fallbackLatitude;
+      userLongitude = _fallbackLongitude;
+      userCity = 'Unknown Location';
+      debugPrint('📍 Using fallback coordinates');
+    }
+    update([userGreetingId]);
+  }
+
   Future<void> _getCityFromCoordinates(
     double latitude,
     double longitude,
   ) async {
     try {
-      List<Placemark> placemarks = await GeocodingPlatform.instance!
+      final placemarks = await GeocodingPlatform.instance!
           .placemarkFromCoordinates(latitude, longitude);
 
       if (placemarks.isNotEmpty) {
@@ -372,54 +410,204 @@ class HomeController extends GetxController {
             placemarks.first.locality ??
             placemarks.first.administrativeArea ??
             'Unknown Location';
-        debugPrint('✅ City resolved: $userCity');
+        debugPrint('✅ City: $userCity');
         update([userGreetingId]);
       }
     } catch (e) {
-      debugPrint('⚠️ Error getting city: $e');
+      debugPrint('⚠️ Geocoding error: $e');
     }
   }
 
-  /// Show order preference dialog with available services
-  void _showOrderPreferenceDialog() {
-    debugPrint('📱 Opening preference dialog...');
+  // ─── Invite flow ──────────────────────────────────────────────────────────
+
+  Future<void> _checkPendingInvites() async {
+    try {
+      debugPrint('📨 Checking pending invites...');
+      final response = await _apiClient.get(endpoint: Urls.checkInvitesUrl);
+      if (response == null) return;
+
+      final inviteModel = InviteModel.fromJson(response);
+
+      if (inviteModel.success == true &&
+          inviteModel.data != null &&
+          inviteModel.data!.isNotEmpty) {
+        debugPrint('📨 Found ${inviteModel.data!.length} pending invite(s)');
+        await Future.delayed(const Duration(milliseconds: 600));
+        _showInviteBottomSheet(inviteModel.data!.first);
+      }
+    } catch (e) {
+      debugPrint('⚠️ Invite check error (non-blocking): $e');
+    }
+  }
+
+  void _showInviteBottomSheet(InviteData invite) {
+    InviteBottomSheet.show(
+      invite: invite,
+      onAccept: () => _respondToInvite(invite, action: 'accept'),
+      onDecline: () => _respondToInvite(invite, action: 'ignore'),
+    );
+  }
+
+  Future<void> _respondToInvite(
+    InviteData invite, {
+    required String action,
+  }) async {
+    try {
+      final body = {
+        'inviteId': invite.inviteId,
+        'action': action,
+        'latitude': userLatitude,
+        'longitude': userLongitude,
+      };
+
+      final response = await _apiClient.post(
+        endpoint: Urls.acceptOrRejectInvitesUrl,
+        data: body,
+      );
+
+      if (Get.isBottomSheetOpen == true) Navigator.of(Get.context!).pop();
+      await Future.delayed(const Duration(milliseconds: 350));
+
+      if (response == null) {
+        Get.snackbar('Error', 'Failed to respond to invite. Please try again.');
+        return;
+      }
+
+      final success = response['success'] == true;
+      final message = (response['message'] ?? '').toString();
+
+      if (success) {
+        if (action == 'accept') {
+          Get.snackbar(
+            'Joined!',
+            'You have joined the shared cart.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Get.theme.primaryColor.withOpacity(0.9),
+            colorText: Colors.white,
+          );
+          Get.toNamed(Routes.cartView);
+        }
+      } else {
+        final isOutsideRadius = response['outsideRadius'] == true;
+        final isCartConflict = message.toLowerCase().contains(
+          'items in your own cart',
+        );
+
+        if (isOutsideRadius) {
+          OutsideRadiusBottomSheet.show(
+            distanceKm: (response['distanceKm'] ?? 0.0).toDouble(),
+            vendorName:
+                (response['vendorName'] ??
+                        invite.vendor?.name ??
+                        'the restaurant')
+                    .toString(),
+            onDismiss: () {},
+          );
+        } else if (isCartConflict) {
+          ClearCartToJoinBottomSheet.show(
+            onClearAndRetry: () => _clearCartAndRetryInvite(invite),
+            onCancel: () {},
+          );
+        } else {
+          Get.snackbar(
+            'Error',
+            message.isNotEmpty ? message : 'Could not respond to invite.',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error responding to invite: $e');
+      if (Get.isBottomSheetOpen == true) Navigator.of(Get.context!).pop();
+      await Future.delayed(const Duration(milliseconds: 350));
+
+      final err = e.toString().toLowerCase();
+      if (err.contains('items in your own cart')) {
+        ClearCartToJoinBottomSheet.show(
+          onClearAndRetry: () => _clearCartAndRetryInvite(invite),
+          onCancel: () {},
+        );
+        return;
+      }
+      if (err.contains('outside') || err.contains('outsideradius')) {
+        double km = 0.0;
+        final match = RegExp(r'([\d.]+)\s*km').firstMatch(err);
+        if (match != null) km = double.tryParse(match.group(1) ?? '0') ?? 0.0;
+        OutsideRadiusBottomSheet.show(
+          distanceKm: km,
+          vendorName: invite.vendor?.name ?? 'the restaurant',
+          onDismiss: () {},
+        );
+        return;
+      }
+      Get.snackbar('Error', e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  Future<void> _clearCartAndRetryInvite(InviteData invite) async {
+    try {
+      final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
+      if (Get.isBottomSheetOpen == true) Navigator.of(Get.context!).pop();
+      await Future.delayed(const Duration(milliseconds: 350));
+
+      if (response != null && response is Map && response['success'] == true) {
+        _cartService.clearCart();
+        await _respondToInvite(invite, action: 'accept');
+      } else {
+        Get.snackbar('Error', 'Failed to clear cart. Please try again.');
+      }
+    } catch (e) {
+      if (Get.isBottomSheetOpen == true) Navigator.of(Get.context!).pop();
+      Get.snackbar('Error', 'Failed to clear cart. Please try again.');
+    }
+  }
+
+  // ─── Order preference ─────────────────────────────────────────────────────
+
+  /// Shows the preference dialog.
+  /// [canDismiss] = false means no Cancel button — user must pick.
+  /// [canDismiss] = true means Cancel is shown (used when preference already set).
+  void _showOrderPreferenceDialog({bool canDismiss = true}) {
+    debugPrint('📱 Opening preference dialog | canDismiss: $canDismiss');
 
     OrderPreferenceDialog.show(
       currentPreference: orderPreference,
       availableServices: availableServices,
       banners: banners,
-      onPreferenceSelected: (String selectedPreference) {
-        debugPrint('✅ Preference Selected from Dialog: $selectedPreference');
-        _onPreferenceSelected(selectedPreference);
+      canDismiss: canDismiss,
+      onPreferenceSelected: (String selected) {
+        debugPrint('✅ Preference selected: $selected');
+        _onPreferenceSelected(selected);
       },
-      onDialogDismissed: () {},
+      onDialogDismissed:
+          canDismiss
+              ? () {
+                debugPrint(
+                  'ℹ️ Preference dialog dismissed — preference unchanged',
+                );
+              }
+              : null,
       title: 'How Would You Like to Order?',
       subtitle: 'Please choose your preferred service to continue.',
     );
   }
 
-  /// Handle preference selection from dialog
   Future<void> _onPreferenceSelected(String selectedPreference) async {
-    debugPrint('🎯 Updating preference: $selectedPreference');
-
     orderPreference = selectedPreference;
     Store.deliveryPreference = selectedPreference;
-
-    debugPrint('💾 Saved to storage: $selectedPreference');
-
     update([orderPreferenceId]);
 
-    String serviceType = _extractServiceType(selectedPreference);
+    debugPrint('💾 Preference saved: $selectedPreference');
 
     currentPage = 1;
     vendors.clear();
     prebookList.clear();
 
-    debugPrint('🚀 Fetching vendors for service type: $serviceType');
-    await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+    final String? serviceType = _extractServiceType(selectedPreference);
+    if (serviceType != null) {
+      await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+    }
   }
 
-  /// Update carousel index
   void updateCarouselIndex(int index) {
     currentCarouselIndex = index;
     update([carouselId]);
@@ -428,12 +616,13 @@ class HomeController extends GetxController {
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   void onSearchTapped() {
+    final String? serviceType = _extractServiceType(orderPreference);
     Get.toNamed(
       Routes.searchView,
       arguments: {
         'latitude': userLatitude,
         'longitude': userLongitude,
-        'serviceType': _extractServiceType(orderPreference),
+        'serviceType': serviceType ?? '',
         'serviceLabel':
             orderPreference.isEmpty ? 'Select Service' : orderPreference,
       },
@@ -444,23 +633,108 @@ class HomeController extends GetxController {
     Get.snackbar('Notifications', 'Notification panel opened');
   }
 
-  void onLocationChangeTapped() {
-    debugPrint('🔄 Location change tapped');
-    Get.snackbar('Location', 'Change location functionality');
+  /// Opens location picker. After confirm:
+  /// - Always re-fetches available services for new location
+  /// - If no services → shows error
+  /// - If services available:
+  ///     - If current preference still valid → re-fetch vendors
+  ///     - If preference no longer valid or empty → show mandatory dialog
+  void onLocationChangeTapped() async {
+    debugPrint('🗺️ Opening location picker...');
+
+    final result = await Get.toNamed(
+      Routes.locationPickerView,
+      arguments: {'latitude': userLatitude, 'longitude': userLongitude},
+    );
+
+    if (result == null || result is! Map<String, dynamic>) {
+      debugPrint('ℹ️ Location picker dismissed without selection');
+      return;
+    }
+
+    final double lat = (result['latitude'] as num).toDouble();
+    final double lng = (result['longitude'] as num).toDouble();
+    final String city = result['city']?.toString() ?? 'Unknown';
+
+    debugPrint('✅ New location: $city ($lat, $lng)');
+
+    // ── Update state and storage ─────────────────────────────────────────
+    userLatitude = lat;
+    userLongitude = lng;
+    userCity = city;
+    await Store.saveManualLocation(latitude: lat, longitude: lng, city: city);
+    update([userGreetingId]);
+
+    // ── Show loading overlay while fetching services ──────────────────────
+    isLoadingServices = true;
+    hasError = false;
+    vendors.clear();
+    prebookList.clear();
+    update([carouselId, vendorsId]);
+
+    // ── Fetch services for new location (no serviceType) ──────────────────
+    debugPrint('📋 Fetching services for new location...');
+    final bool servicesLoaded = await _fetchHomeData(
+      serviceType: null,
+      isRefresh: true,
+    );
+
+    isLoadingServices = false;
+    update([carouselId]);
+
+    if (!servicesLoaded || availableServices.isEmpty) {
+      // ── No services at new location ───────────────────────────────────
+      debugPrint('❌ No services at new location');
+      hasError = true;
+      errorMessage =
+          'No services available in your area.\nTry changing your location.';
+      // Also clear preference since it's invalid here
+      orderPreference = '';
+      Store.deliveryPreference = '';
+      update([vendorsId, orderPreferenceId]);
+      return;
+    }
+
+    // ── Check if existing preference is still valid here ──────────────────
+    if (orderPreference.isNotEmpty &&
+        !_isPreferenceAvailable(orderPreference)) {
+      debugPrint(
+        '⚠️ Previous preference "$orderPreference" not available at new location — clearing',
+      );
+      orderPreference = '';
+      Store.deliveryPreference = '';
+      update([orderPreferenceId]);
+    }
+
+    if (orderPreference.isEmpty) {
+      // ── No valid preference — must pick one ───────────────────────────
+      debugPrint('📋 No valid preference — showing mandatory dialog');
+      _showOrderPreferenceDialog(canDismiss: false);
+    } else {
+      // ── Preference still valid — fetch vendors ────────────────────────
+      debugPrint(
+        '✅ Preference "$orderPreference" valid at new location — fetching vendors',
+      );
+      currentPage = 1;
+      final String? serviceType = _extractServiceType(orderPreference);
+      if (serviceType != null) {
+        await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+      }
+    }
   }
 
-  /// Change order preference — shows cart-clear confirmation if cart has items
+  /// Change order preference button tapped from home screen
   void onOrderPreferenceChanged() {
     debugPrint('🔄 Change preference tapped');
 
     if (_cartService.itemCount.value > 0) {
       _showClearCartConfirmationDialog();
     } else {
-      _showOrderPreferenceDialog();
+      // canDismiss: true — preference already set, user can cancel
+      _showOrderPreferenceDialog(canDismiss: true);
     }
   }
 
-  /// Confirmation dialog shown when user has cart items and taps change preference
   void _showClearCartConfirmationDialog() {
     final count = _cartService.itemCount.value;
 
@@ -497,36 +771,27 @@ class HomeController extends GetxController {
             ),
             onPressed: () async {
               Navigator.of(Get.context!).pop();
-
               try {
                 final response = await _apiClient.delete(
                   endpoint: Urls.clearCartUrl,
                 );
-
                 if (response != null &&
                     response is Map<String, dynamic> &&
                     response['success'] == true) {
                   _cartService.clearCart();
-                  debugPrint('✅ Cart cleared before preference change');
+                  _showOrderPreferenceDialog(canDismiss: true);
                 } else {
                   Get.snackbar(
                     'Error',
                     'Failed to clear cart. Please try again.',
-                    snackPosition: SnackPosition.BOTTOM,
                   );
-                  return;
                 }
               } catch (e) {
-                debugPrint('❌ Error clearing cart: $e');
                 Get.snackbar(
                   'Error',
                   'Failed to clear cart. Please try again.',
-                  snackPosition: SnackPosition.BOTTOM,
                 );
-                return;
               }
-
-              _showOrderPreferenceDialog();
             },
             child: const Text(
               'Yes, Clear & Change',
@@ -548,29 +813,19 @@ class HomeController extends GetxController {
       arguments: {
         'latitude': userLatitude,
         'longitude': userLongitude,
-        'serviceType': _extractServiceType(orderPreference),
+        'serviceType': _extractServiceType(orderPreference) ?? '',
         'serviceLabel':
             orderPreference.isEmpty ? 'Select Service' : orderPreference,
       },
     );
   }
 
-  /// Handle restaurant/vendor tap - check for multiple branches
   void onRestaurantTapped(Vendor restaurant) {
     final branches = restaurant.branchList ?? [];
-
-    debugPrint('🏪 Restaurant tapped: ${restaurant.hotelName}');
-    debugPrint('📍 Branch count: ${branches.length}');
-
-    if (branches.isEmpty) {
-      debugPrint('✅ Single location - navigating directly');
-      Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
-    } else if (branches.length == 1) {
-      debugPrint('✅ Only one branch - navigating directly');
-      Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
-    } else {
-      debugPrint('🔀 Multiple branches detected - showing bottom sheet');
+    if (branches.length > 1) {
       _showMultipleBranchesBottomSheet(restaurant, branches);
+    } else {
+      Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
     }
   }
 
@@ -582,8 +837,8 @@ class HomeController extends GetxController {
       MultipleBranchBottomSheet(
         vendorName: mainVendor.hotelName ?? 'Restaurant',
         branches: branches,
-        onBranchSelected: (Vendor selectedBranch) {
-          Get.toNamed(Routes.restaurantDetail, arguments: selectedBranch);
+        onBranchSelected: (Vendor selected) {
+          Get.toNamed(Routes.restaurantDetail, arguments: selected);
         },
       ),
       isScrollControlled: true,
@@ -596,11 +851,59 @@ class HomeController extends GetxController {
     );
   }
 
+  // ─── Retry / Refresh ──────────────────────────────────────────────────────
+
+  Future<void> retryFetchingVendors() async {
+    debugPrint('🔄 RETRY triggered');
+    currentPage = 1;
+    vendors.clear();
+    prebookList.clear();
+
+    final String? serviceType = _extractServiceType(orderPreference);
+    if (serviceType != null) {
+      await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+    } else {
+      // No preference — re-run full init flow
+      await _initializeHomeScreen();
+    }
+  }
+
+  Future<void> refreshVendors() async {
+    debugPrint('🔄 REFRESH triggered');
+    currentPage = 1;
+    vendors.clear();
+    prebookList.clear();
+
+    final String? serviceType = _extractServiceType(orderPreference);
+    if (serviceType != null) {
+      await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+    }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  String _parseError(String error) {
-    debugPrint('🔍 Parsing error: $error');
+  /// Returns null when preference is empty — never silently defaults to delivery
+  String? _extractServiceType(String preference) {
+    if (preference.isEmpty) return null;
+    if (preference.contains('Delivery')) return 'delivery';
+    if (preference.contains('Takeaway')) return 'takeaway';
+    if (preference.contains('Dine-in')) return 'dine-in';
+    if (preference.contains('Special Booking')) return 'car-dine-in';
+    return null;
+  }
 
+  /// Checks if the current preference is in the list of available services
+  bool _isPreferenceAvailable(String preference) {
+    final String? serviceType = _extractServiceType(preference);
+    if (serviceType == null) return false;
+    return availableServices.any(
+      (s) =>
+          s.toLowerCase().replaceAll('-', '').replaceAll(' ', '') ==
+          serviceType.toLowerCase().replaceAll('-', '').replaceAll(' ', ''),
+    );
+  }
+
+  String _parseError(String error) {
     if (error.contains('Client is closed') || error.contains('Bad state')) {
       return 'Connection lost. Please try again.';
     } else if (error.contains('SocketException') ||
@@ -623,16 +926,7 @@ class HomeController extends GetxController {
     isLoadingVendors = false;
     isLoadingMore = false;
     update([vendorsId]);
-
-    debugPrint('🔴 Error: $message');
-  }
-
-  String _extractServiceType(String preference) {
-    if (preference.contains('Delivery')) return 'delivery';
-    if (preference.contains('Takeaway')) return 'takeaway';
-    if (preference.contains('Dine-in')) return 'dine-in';
-    if (preference.contains('Special Booking')) return 'car-dine-in';
-    return 'delivery';
+    debugPrint('🔴 API Error: $message');
   }
 
   void _onScroll() {
@@ -640,31 +934,13 @@ class HomeController extends GetxController {
         scrollController.position.maxScrollExtent * 0.9) {
       if (hasNextPage && !isLoadingMore && !isLoadingVendors && !_isFetching) {
         currentPage++;
-        debugPrint('📜 Scroll trigger at 90%: Loading page $currentPage');
-        String serviceType = _extractServiceType(orderPreference);
-        _fetchHomeData(serviceType: serviceType, isRefresh: false);
+        debugPrint('📜 Scroll trigger: Loading page $currentPage');
+        final String? serviceType = _extractServiceType(orderPreference);
+        if (serviceType != null) {
+          _fetchHomeData(serviceType: serviceType, isRefresh: false);
+        }
       }
     }
-  }
-
-  Future<void> retryFetchingVendors() async {
-    debugPrint('🔄 RETRY: Resetting pagination and fetching');
-    currentPage = 1;
-    vendors.clear();
-    prebookList.clear();
-
-    String serviceType = _extractServiceType(orderPreference);
-    await _fetchHomeData(serviceType: serviceType, isRefresh: true);
-  }
-
-  Future<void> refreshVendors() async {
-    debugPrint('🔄 REFRESH: Fetching vendors');
-    currentPage = 1;
-    vendors.clear();
-    prebookList.clear();
-
-    String serviceType = _extractServiceType(orderPreference);
-    await _fetchHomeData(serviceType: serviceType, isRefresh: true);
   }
 }
 
