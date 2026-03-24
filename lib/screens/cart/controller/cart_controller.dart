@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'dart:async';
 import 'dart:developer';
 
@@ -36,7 +38,7 @@ class CartController extends GetxController {
   bool isPromoApplying = false;
 
   Timer? _quantityDebounceTimer;
-  static const Duration _debounceDuration = Duration(milliseconds: 500);
+  // static const Duration _debounceDuration = Duration(milliseconds: 500);
 
   // ── Public getter so CartExtrasController can access _cartService ─────────
   CartService get cartService => _cartService;
