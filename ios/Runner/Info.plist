@@ -2,59 +2,132 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
-	<string>Eatplek App</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>eatplek_app</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-	<string>sms</string>
-	<string>tel</string>
-	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access to show delivery location</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>EatPlek needs your location to show nearby restaurants.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>EatPlek needs your location to show nearby restaurants.</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         APP IDENTITY
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+
+    <!-- Display name shown under the app icon on home screen -->
+    <key>CFBundleDisplayName</key>
+    <string>EatPlek</string>
+
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <!-- Internal bundle name (no spaces, matches Xcode target) -->
+    <key>CFBundleName</key>
+    <string>eatplek_app</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <!-- Version string e.g. 1.0.0 — set via flutter build -->
+    <key>CFBundleShortVersionString</key>
+    <string>$(FLUTTER_BUILD_NAME)</string>
+
+    <key>CFBundleSignature</key>
+    <string>????</string>
+
+    <!-- Build number — set via flutter build -->
+    <key>CFBundleVersion</key>
+    <string>$(FLUTTER_BUILD_NUMBER)</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         APP STORE COMPLIANCE
+         Avoids the export compliance questionnaire on every submission.
+         EatPlek does not use custom encryption beyond HTTPS/TLS.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         PLATFORM REQUIREMENTS
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         ORIENTATION
+         Portrait-only for phones — food delivery UI is designed portrait.
+         iPad retains all orientations for flexibility.
+         REMOVED: LandscapeLeft / LandscapeRight for iPhone — your layouts
+         are not designed for landscape and will break.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         UI PERFORMANCE
+         Enables ProMotion (120fps) on iPhone 13 Pro and newer.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+
+    <!-- Enables keyboard, trackpad, and mouse support on iPad -->
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         UI APPEARANCE
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+
+    <key>UIMainStoryboardFile</key>
+    <string>Main</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         LOCATION PERMISSIONS
+         Only NSLocationWhenInUseUsageDescription is needed.
+         EatPlek uses location only while the app is in the foreground
+         (restaurant discovery, delivery address). No background tracking.
+
+         REMOVED:
+         ✗ NSLocationAlwaysUsageDescription — not needed, no background use
+         ✗ Duplicate NSLocationWhenInUseUsageDescription (was silently
+           ignored — only the last value would have taken effect)
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>EatPlek uses your location to find nearby restaurants and estimate delivery times.</string>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         FIREBASE CLOUD MESSAGING
+         Prevents method swizzling conflicts between Firebase and Flutter.
+         Required when using Firebase Messaging in a Flutter app.
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         URL SCHEMES — Apps EatPlek can open via url_launcher
+         sms    — OTP autofill, Refer & Earn share
+         tel    — Restaurant contact / support calls
+         whatsapp — Refer & Earn share via WhatsApp
+    ═══════════════════════════════════════════════════════════════════ -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>sms</string>
+        <string>tel</string>
+        <string>whatsapp</string>
+    </array>
+
 </dict>
 </plist>
