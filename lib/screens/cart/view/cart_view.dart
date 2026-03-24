@@ -3,6 +3,7 @@ import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart' hide ShimmerEffect;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -26,86 +27,33 @@ class CartView extends StatefulWidget {
 }
 
 class _CartViewState extends State<CartView> {
-  late ResponsiveHelper responsive;
-
-  @override
-  void initState() {
-    super.initState();
-    responsive = ResponsiveHelper();
-  }
+  final ResponsiveHelper responsive = ResponsiveHelper();
 
   @override
   Widget build(BuildContext context) {
-    responsive = ResponsiveHelper();
-
-    return WillPopScope(
-      onWillPop: () async {
-        Navigator.of(context).pop();
-        return false;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop();
       },
       child: Scaffold(
-        appBar: AppBar(
-          leadingWidth: responsive.spacing80,
-          centerTitle: widget.isFromBottomNav ? true : false,
-          title: Text(
-            'Cart',
-            style: TextStyle(
-              fontSize: responsive.fontSize18,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-            ),
-          ),
-          leading:
-              widget.isFromBottomNav
-                  ? const SizedBox.shrink()
-                  : GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: CircleAvatar(
-                      radius: responsive.spacing25,
-                      backgroundColor: Colors.transparent,
-                      child: Container(
-                        padding: EdgeInsets.all(responsive.spacing16),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.black.withOpacity(0.06),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: SvgPicture.string(arrowBack2),
-                      ),
-                    ),
-                  ),
-        ),
+        backgroundColor: AppColor.scaffoldColor,
+        appBar: _buildAppBar(),
         body: GetBuilder<CartController>(
           id: 'empty_cart',
           init: CartController(),
           builder: (controller) {
-            // ✅ LOADING STATE
-            if (controller.isLoading) {
-              return _buildLoadingState(context);
-            }
+            if (controller.isLoading) return _buildLoadingState();
+            if (controller.hasError) return _buildErrorState(controller);
+            if (controller.isCartEmpty) return const EmptyCartWidget();
 
-            // ✅ ERROR STATE
-            if (controller.hasError) {
-              return _buildErrorState(context, controller);
-            }
-
-            // ✅ EMPTY CART STATE
-            if (controller.isCartEmpty) {
-              return const EmptyCartWidget();
-            }
-
-            // ✅ CART WITH DATA
             return SingleChildScrollView(
               padding: EdgeInsets.all(responsive.spacing20),
+              physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
                   const CartFoodListWidget(),
 
-                  // ── Friend invitations (below cart items) ──────────────
                   GetBuilder<CartController>(
                     id: 'friend_invitations',
                     builder:
@@ -115,33 +63,25 @@ class _CartViewState extends State<CartView> {
                         ),
                   ),
 
-                  PromoCodeWidget(),
+                  const PromoCodeWidget(),
                   const AdditionalNotesWidget(),
 
                   GetBuilder<CartController>(
                     id: 'price_summary',
-                    builder: (controller) {
-                      final totals = controller.cartModel?.data?.totals;
-
-                      // ── Coupon discount ──────────────────────────────────
-                      final apiCouponDiscount =
+                    builder: (ctrl) {
+                      final totals = ctrl.cartModel?.data?.totals;
+                      final apiDiscount =
                           (totals?.couponDiscount ?? 0).toDouble();
                       final effectiveDiscount =
-                          apiCouponDiscount > 0
-                              ? apiCouponDiscount
-                              : controller.promoDiscount;
-
-                      // ── Coupon code label ────────────────────────────────
-                      final apiCouponCode =
-                          controller.cartModel?.data?.couponCode;
+                          apiDiscount > 0 ? apiDiscount : ctrl.promoDiscount;
+                      final apiCode = ctrl.cartModel?.data?.couponCode;
                       final appliedCode =
-                          (apiCouponCode != null &&
-                                  apiCouponCode.toString().isNotEmpty)
-                              ? apiCouponCode.toString()
-                              : controller.appliedPromoCode;
+                          (apiCode != null && apiCode.toString().isNotEmpty)
+                              ? apiCode.toString()
+                              : ctrl.appliedPromoCode;
 
                       return PriceSummaryWidget(
-                        subtotal: controller.subtotal,
+                        subtotal: ctrl.subtotal,
                         deliveryFee: null,
                         taxAmount:
                             totals != null ? (totals.taxAmount ?? 0) : null,
@@ -151,7 +91,7 @@ class _CartViewState extends State<CartView> {
                                 : null,
                         promoDiscount: effectiveDiscount,
                         appliedPromoCode: appliedCode,
-                        totalAmount: controller.totalAmount,
+                        totalAmount: ctrl.totalAmount,
                       );
                     },
                   ),
@@ -168,98 +108,146 @@ class _CartViewState extends State<CartView> {
                 controller.hasError) {
               return const SizedBox.shrink();
             }
-
-            return Container(
-              width: responsive.screenWidth,
-              color: AppColor.scaffoldColor,
-              padding: EdgeInsets.only(
-                left: responsive.spacing20,
-                right: responsive.spacing20,
-                top: responsive.spacing20,
-                bottom:
-                    widget.isFromBottomNav
-                        ? responsive.bottomPadding + 110
-                        : responsive.spacing20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Add Friend to Order (cart owner only) ──────────────
-                  if (controller.isCartOwner)
-                    GestureDetector(
-                      onTap: () => AddFriendToCartBottomSheet.show(),
-                      child: Container(
-                        width: responsive.screenWidth,
-                        height: responsive.buttonHeight,
-                        margin: EdgeInsets.only(bottom: responsive.spacing12),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(
-                            responsive.spacing40,
-                          ),
-                          border: Border.all(
-                            color: Get.theme.primaryColor,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_add_alt_1_rounded,
-                              size: responsive.spacing20,
-                              color: Get.theme.primaryColor,
-                            ),
-                            SizedBox(width: responsive.spacing8),
-                            Text(
-                              'Add Friend to Order',
-                              style: TextStyle(
-                                fontSize: responsive.fontSize16,
-                                fontWeight: FontWeight.w600,
-                                color: Get.theme.primaryColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // ── Place Order ────────────────────────────────────────
-                  button(
-                    name: 'Place Order',
-                    width: responsive.screenWidth,
-                    fontSize: responsive.fontSize16,
-                    height: responsive.buttonHeight,
-                    fontWeight: FontWeight.w600,
-                    borderRadius: BorderRadius.circular(responsive.spacing40),
-                    onTap: () => _navigateToOrderConfirmation(controller),
-                  ),
-                ],
-              ),
-            );
+            return _buildBottomBar(controller);
           },
         ),
       ),
     );
   }
 
-  /// ✅ Navigate to Order Confirmation with cart data
-  void _navigateToOrderConfirmation(CartController cartController) {
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      leadingWidth: responsive.spacing80,
+      centerTitle: widget.isFromBottomNav,
+      title: Text(
+        'Cart',
+        style: TextStyle(
+          fontSize: responsive.fontSize18,
+          fontWeight: FontWeight.w700,
+          color: AppColor.black,
+        ),
+      ),
+      leading:
+          widget.isFromBottomNav
+              ? const SizedBox.shrink()
+              : GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Center(
+                  child: Container(
+                    width: responsive.spacing40,
+                    height: responsive.spacing40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColor.white,
+                      border: Border.all(
+                        color: Colors.black.withOpacity(0.08),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(child: SvgPicture.string(arrowBack2)),
+                  ),
+                ),
+              ),
+    );
+  }
+
+  Widget _buildBottomBar(CartController controller) {
+    return Container(
+      color: AppColor.scaffoldColor,
+      padding: EdgeInsets.only(
+        left: responsive.spacing20,
+        right: responsive.spacing20,
+        top: responsive.spacing16,
+        bottom:
+            widget.isFromBottomNav
+                ? responsive.bottomPadding + responsive.spacing100
+                : responsive.spacing20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (controller.isCartOwner)
+            GestureDetector(
+                  onTap: () => AddFriendToCartBottomSheet.show(),
+                  child: Container(
+                    width: double.infinity,
+                    height: responsive.buttonHeight,
+                    margin: EdgeInsets.only(bottom: responsive.spacing12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(responsive.spacing40),
+                      border: Border.all(
+                        color: AppColor.appPrimary,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_add_alt_1_rounded,
+                          size: responsive.spacing20,
+                          color: AppColor.appPrimary,
+                        ),
+                        SizedBox(width: responsive.spacing8),
+                        Text(
+                          'Add Friend to Order',
+                          style: TextStyle(
+                            fontSize: responsive.fontSize15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColor.appPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .animate()
+                .fade(duration: 300.ms)
+                .slideY(begin: 0.1, end: 0, duration: 300.ms),
+
+          button(
+                name: 'Place Order',
+                width: double.infinity,
+                fontSize: responsive.fontSize16,
+                height: responsive.buttonHeight,
+                fontWeight: FontWeight.w700,
+                borderRadius: BorderRadius.circular(responsive.spacing40),
+                onTap: () => _navigateToConfirmation(controller),
+              )
+              .animate()
+              .fade(duration: 300.ms, delay: 50.ms)
+              .slideY(begin: 0.1, end: 0, duration: 300.ms, delay: 50.ms),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToConfirmation(CartController cartController) {
     if (!cartController.validateInstructions()) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(cartController.instructionsError),
-          backgroundColor: Colors.red.withOpacity(0.8),
+          backgroundColor: Colors.red.withOpacity(0.85),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+          ),
         ),
       );
       return;
     }
-
     if (cartController.isCartEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please add items to cart before placing order'),
-          backgroundColor: Colors.red.withOpacity(0.8),
+        const SnackBar(
+          content: Text('Please add items to cart before placing order'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -267,28 +255,14 @@ class _CartViewState extends State<CartView> {
 
     final vendor = cartController.cartModel?.data?.vendor;
     final totals = cartController.cartModel?.data?.totals;
-
-    // ✅ Resolve effective discount and code from API totals
-    final apiCouponDiscount = (totals?.couponDiscount ?? 0).toDouble();
+    final apiDiscount = (totals?.couponDiscount ?? 0).toDouble();
     final effectiveDiscount =
-        apiCouponDiscount > 0
-            ? apiCouponDiscount
-            : cartController.promoDiscount;
-
-    final apiCouponCode = cartController.cartModel?.data?.couponCode;
+        apiDiscount > 0 ? apiDiscount : cartController.promoDiscount;
+    final apiCode = cartController.cartModel?.data?.couponCode;
     final effectiveCode =
-        (apiCouponCode != null && apiCouponCode.toString().isNotEmpty)
-            ? apiCouponCode.toString()
+        (apiCode != null && apiCode.toString().isNotEmpty)
+            ? apiCode.toString()
             : cartController.appliedPromoCode;
-
-    debugPrint('═════════════════════════════════════════');
-    debugPrint('🛒 NAVIGATING TO ORDER CONFIRMATION');
-    debugPrint('═════════════════════════════════════════');
-    debugPrint('📦 Cart Items Count: ${cartController.cartItems.length}');
-    debugPrint('🏪 Vendor: ${vendor?.name} | ID: ${vendor?.id}');
-    debugPrint('💵 Total: ${cartController.totalAmount}');
-    debugPrint('🎟 Coupon: $effectiveCode | Discount: $effectiveDiscount');
-    debugPrint('═════════════════════════════════════════');
 
     Get.toNamed(
       Routes.orderConfirmationView,
@@ -306,160 +280,40 @@ class _CartViewState extends State<CartView> {
     );
   }
 
-  /// ✅ LOADING STATE with Skeletonizer
-  Widget _buildLoadingState(BuildContext context) {
+  Widget _buildLoadingState() {
     return Skeletonizer(
       enabled: true,
+      effect: const ShimmerEffect(
+        baseColor: Color(0xFFEEEEEE),
+        highlightColor: Color(0xFFF8F8F8),
+        duration: Duration(milliseconds: 1200),
+      ),
       child: SingleChildScrollView(
         padding: EdgeInsets.all(responsive.spacing20),
         child: Column(
-          children: [
-            ...List.generate(
-              3,
-              (index) => Padding(
-                padding: EdgeInsets.only(bottom: responsive.spacing20),
-                child: Container(
-                  width: responsive.screenWidth,
-                  padding: EdgeInsets.all(responsive.spacing20),
-                  decoration: BoxDecoration(
-                    color: AppColor.white,
-                    borderRadius: BorderRadius.circular(
-                      responsive.largeBorderRadius,
-                    ),
-                    border: Border.all(color: AppColor.black.withOpacity(0.03)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: responsive.spacing80,
-                        height: responsive.spacing80,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(
-                            responsive.smallBorderRadius,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: responsive.spacing20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: responsive.screenWidth * 0.4,
-                              height: responsive.spacing16,
-                              color: Colors.grey[300],
-                            ),
-                            SizedBox(height: responsive.spacing10),
-                            Container(
-                              width: responsive.screenWidth * 0.3,
-                              height: responsive.spacing14,
-                              color: Colors.grey[300],
-                            ),
-                            SizedBox(height: responsive.spacing10),
-                            Container(
-                              width: responsive.screenWidth * 0.25,
-                              height: responsive.spacing16,
-                              color: Colors.grey[300],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Container(
-              width: responsive.screenWidth,
-              padding: EdgeInsets.symmetric(
-                vertical: responsive.spacing20,
-                horizontal: responsive.spacing20,
-              ),
-              margin: EdgeInsets.only(bottom: responsive.spacing100),
+          children: List.generate(
+            3,
+            (_) => Container(
+              width: double.infinity,
+              height: responsive.spacing100,
+              margin: EdgeInsets.only(bottom: responsive.spacing16),
               decoration: BoxDecoration(
                 color: AppColor.white,
                 borderRadius: BorderRadius.circular(
                   responsive.largeBorderRadius,
                 ),
               ),
-              child: Column(
-                children: [
-                  ...List.generate(
-                    4,
-                    (index) => Padding(
-                      padding: EdgeInsets.only(bottom: responsive.spacing16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            width: responsive.screenWidth * 0.3,
-                            height: responsive.spacing14,
-                            color: Colors.grey[300],
-                          ),
-                          Container(
-                            width: responsive.screenWidth * 0.2,
-                            height: responsive.spacing14,
-                            color: Colors.grey[300],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  /// ✅ ERROR STATE
-  Widget _buildErrorState(BuildContext context, CartController controller) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: responsive.spacing80,
-            color: Colors.red.withOpacity(0.6),
-          ),
-          SizedBox(height: responsive.spacing20),
-          Text(
-            'Oops! Something went wrong',
-            style: TextStyle(
-              fontSize: responsive.fontSize24,
-              fontWeight: FontWeight.w600,
-              color: AppColor.black.withOpacity(0.7),
-            ),
-          ),
-          SizedBox(height: responsive.spacing10),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
-            child: Text(
-              controller.errorMessage,
-              style: TextStyle(
-                fontSize: responsive.fontSize14,
-                fontWeight: FontWeight.w400,
-                color: AppColor.black.withOpacity(0.5),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          SizedBox(height: responsive.spacing40),
-          button(
-            name: 'Retry',
-            width: responsive.screenWidth * 0.6,
-            fontSize: responsive.fontSize16,
-            height: responsive.spacing50,
-            fontWeight: FontWeight.w600,
-            borderRadius: BorderRadius.circular(responsive.spacing40),
-            onTap: () => controller.retryFetchCart(),
-          ),
-        ],
-      ),
+  Widget _buildErrorState(CartController controller) {
+    return errorState(
+      message: controller.errorMessage,
+      onRetry: controller.retryFetchCart,
     );
   }
 }

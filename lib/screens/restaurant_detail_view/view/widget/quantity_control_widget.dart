@@ -32,7 +32,7 @@ class QuantityControlWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
 
-    // Full-width "Add" button (food card scenario - quantity is 0)
+    // Full-width "Add" button when quantity is zero (Scenario 1 food card)
     if (addButtonText != null && quantity == 0 && !isCompactMode) {
       return Container(
         margin: margin,
@@ -45,13 +45,20 @@ class QuantityControlWidget extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColor.appPrimary,
               borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColor.appPrimary.withOpacity(0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
             child: Center(
               child: text(
                 text: addButtonText!,
                 color: AppColor.white,
-                size: responsive.fontSize13,
-                fontWeight: FontWeight.w600,
+                size: responsive.fontSize12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -59,59 +66,110 @@ class QuantityControlWidget extends StatelessWidget {
       );
     }
 
-    // Compact quantity control
+    // Compact +/- control
     return Container(
       margin: margin,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Decrease button
+          // Decrease / remove button
           if (showRemoveButton && quantity > 0)
-            GestureDetector(
+            _ControlButton(
               onTap: onDecrease,
-              child: Container(
-                width: buttonSize,
-                height: buttonSize,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColor.black.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(responsive.spacing6),
-                ),
-                child: Icon(Icons.remove, color: AppColor.black.withOpacity(0.4), size: iconSize),
-              ),
+              size: buttonSize,
+              iconSize: iconSize,
+              icon: Icons.remove,
+              isAdd: false,
             ),
 
-          // Quantity display
+          // Quantity count
           if (quantity > 0) ...[
             SizedBox(width: responsive.spacing5),
-            Container(
-              constraints: BoxConstraints(minWidth: responsive.spacing20),
-              child: Text(
-                quantity.toString(),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: responsive.fontSize14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColor.black.withOpacity(0.6),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              transitionBuilder:
+                  (child, animation) =>
+                      ScaleTransition(scale: animation, child: child),
+              child: ConstrainedBox(
+                key: ValueKey(quantity),
+                constraints: BoxConstraints(minWidth: responsive.spacing20),
+                child: Text(
+                  quantity.toString(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: responsive.fontSize13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColor.appPrimary,
+                  ),
                 ),
               ),
             ),
             SizedBox(width: responsive.spacing5),
           ],
 
-          // Add/Increase button
-          GestureDetector(
+          // Add / increase button
+          _ControlButton(
             onTap: onIncrease,
-            child: Container(
-              width: buttonSize,
-              height: buttonSize,
-              decoration: BoxDecoration(
-                color: AppColor.appPrimary,
-                borderRadius: BorderRadius.circular(responsive.spacing6),
-              ),
-              child: Icon(Icons.add, color: AppColor.white, size: iconSize),
-            ),
+            size: buttonSize,
+            iconSize: iconSize,
+            icon: Icons.add,
+            isAdd: true,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ControlButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final double size;
+  final double iconSize;
+  final IconData icon;
+  final bool isAdd;
+
+  const _ControlButton({
+    required this.onTap,
+    required this.size,
+    required this.iconSize,
+    required this.icon,
+    required this.isAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: isAdd ? AppColor.appPrimary : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          border:
+              isAdd
+                  ? null
+                  : Border.all(
+                    color: AppColor.appPrimary.withOpacity(0.5),
+                    width: 1.2,
+                  ),
+          boxShadow:
+              isAdd
+                  ? [
+                    BoxShadow(
+                      color: AppColor.appPrimary.withOpacity(0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                  : null,
+        ),
+        child: Icon(
+          icon,
+          color: isAdd ? AppColor.white : AppColor.appPrimary,
+          size: iconSize,
+        ),
       ),
     );
   }

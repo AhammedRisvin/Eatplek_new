@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
 import '../../../../core/util/responsive_helper.dart';
 import '../../controller/restaurant_detail_view_controller.dart';
@@ -19,10 +18,14 @@ class FoodGridSection extends StatelessWidget {
     return GetBuilder<RestaurantDetailViewController>(
       id: 'food_grid',
       builder: (controller) {
-        final filteredFoodItems = controller.getFilteredFoodItems();
+        final items = controller.getFilteredFoodItems();
 
-        if (filteredFoodItems.isEmpty) {
-          return _buildEmptyCategoryState(responsive);
+        if (items.isEmpty) {
+          return emptyState(
+            icon: Icons.no_food_rounded,
+            title: 'No items in this category',
+            subtitle: 'Try a different category above.',
+          );
         }
 
         return Padding(
@@ -37,34 +40,13 @@ class FoodGridSection extends StatelessWidget {
               crossAxisSpacing: responsive.gridCrossAxisSpacing,
               childAspectRatio: responsive.gridChildAspectRatioForFood,
             ),
-            itemCount: filteredFoodItems.length,
-            itemBuilder: (context, index) {
-              return FoodWidget(foodItem: filteredFoodItems[index]);
-            },
+            itemCount: items.length,
+            itemBuilder:
+                (context, index) =>
+                    FoodWidget(foodItem: items[index], animationIndex: index),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildEmptyCategoryState(ResponsiveHelper responsive) {
-    return SizedBox(
-      height: responsive.spacing200,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant_menu, size: responsive.iconSizeLarge, color: AppColor.black.withOpacity(0.3)),
-            SizedBox(height: responsive.spacing16),
-            text(
-              text: 'No items available in this category',
-              size: responsive.fontSize16,
-              fontWeight: FontWeight.w500,
-              color: AppColor.black.withOpacity(0.6),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

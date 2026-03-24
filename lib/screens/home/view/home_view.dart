@@ -1,3 +1,4 @@
+import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -19,7 +20,6 @@ class HomeView extends StatelessWidget {
     final responsive = ResponsiveHelper();
 
     return GetBuilder<HomeController>(
-      init: HomeController(),
       builder: (controller) {
         return Scaffold(
           body: Stack(
@@ -35,34 +35,43 @@ class HomeView extends StatelessWidget {
                           return ErrorScreenSection(controller: controller);
                         }
 
-                        return SingleChildScrollView(
-                          controller: controller.scrollController,
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: responsive.spacing20,
+                        return RefreshIndicator(
+                          onRefresh: controller.refreshVendors,
+                          color: AppColor.appPrimary,
+                          backgroundColor: AppColor.white,
+                          strokeWidth: 2.5,
+                          child: SingleChildScrollView(
+                            controller: controller.scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: responsive.spacing20,
+                                  ),
+                                  child: BannerCarouselSection(
+                                    controller: controller,
+                                  ),
                                 ),
-                                child: BannerCarouselSection(
-                                  controller: controller,
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: responsive.spacing20,
+                                  ),
+                                  child: OrderPreferenceSection(
+                                    controller: controller,
+                                  ),
                                 ),
-                              ),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: responsive.spacing20,
+                                PrebookListSection(
+                                  prebookList: controller.prebookList,
                                 ),
-                                child: OrderPreferenceSection(
-                                  controller: controller,
-                                ),
-                              ),
-                              PrebookListSection(
-                                prebookList: controller.prebookList,
-                              ),
-                              VendorGridSection(controller: controller),
-                              if (controller.isLoadingMore)
-                                _buildLoadingMoreIndicator(responsive),
-                              SizedBox(height: responsive.spacing100),
-                            ],
+                                VendorGridSection(controller: controller),
+                                if (controller.isLoadingMore)
+                                  _buildLoadingMoreIndicator(responsive),
+                                SizedBox(height: responsive.spacing100),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -71,14 +80,14 @@ class HomeView extends StatelessWidget {
                 ],
               ),
 
+              // Loading overlay while switching service types
               GetBuilder<HomeController>(
                 id: HomeController.carouselId,
-                builder: (controller) {
-                  return LoadingOverlay(
-                    isVisible: controller.isLoadingServices,
-                    message: 'Loading services...',
-                  );
-                },
+                builder:
+                    (controller) => LoadingOverlay(
+                      isVisible: controller.isLoadingServices,
+                      message: 'Finding restaurants near you...',
+                    ),
               ),
             ],
           ),
@@ -90,33 +99,29 @@ class HomeView extends StatelessWidget {
   Widget _buildLoadingMoreIndicator(ResponsiveHelper responsive) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: responsive.spacing20),
-      child: Center(
-        child: SizedBox(
-          height: responsive.spacing40,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                width: responsive.spacing16,
-                height: responsive.spacing16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Get.theme.primaryColor,
-                  ),
-                ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: responsive.spacing16,
+            height: responsive.spacing16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                AppColor.appPrimary.withOpacity(0.5),
               ),
-              SizedBox(width: responsive.spacing12),
-              Text(
-                'Loading more...',
-                style: Get.theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: responsive.fontSize14,
-                  color: Colors.black.withOpacity(0.6),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          SizedBox(width: responsive.spacing10),
+          Text(
+            'Loading more...',
+            style: TextStyle(
+              fontSize: responsive.fontSize13,
+              color: AppColor.black.withOpacity(0.4),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
       ),
     );
   }

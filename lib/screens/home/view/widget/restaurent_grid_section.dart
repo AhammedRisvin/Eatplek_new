@@ -1,6 +1,7 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart' hide ShimmerEffect;
 import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../../core/util/responsive_helper.dart';
@@ -20,49 +21,72 @@ class VendorGridSection extends StatelessWidget {
       children: [
         SizedBox(height: responsive.spacing20),
         _buildSectionHeader(responsive),
-        SizedBox(height: responsive.spacing20),
-        _buildVendorsGrid(responsive),
+        SizedBox(height: responsive.spacing16),
+        _buildContent(responsive),
       ],
     );
   }
 
-  /// Builds section header with title and view all button
   Widget _buildSectionHeader(ResponsiveHelper responsive) {
     return Padding(
       padding: responsive.horizontalPadding20,
       child: Row(
         children: [
+          Container(
+            width: responsive.spacing4,
+            height: responsive.spacing18,
+            margin: EdgeInsets.only(right: responsive.spacing8),
+            decoration: BoxDecoration(
+              color: AppColor.appPrimary,
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+            ),
+          ),
           text(
-            text: 'Delicious Options Around You',
+            text: 'Restaurants Near You',
             size: responsive.fontSize16,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
             color: AppColor.black,
           ),
           const Spacer(),
-          button(
-            name: 'View All',
-            width: responsive.smallButtonWidth,
-            height: responsive.buttonSmallHeight,
-            borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-            fontSize: responsive.fontSize12,
-            fontWeight: FontWeight.w400,
+          GestureDetector(
             onTap: controller.onViewAllRestaurants,
-            color: AppColor.appPrimary.withOpacity(0.1),
-            borderColor: AppColor.appPrimary.withOpacity(0.1),
-            textColor: AppColor.appPrimary,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.spacing12,
+                vertical: responsive.spacing6,
+              ),
+              decoration: BoxDecoration(
+                color: AppColor.appPrimary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(
+                  responsive.largeBorderRadius,
+                ),
+              ),
+              child: text(
+                text: 'View All',
+                size: responsive.fontSize12,
+                fontWeight: FontWeight.w600,
+                color: AppColor.appPrimary,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Builds the vendors grid with loading and empty states
-  Widget _buildVendorsGrid(ResponsiveHelper responsive) {
+  Widget _buildContent(ResponsiveHelper responsive) {
     if (controller.isLoadingVendors && controller.vendors.isEmpty) {
       return _buildSkeletonGrid(responsive);
     }
-    if (!controller.isLoadingVendors && !controller.hasError && controller.vendors.isEmpty) {
-      return _buildEmptyState(responsive);
+
+    if (!controller.isLoadingVendors &&
+        !controller.hasError &&
+        controller.vendors.isEmpty) {
+      return emptyState(
+        icon: Icons.restaurant_menu_rounded,
+        title: 'No restaurants found',
+        subtitle: 'Try changing your location or order preference.',
+      );
     }
 
     return Padding(
@@ -79,14 +103,27 @@ class VendorGridSection extends StatelessWidget {
         ),
         itemCount: controller.vendors.length,
         itemBuilder: (context, index) {
-          final vendor = controller.vendors[index];
-          return VendorCardWidget(vendor: vendor, onTap: () => controller.onRestaurantTapped(vendor));
+          return VendorCardWidget(
+                vendor: controller.vendors[index],
+                onTap:
+                    () => controller.onRestaurantTapped(
+                      controller.vendors[index],
+                    ),
+              )
+              .animate()
+              .fade(duration: 350.ms, delay: (index * 50).ms)
+              .slideY(
+                begin: 0.2,
+                end: 0,
+                duration: 350.ms,
+                delay: (index * 50).ms,
+                curve: Curves.easeOut,
+              );
         },
       ),
     );
   }
 
-  /// Builds skeleton grid for loading state
   Widget _buildSkeletonGrid(ResponsiveHelper responsive) {
     return Padding(
       padding: responsive.horizontalPadding20,
@@ -108,20 +145,20 @@ class VendorGridSection extends StatelessWidget {
             childAspectRatio: responsive.gridChildAspectRatio,
           ),
           itemCount: 6,
-          itemBuilder: (context, index) {
-            return _buildSkeletonCard(responsive);
-          },
+          itemBuilder: (_, _) => _buildSkeletonCard(responsive),
         ),
       ),
     );
   }
 
-  /// Builds individual skeleton card
   Widget _buildSkeletonCard(ResponsiveHelper responsive) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
-        color: Colors.grey[300],
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,48 +172,34 @@ class VendorGridSection extends StatelessWidget {
                     topLeft: Radius.circular(responsive.cardBorderRadius),
                     topRight: Radius.circular(responsive.cardBorderRadius),
                   ),
-                  color: Colors.grey[300],
+                  color: Colors.grey.shade200,
                 ),
               ),
             ),
           ),
-          SizedBox(height: responsive.spacing10),
+          SizedBox(height: responsive.spacing8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: responsive.spacing8),
-            child: Skeleton.leaf(child: Container(height: responsive.spacing12, color: Colors.grey[300])),
-          ),
-          SizedBox(height: responsive.spacing5),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: responsive.spacing8),
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing10),
             child: Skeleton.leaf(
-              child: Container(height: responsive.spacing10, width: responsive.spacing80, color: Colors.grey[300]),
+              child: Container(
+                height: responsive.spacing12,
+                color: Colors.grey.shade200,
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  /// Builds empty state when no vendors found
-  Widget _buildEmptyState(ResponsiveHelper responsive) {
-    return Padding(
-      padding: responsive.horizontalPadding20,
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: responsive.spacing40),
-          child: Column(
-            children: [
-              Icon(Icons.restaurant_menu, size: responsive.iconSizeXL, color: Colors.grey[300]),
-              SizedBox(height: responsive.spacing12),
-              text(
-                text: 'No vendors found',
-                size: responsive.fontSize16,
-                fontWeight: FontWeight.w500,
-                color: AppColor.black.withOpacity(0.5),
+          SizedBox(height: responsive.spacing6),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing10),
+            child: Skeleton.leaf(
+              child: Container(
+                height: responsive.spacing10,
+                width: responsive.spacing80,
+                color: Colors.grey.shade200,
               ),
-            ],
+            ),
           ),
-        ),
+          SizedBox(height: responsive.spacing10),
+        ],
       ),
     );
   }
