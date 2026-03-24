@@ -8,9 +8,14 @@ import 'package:get/get.dart';
 
 /// Service to manage cart state globally.
 /// Both CartController and RestaurantDetailViewController listen to this.
-/// Also owns global silent polling so friend cart updates reflect everywhere.
+///
+/// POLLING STRATEGY:
+/// - Timer fires every 3 seconds always (cheap — no network call)
+/// - _silentPoll() only hits the API when [isCartViewActive] is true
+/// - CartView sets isCartViewActive = true on enter, false on leave
+/// - This means zero unnecessary API calls on Home / Orders / Profile
 class CartService extends GetxService with WidgetsBindingObserver {
-  // ── Cart state ────────────────────────────────────────────────────────────
+  // ── Cart state ─────────────────────────────────────────────────────────────
   final RxList<Map<String, dynamic>> cartItems = <Map<String, dynamic>>[].obs;
 
   final RxMap<String, int> cartFoodQuantity = <String, int>{}.obs;
@@ -24,16 +29,18 @@ class CartService extends GetxService with WidgetsBindingObserver {
 
   final FittorConnect _apiClient = FittorConnect();
 
-  // ── Polling ───────────────────────────────────────────────────────────────
+  // ── Polling ────────────────────────────────────────────────────────────────
   Timer? _pollingTimer;
   static const Duration _pollingInterval = Duration(seconds: 3);
 
+  /// Set to true only while CartView is the active screen.
+  /// _silentPoll() skips the network call when this is false.
+  bool isCartViewActive = false;
+
   /// True while any local cart mutation (add/remove/update) is in flight.
-  /// CartController sets this before API calls so the poll cycle knows
-  /// a diff was owner-triggered, not friend-triggered.
   bool localMutationInFlight = false;
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void onInit() {
@@ -51,39 +58,63 @@ class CartService extends GetxService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 App resumed — restarting cart polling');
-      startGlobalPolling();
+      // Only restart if CartView was active when app was backgrounded
+      if (isCartViewActive) {
+        debugPrint('📱 App resumed — CartView was active, restarting poll');
+        startGlobalPolling();
+      }
     } else if (state == AppLifecycleState.paused) {
       debugPrint('📱 App paused — stopping cart polling');
       stopGlobalPolling();
     }
   }
 
-  // ── Public polling API ────────────────────────────────────────────────────
+  // ── Cart view presence API ─────────────────────────────────────────────────
 
-  /// Call once from main.dart after CartService is registered, only when
-  /// Store.userToken is not empty (i.e. user is logged in).
-  void startGlobalPolling() {
-    if (_pollingTimer?.isActive == true) return;
-    if (Store.userToken.isEmpty) {
-      debugPrint('⏭️ CartService: skipping poll start — no token');
-      return;
-    }
-    debugPrint(
-      '🔄 CartService: global polling started (every ${_pollingInterval.inSeconds}s)',
-    );
+  /// Call from CartView.initState() or didChangeDependencies()
+  void onCartViewEntered() {
+    isCartViewActive = true;
+    debugPrint('🛒 CartService: CartView entered — starting poll timer');
+    // Cancel any existing timer first to avoid duplicates
+    _pollingTimer?.cancel();
+    // Fetch immediately on enter
+    _silentPoll();
+    // Start fresh timer — only runs while cart is open
     _pollingTimer = Timer.periodic(_pollingInterval, (_) => _silentPoll());
+  }
+
+  /// Call from CartView.dispose()
+  void onCartViewExited() {
+    isCartViewActive = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+    debugPrint('🛒 CartService: CartView exited — poll timer stopped');
+  }
+
+  // ── Public polling API ─────────────────────────────────────────────────────
+
+  /// No longer used for global polling.
+  /// Kept for compatibility with didChangeAppLifecycleState.
+  /// Actual polling is managed by onCartViewEntered/onCartViewExited.
+  void startGlobalPolling() {
+    if (isCartViewActive) {
+      _pollingTimer?.cancel();
+      _pollingTimer = Timer.periodic(_pollingInterval, (_) => _silentPoll());
+      debugPrint('🔄 CartService: poll timer restarted (app resume)');
+    }
   }
 
   void stopGlobalPolling() {
     _pollingTimer?.cancel();
     _pollingTimer = null;
-    debugPrint('⏹️ CartService: global polling stopped');
+    debugPrint('⏹️ CartService: polling stopped');
   }
 
-  // ── Silent poll ───────────────────────────────────────────────────────────
+  // ── Silent poll ────────────────────────────────────────────────────────────
 
   Future<void> _silentPoll() async {
+    // ✅ KEY GUARD — only hit the network if CartView is open
+    if (!isCartViewActive) return;
     if (Store.userToken.isEmpty) return;
 
     try {
@@ -101,23 +132,18 @@ class CartService extends GetxService with WidgetsBindingObserver {
       final freshItemCount = freshTotals?['itemCount'] ?? 0;
       final freshTotal = (freshTotals?['grandTotal'] ?? 0).toDouble();
 
-      // ── Diff check ────────────────────────────────────────────────────────
-      final oldItemCount = itemCount.value;
-      final oldTotal = totalPrice.value;
-      final oldItemsSnapshot = _buildItemsSnapshot(cartItems);
-      final newItemsSnapshot = _buildItemsSnapshot(freshItems);
-
+      // ── Diff check — only update state if something actually changed ──────
       final hasChanged =
-          oldItemCount != freshItemCount ||
-          oldTotal != freshTotal ||
-          oldItemsSnapshot != newItemsSnapshot;
+          itemCount.value != freshItemCount ||
+          totalPrice.value != freshTotal ||
+          _buildItemsSnapshot(cartItems) != _buildItemsSnapshot(freshItems);
 
       if (!hasChanged) {
         debugPrint('🔄 CartService poll: no change');
         return;
       }
 
-      debugPrint('🔄 CartService poll: change detected — syncing silently');
+      debugPrint('🔄 CartService poll: change detected — syncing');
 
       updateCartFromApi({
         'items': freshItems,
@@ -133,28 +159,21 @@ class CartService extends GetxService with WidgetsBindingObserver {
         },
       });
 
-      // If CartController is alive (user is on CartView), sync its cartModel
-      // so items, totals, coupon, and vendor all reflect the fresh data.
       _notifyCartController(response);
     } catch (e) {
       debugPrint('⚠️ CartService silent poll error (ignored): $e');
     }
   }
 
-  /// Notify CartController to re-sync its cartModel from the fresh response.
-  /// This keeps CartView's price summary, coupon, and vendor in sync.
   void _notifyCartController(Map<String, dynamic> freshResponse) {
     try {
-      // Dynamic lookup avoids a hard import cycle
       final ctrl = Get.find(tag: 'CartController');
       (ctrl as dynamic).syncFromPoll(freshResponse);
     } catch (_) {
-      // CartController not registered — user isn't on cart screen, fine
+      // CartController not registered — fine
     }
   }
 
-  /// Builds a lightweight string snapshot of items for diffing.
-  /// Format: "foodId:qty,foodId:qty,..."  sorted for stable comparison.
   String _buildItemsSnapshot(List<Map<String, dynamic>> items) {
     final parts =
         items.map((i) => '${i['foodId']}:${i['quantity'] ?? 1}').toList()
@@ -162,10 +181,9 @@ class CartService extends GetxService with WidgetsBindingObserver {
     return parts.join(',');
   }
 
-  // ── Cart API helpers ──────────────────────────────────────────────────────
+  // ── Cart API helpers ───────────────────────────────────────────────────────
 
-  /// Lightweight fetch — called from HomeController on init to populate
-  /// itemCount for the bottom nav badge without needing CartController alive.
+  /// One-shot fetch — called from HomeController on init for the badge count
   Future<void> fetchCartItemCount() async {
     try {
       debugPrint('🛒 CartService: Fetching cart item count...');
@@ -176,12 +194,10 @@ class CartService extends GetxService with WidgetsBindingObserver {
           response['success'] == true &&
           response['data'] != null) {
         final data = response['data'] as Map<String, dynamic>;
-
         final items =
             data['items'] != null
                 ? List<Map<String, dynamic>>.from(data['items'])
                 : <Map<String, dynamic>>[];
-
         final totals = data['totals'] as Map<String, dynamic>?;
 
         updateCartFromApi({
@@ -201,22 +217,16 @@ class CartService extends GetxService with WidgetsBindingObserver {
         debugPrint(
           '✅ CartService: Item count loaded — ${itemCount.value} items',
         );
-      } else {
-        debugPrint('⚠️ CartService: Empty or failed cart response');
       }
     } catch (e) {
       debugPrint('❌ CartService: fetchCartItemCount error — $e');
     }
   }
 
-  /// Update cart state from API response
   void updateCartFromApi(Map<String, dynamic> cartData) {
     try {
-      debugPrint('🔄 CartService: Updating cart from API response');
-
       if (cartData['items'] != null) {
         cartItems.value = List<Map<String, dynamic>>.from(cartData['items']);
-        debugPrint('📊 CartService: ${cartItems.length} items in cart');
       }
 
       cartFoodQuantity.clear();
@@ -233,7 +243,6 @@ class CartService extends GetxService with WidgetsBindingObserver {
 
         if (!hasCustomizations) {
           cartFoodQuantity[foodId] = item['quantity'] ?? 1;
-
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
@@ -247,7 +256,6 @@ class CartService extends GetxService with WidgetsBindingObserver {
             cartCustomizationQuantity[foodId]![custom['customizationId']] =
                 custom['quantity'] ?? 0;
           }
-
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
@@ -262,14 +270,11 @@ class CartService extends GetxService with WidgetsBindingObserver {
         itemCount.value = cartData['totals']['itemCount'] ?? 0;
         totalPrice.value = (cartData['totals']['grandTotal'] ?? 0).toDouble();
       }
-
-      debugPrint('✅ CartService: Cart state synchronized');
     } catch (e) {
       debugPrint('❌ CartService: Error updating cart - $e');
     }
   }
 
-  /// Clear cart locally — call after successful clearCart API response
   void clearCart() {
     cartItems.clear();
     cartFoodQuantity.clear();
@@ -280,7 +285,7 @@ class CartService extends GetxService with WidgetsBindingObserver {
     debugPrint('🗑️ CartService: Cart cleared locally');
   }
 
-  // ── Query helpers ─────────────────────────────────────────────────────────
+  // ── Query helpers ──────────────────────────────────────────────────────────
 
   bool isFoodInCart(String foodId) =>
       cartItems.any((item) => item['foodId'] == foodId);

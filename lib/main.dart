@@ -68,12 +68,17 @@ Future<void> main() async {
   // on HomeView header immediately without a second API call
   Get.put<ProfileController>(ProfileController(), permanent: true);
 
-  // CartService registered permanently — owns global polling and is found
-  // by CartController, RestaurantDetailViewController, and HomeController
-  final cartService = Get.put<CartService>(CartService(), permanent: true);
+  // CartService registered permanently — found by CartController,
+  // RestaurantDetailViewController, and HomeController.
+  // Polling is NOT started here — it starts only when CartView is opened
+  // (CartService.onCartViewEntered) and stops when CartView is closed
+  // (CartService.onCartViewExited). This eliminates unnecessary API calls
+  // on every other screen.
+  Get.put<CartService>(CartService(), permanent: true);
 
+  // One-shot fetch to populate the bottom nav badge count on startup
   if (Store.userToken.isNotEmpty) {
-    cartService.startGlobalPolling();
+    Get.find<CartService>().fetchCartItemCount();
   }
 
   runApp(const MyApp());

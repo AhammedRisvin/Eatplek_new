@@ -26,39 +26,20 @@ class FittorConnect {
       enableLogging: true,
     );
 
-    // 🔵 ADD DETAILED LOGGING INTERCEPTOR
+    // ── Request/Response logger (debug only) ────────────────────────────────
     _client.addInterceptor(
       CallbackInterceptor(
         onRequest: (request) async {
-          debugPrint("🔵 REQUEST");
-          debugPrint("URL: ${request.url}");
-          debugPrint("Method: ${request.method}");
-
-          try {
-            debugPrint("Body: ${utf8.decode(request.body)}");
-          } catch (_) {
-            debugPrint("Body: (binary or empty)");
-          }
-
+          debugPrint("🔵 ${request.method.name.toUpperCase()} ${request.url}");
           return request;
         },
         onResponse: (response) async {
-          debugPrint("🟢 RESPONSE");
-          debugPrint("Status: ${response.statusCode}");
-
-          try {
-            debugPrint("Response Body: ${utf8.decode(response.bodyBytes)}");
-          } catch (_) {
-            debugPrint("Response Body: (binary or unreadable)");
-          }
-
+          debugPrint("🟢 ${response.statusCode}");
           return response;
         },
         onError: (error, stack) async {
-          debugPrint("🔴 ERROR");
-          debugPrint("Error: $error");
-
-          return error; // must return
+          debugPrint("🔴 ERROR: $error");
+          return error;
         },
       ),
     );
@@ -73,15 +54,16 @@ class FittorConnect {
       ),
     );
 
-    // Add retry
-    _client.addInterceptor(
-      RetryInterceptor(
-        maxRetries: 1,
-        baseDelay: const Duration(milliseconds: 2000),
-        retryOnTimeout: true,
-        retryOnConnectionError: true,
-      ),
-    );
+    // Retry disabled — was causing duplicate API calls and duplicate log entries.
+    // Re-enable only if specifically needed for a feature, with maxRetries: 0 default.
+    // _client.addInterceptor(
+    //   RetryInterceptor(
+    //     maxRetries: 1,
+    //     baseDelay: const Duration(milliseconds: 2000),
+    //     retryOnTimeout: true,
+    //     retryOnConnectionError: true,
+    //   ),
+    // );
 
     // Add common headers interceptor
     _client.addInterceptor(

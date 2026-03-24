@@ -1,5 +1,3 @@
-// ignore_for_file: curly_braces_in_flow_control_structures
-
 import 'dart:async';
 import 'dart:developer';
 
@@ -38,7 +36,7 @@ class CartController extends GetxController {
   bool isPromoApplying = false;
 
   Timer? _quantityDebounceTimer;
-  // static const Duration _debounceDuration = Duration(milliseconds: 500);
+  static const Duration _debounceDuration = Duration(milliseconds: 500);
 
   // ── Public getter so CartExtrasController can access _cartService ─────────
   CartService get cartService => _cartService;
@@ -59,7 +57,10 @@ class CartController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _fetchCartData();
+    // ✅ DO NOT call _fetchCartData() here.
+    // CartView is mounted inside IndexedStack at app start even when not visible.
+    // Fetching here would fire the cart API on every app launch regardless of screen.
+    // CartView.initState() calls fetchCartData() explicitly when user opens cart.
     _listenToCartServiceUpdates();
   }
 

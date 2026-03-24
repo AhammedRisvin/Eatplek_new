@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/network/api_client.dart';
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -16,15 +17,17 @@ class ProfileController extends GetxController {
 
   bool _hasFetched = false;
 
-  @override
-  void onInit() {
-    super.onInit();
-    fetchProfile();
-  }
-
+  /// Called from ProfileView.initState() — safe because by then the user is
+  /// logged in and the bottom nav is visible.
   Future<void> fetchProfile({bool forceRefresh = false}) async {
     if (_hasFetched && !forceRefresh) {
       debugPrint('👤 ProfileController: Using cached profile data');
+      return;
+    }
+
+    // Guard — no token means the user isn't logged in yet
+    if (Store.userToken.isEmpty) {
+      debugPrint('👤 ProfileController: skipping fetch — no token');
       return;
     }
 

@@ -71,7 +71,7 @@ class _OrdersViewState extends State<OrdersView> {
   @override
   Widget build(BuildContext context) {
     return GetBuilder<OrdersController>(
-      init: OrdersController(),
+      // OrdersController registered via HomeBindings — no init needed here
       builder: (controller) {
         return Scaffold(
           backgroundColor: AppColor.scaffoldColor,

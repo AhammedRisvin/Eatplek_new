@@ -10,6 +10,7 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import '../../../core/routes/routes.dart';
 import '../controller/cart_controller.dart';
+import '../controller/cart_service.dart';
 import 'widget/add_friend_bottom_sheet.dart';
 import 'widget/additional_notes_widget.dart';
 import 'widget/cart_food_list.dart';
@@ -28,6 +29,20 @@ class CartView extends StatefulWidget {
 
 class _CartViewState extends State<CartView> {
   final ResponsiveHelper responsive = ResponsiveHelper();
+
+  @override
+  void initState() {
+    super.initState();
+    // Tell CartService the user is now on CartView — start polling
+    Get.find<CartService>().onCartViewEntered();
+  }
+
+  @override
+  void dispose() {
+    // Tell CartService the user left CartView — stop polling
+    Get.find<CartService>().onCartViewExited();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

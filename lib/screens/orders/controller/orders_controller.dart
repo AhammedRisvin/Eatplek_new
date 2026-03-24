@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -78,8 +79,12 @@ class OrdersController extends GetxController
       }
     });
 
-    // Fetch first tab immediately
-    _fetchOrders(0);
+    // ✅ Fetch first tab ONLY if token is present — guard against IndexedStack
+    // mounting this controller before the user has navigated to the orders tab.
+    // The tab listener below handles lazy-loading on first switch.
+    if (Store.userToken.isNotEmpty) {
+      _fetchOrders(0);
+    }
   }
 
   @override

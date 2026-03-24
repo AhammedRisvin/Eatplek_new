@@ -29,6 +29,11 @@ class _ProfileViewState extends State<ProfileView> {
   void initState() {
     super.initState();
     _controller = Get.find<ProfileController>();
+    // Fetch profile now that the user is on the profile tab
+    // Safe to call here — token is guaranteed to be set by this point
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _controller.fetchProfile();
+    });
   }
 
   @override

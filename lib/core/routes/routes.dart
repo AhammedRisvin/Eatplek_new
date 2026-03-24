@@ -77,7 +77,7 @@ class Routes {
       name: home,
       page: () => const HomeView(),
       transition: Transition.circularReveal,
-      binding: HomeBindings(),
+      // No binding — HomeController registered by bottomNav binding
     ),
 
     GetPage(
@@ -125,7 +125,7 @@ class Routes {
       name: profileView,
       page: () => const ProfileView(),
       transition: Transition.circularReveal,
-      binding: HomeBindings(),
+      // No binding — ProfileController registered permanently in main.dart
     ),
     GetPage(
       name: searchView,
