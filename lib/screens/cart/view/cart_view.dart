@@ -167,7 +167,7 @@ class _CartViewState extends State<CartView> {
         top: responsive.spacing16,
         bottom:
             widget.isFromBottomNav
-                ? responsive.bottomPadding + responsive.spacing100
+                ? responsive.bottomPadding + responsive.spacing10
                 : responsive.spacing20,
       ),
       child: Column(

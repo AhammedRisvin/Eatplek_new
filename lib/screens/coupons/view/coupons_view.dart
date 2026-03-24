@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_underscores
+
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

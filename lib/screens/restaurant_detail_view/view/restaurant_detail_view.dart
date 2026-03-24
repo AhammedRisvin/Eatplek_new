@@ -55,26 +55,26 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
         return Scaffold(
           body: Stack(
             children: [
+              // ── Full screen background + header + content card ──────────
               SizedBox(
                 height: responsive.screenHeight,
                 width: responsive.screenWidth,
                 child: Stack(
                   children: [
-                    // Background header image
-                    _buildHeader(controller, responsive),
-                    // Collapsible app bar on scroll
+                    _buildHeaderBg(responsive),
+                    _buildHeaderButtons(responsive),
                     _buildCollapsibleAppBar(responsive),
-                    // Main scrollable content card
                     _buildContentCard(controller, responsive),
                   ],
                 ),
               ),
-              // Floating bottom cart bar
-              Positioned(
+
+              // ── Floating bottom cart bar ───────────────────────────────
+              const Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: const BottomCartBar(),
+                child: BottomCartBar(),
               ),
             ],
           ),
@@ -83,60 +83,92 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Static header (visible before scroll) ─────────────────────────────────
-  Widget _buildHeader(
-    RestaurantDetailViewController controller,
-    ResponsiveHelper responsive,
-  ) {
+  // ── Background image (full header area) ──────────────────────────────────
+  Widget _buildHeaderBg(ResponsiveHelper responsive) {
     if (_isScrolled) return const SizedBox.shrink();
+
+    // Use a fixed pixel height that accounts for status bar
+    final double headerH = responsive.topPadding + responsive.spacing160;
 
     return Container(
       width: responsive.screenWidth,
-      height: responsive.spacing201,
+      height: headerH,
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage('assets/image/restaurantBg.png'),
           fit: BoxFit.cover,
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
-          child: Row(
-            children: [
-              _buildCircleButton(
-                child: SvgPicture.string(arrowBack),
-                onTap: () => Navigator.of(context).pop(),
-                responsive: responsive,
+    );
+  }
+
+  // ── Buttons row (back, title, map, share) ─────────────────────────────────
+  // Separated from bg so SafeArea works correctly on all devices
+  Widget _buildHeaderButtons(ResponsiveHelper responsive) {
+    if (_isScrolled) return const SizedBox.shrink();
+
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: responsive.spacing16,
+          vertical: responsive.spacing12,
+        ),
+        child: Row(
+          children: [
+            // Back button
+            _circleBtn(
+              child: SvgPicture.string(
+                arrowBack,
+                width: responsive.spacing15,
+                height: responsive.spacing15,
               ),
-              SizedBox(width: responsive.spacing10),
-              text(
-                text: 'Restaurant',
-                color: AppColor.white,
-                size: responsive.fontSize20,
-                fontWeight: FontWeight.w600,
+              onTap: () => Navigator.of(context).pop(),
+              responsive: responsive,
+            ),
+
+            SizedBox(width: responsive.spacing10),
+
+            // Title
+            text(
+              text: 'Restaurant',
+              color: AppColor.white,
+              size: responsive.fontSize18,
+              fontWeight: FontWeight.w600,
+            ),
+
+            const Spacer(),
+
+            // Map button
+            _circleBtn(
+              child: Image.asset(
+                mapPng,
+                width: responsive.spacing20,
+                height: responsive.spacing20,
               ),
-              const Spacer(),
-              _buildCircleButton(
-                child: Image.asset(mapPng),
-                onTap: () {},
-                responsive: responsive,
+              onTap: () {},
+              responsive: responsive,
+            ),
+
+            SizedBox(width: responsive.spacing8),
+
+            // Share button
+            _circleBtn(
+              child: Image.asset(
+                sharePng,
+                width: responsive.spacing20,
+                height: responsive.spacing20,
               ),
-              SizedBox(width: responsive.spacing8),
-              _buildCircleButton(
-                child: Image.asset(sharePng),
-                onTap: () {},
-                responsive: responsive,
-              ),
-            ],
-          ),
+              onTap: () {},
+              responsive: responsive,
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCircleButton({
+  Widget _circleBtn({
     required Widget child,
     required VoidCallback onTap,
     required ResponsiveHelper responsive,
@@ -148,8 +180,8 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
         width: responsive.iconSizeLarge,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: AppColor.white.withOpacity(0.15),
-          border: Border.all(color: AppColor.white.withOpacity(0.35)),
+          color: AppColor.white.withOpacity(0.18),
+          border: Border.all(color: AppColor.white.withOpacity(0.4), width: 1),
         ),
         child: Center(child: child),
       ),
@@ -164,7 +196,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
       top: 0,
       left: 0,
       right: 0,
-      height: _isScrolled ? responsive.spacing120 : 0,
+      height: _isScrolled ? responsive.topPadding + responsive.spacing60 : 0,
       child: AnimatedOpacity(
         duration: const Duration(milliseconds: 250),
         opacity: _isScrolled ? 1.0 : 0.0,
@@ -175,33 +207,45 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
               fit: BoxFit.cover,
             ),
           ),
-          padding: EdgeInsets.only(
-            left: responsive.spacing16,
-            right: responsive.spacing16,
-            top: responsive.spacing30,
-          ),
-          child: Row(
-            children: [
-              GestureDetector(
-                onTap: () => Get.back(),
-                child: Container(
-                  height: responsive.spacing40,
-                  width: responsive.spacing40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColor.white.withOpacity(0.4)),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: responsive.spacing16,
+                vertical: responsive.spacing8,
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      height: responsive.spacing40,
+                      width: responsive.spacing40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColor.white.withOpacity(0.4),
+                        ),
+                      ),
+                      child: Center(
+                        child: SvgPicture.string(
+                          arrowBack,
+                          width: responsive.spacing20,
+                          height: responsive.spacing20,
+                        ),
+                      ),
+                    ),
                   ),
-                  child: Center(child: SvgPicture.string(arrowBack)),
-                ),
+                  SizedBox(width: responsive.spacing16),
+                  text(
+                    text: 'Restaurant',
+                    color: AppColor.white,
+                    size: responsive.fontSize16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ],
               ),
-              SizedBox(width: responsive.spacing16),
-              text(
-                text: 'Restaurant',
-                color: AppColor.white,
-                size: responsive.fontSize16,
-                fontWeight: FontWeight.w600,
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -213,10 +257,13 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     RestaurantDetailViewController controller,
     ResponsiveHelper responsive,
   ) {
+    final double cardTopNormal = responsive.topPadding + responsive.spacing60;
+    final double cardTopScrolled = responsive.topPadding + responsive.spacing60;
+
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOut,
-      top: _isScrolled ? responsive.spacing120 : responsive.spacing100,
+      top: _isScrolled ? cardTopScrolled : cardTopNormal,
       left: 0,
       right: 0,
       bottom: 0,
@@ -291,7 +338,7 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Skeleton ──────────────────────────────────────────────────────────────
+  // ── Loading skeleton ──────────────────────────────────────────────────────
   Widget _buildLoadingSkeleton(ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,13 +370,13 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
           padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
           child: SizedBox(
             height: responsive.spacing50,
-            child: ListView.separated(
+            child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: 5,
-              separatorBuilder: (_, _) => SizedBox(width: responsive.spacing10),
               itemBuilder:
                   (_, _) => Container(
                     width: responsive.spacing100,
+                    margin: EdgeInsets.only(right: responsive.spacing10),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(responsive.spacing40),

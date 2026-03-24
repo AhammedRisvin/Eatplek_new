@@ -1,3 +1,4 @@
+import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:flutter/material.dart';
@@ -239,12 +240,11 @@ class PaymentResultBottomSheet extends StatelessWidget {
     if (result.isSuccess) {
       // Clear cart then navigate to order tracking
       controller.clearCartAfterPayment();
-      // TODO: replace '/home' with your actual order tracking route when ready
       // e.g. Get.offAllNamed(AppRoutes.orderTracking, arguments: {'orderId': controller.placedOrderId})
-      Get.offAllNamed('/home');
+      Get.offAllNamed(Routes.bottomNav);
     } else if (result.isPending) {
       // Go to orders screen so user can monitor status
-      Get.offAllNamed('/home');
+      Get.offAllNamed(Routes.bottomNav);
     } else {
       // Failed — retry the payment (reuses same placedOrderId, no new order created)
       controller.retryPayment();
@@ -253,6 +253,6 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
   void _onSecondaryTap() {
     Navigator.of(Get.context!).pop();
-    Get.offAllNamed('/home');
+    Get.offAllNamed(Routes.bottomNav);
   }
 }
