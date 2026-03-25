@@ -5,6 +5,7 @@ mixin Urls {
   static const String login = 'api/users/send-otp';
   static const String verifyOtp = 'api/users/verify-otp';
   static const String addUserDetails = 'api/users/profile';
+  static const String refreshToken = 'api/users/refresh-token';
 
   //Home
   static const String getHomeUrl = 'api/users/app/home';
@@ -43,9 +44,9 @@ mixin Urls {
   static const String removeInviteUrl = 'api/cart/friend/invite/';
 
   // Payments
-
   static const String initiatePaymentUrl = 'api/payments/initiate';
   static const String confirmPaymentUrl = 'api/payments/confirm';
 
-  //api/cart/friend/invite/{inviteId}
+  static const String logout = '/api/users/logout';
+  static const String deleteAccount = '/api/users/me/hard';
 }

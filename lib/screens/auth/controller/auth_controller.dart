@@ -41,7 +41,7 @@ class AuthController extends GetxController {
   late String _deviceOs = '';
   late String _deviceName = '';
 
-  // ✅ FIX: real FCM token from NotificationService instead of placeholder
+  // FCM token from NotificationService
   String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
 
   // API
@@ -121,7 +121,6 @@ class AuthController extends GetxController {
     nameController.dispose();
     otpController.dispose();
     _stopTimer();
-    _apiClient.dispose();
     super.onClose();
   }
 
@@ -317,10 +316,9 @@ class AuthController extends GetxController {
         debugPrint('OTP Verification Response: $response');
 
         if (status == 'pending') {
-          // New user — show profile completion bottom sheet
-          if (response.containsKey('token')) {
-            Store.userToken = response['token'];
-          }
+          // New user — save tokens immediately so the profile PUT is authed,
+          // then show the profile completion bottom sheet.
+          await _storeUserData(response);
           _showProfileBottomSheet = true;
           update(['auth_screen']);
 
@@ -328,8 +326,8 @@ class AuthController extends GetxController {
             _requestLocationPermission();
           });
         } else if (status == 'registered') {
-          // Existing user — go straight to home
-          _storeUserData(response);
+          // Existing user — persist everything and go to home.
+          await _storeUserData(response);
           Get.snackbar('Success', response['message'] ?? 'Login successful!');
           Get.offAllNamed(Routes.bottomNav);
         }
@@ -535,14 +533,15 @@ class AuthController extends GetxController {
         'deviceName': _deviceName,
       };
 
+      // Token is already saved and set on _apiClient from the OTP step,
+      // so no need to pass Authorization header manually here.
       final response = await _apiClient.put<Map<String, dynamic>>(
         endpoint: Urls.addUserDetails,
         data: body,
-        headers: {'Authorization': 'Bearer ${Store.userToken}'},
       );
 
       if (response['success'] == true) {
-        _storeUserData(response);
+        await _storeUserData(response);
         Get.snackbar(
           'Success',
           response['message'] ?? 'Profile updated successfully!',
@@ -566,27 +565,52 @@ class AuthController extends GetxController {
 
   // ==================== Data Storage ====================
 
-  void _storeUserData(Map<String, dynamic> response) {
+  /// Persists all user data from any auth response (OTP verify or profile PUT).
+  ///
+  /// Token priority: `accessToken` is used as the bearer token going forward.
+  /// Both access + refresh tokens are saved atomically via [Store.saveTokens].
+  /// After saving, [_apiClient.setAuthToken] is called so the in-memory header
+  /// is updated immediately — no restart needed.
+  Future<void> _storeUserData(Map<String, dynamic> response) async {
     try {
-      if (response.containsKey('token')) {
-        Store.userToken = response['token'];
-        log('Token updated: ${Store.userToken}');
+      // ── Tokens ────────────────────────────────────────────────────────────
+      final accessToken = response['accessToken'] as String? ?? '';
+      final refreshToken = response['refreshToken'] as String? ?? '';
+
+      if (accessToken.isNotEmpty) {
+        await Store.saveTokens(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+        );
+        // Sync the live Authorization header on the existing client instance.
+        _apiClient.setAuthToken();
+        log('✅ Tokens saved and auth header updated');
       }
 
+      // ── Top-level fields ───────────────────────────────────────────────────
       if (response.containsKey('status')) {
-        Store.status = response['status'];
-        log('Status updated: ${Store.status}');
+        Store.status = response['status'] as String? ?? '';
       }
 
+      // ── User data object ───────────────────────────────────────────────────
       final data = response['data'] as Map<String, dynamic>?;
       if (data != null) {
-        Store.id = data['id'] ?? '';
-        Store.name = data['name'] ?? '';
-        Store.phone = data['phone'] ?? '';
-        debugPrint('User data stored successfully');
+        Store.id = data['id'] as String? ?? '';
+        Store.name = data['name'] as String? ?? '';
+        Store.phone = data['phone'] as String? ?? '';
+        Store.district = data['district'] as String? ?? '';
+        Store.state = data['state'] as String? ?? '';
+        Store.place = data['place'] as String? ?? '';
+        Store.profileImage = data['profileImage'] as String? ?? '';
+        Store.profileComplete = data['profileComplete'] as bool? ?? false;
+
+        debugPrint(
+          '💾 User stored — id: ${Store.id} | name: ${Store.name} | '
+          'place: ${Store.place} | profileComplete: ${Store.profileComplete}',
+        );
       }
     } catch (e) {
-      debugPrint('Error storing user data: $e');
+      debugPrint('❌ Error storing user data: $e');
     }
   }
 

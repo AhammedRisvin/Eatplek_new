@@ -5,7 +5,6 @@ import 'package:eatplek_app/screens/home/model/invite_model.dart';
 import 'package:eatplek_app/screens/home/view/widget/clear_cart_to_join_bottom_sheet.dart';
 import 'package:eatplek_app/screens/home/view/widget/invite_bottom_sheet.dart';
 import 'package:eatplek_app/screens/home/view/widget/outside_radius_bottom_sheet.dart';
-import 'package:eatplek_app/screens/profile/controller/profile_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -28,14 +27,10 @@ class HomeController extends GetxController {
   double userLongitude = 0.0;
   String orderPreference = '';
 
-  // Derived from ProfileController — no duplicate API call
   String get userName {
-    try {
-      final profileController = Get.find<ProfileController>();
-      final name = profileController.userData.value?.name;
-      if (name != null && name.isNotEmpty) return name.split(' ').first;
-    } catch (_) {}
-    return '';
+    final name = Store.name.trim();
+    if (name.isEmpty) return '';
+    return name.split(' ').first;
   }
 
   // ─── API data ─────────────────────────────────────────────────────────────
@@ -98,25 +93,9 @@ class HomeController extends GetxController {
     scrollController = ScrollController();
     scrollController.addListener(_onScroll);
 
-    _listenToProfileUpdates();
-
     debugPrint('🚀 HomeController initialized');
 
     _initializeHomeScreen();
-  }
-
-  void _listenToProfileUpdates() {
-    try {
-      final profileController = Get.find<ProfileController>();
-      ever(profileController.userData, (_) {
-        debugPrint('👤 Profile data updated — refreshing greeting');
-        update([userGreetingId]);
-      });
-    } catch (_) {
-      debugPrint(
-        '⚠️ ProfileController not found during greeting listener setup',
-      );
-    }
   }
 
   @override

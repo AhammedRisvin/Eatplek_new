@@ -1,7 +1,6 @@
 import 'dart:developer';
 
 import 'package:eatplek_app/core/routes/routes.dart';
-import 'package:eatplek_app/core/util/storage.dart';
 import 'package:eatplek_app/screens/bottom_nav/controller/bottom_nav_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -13,6 +12,7 @@ import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
 import '../../../core/util/responsive_helper.dart';
 import '../controller/profile_controller.dart';
+import 'widget/confirm_bottom_sheet.dart';
 import 'widget/profile_tile.dart';
 
 class ProfileView extends StatefulWidget {
@@ -29,21 +29,13 @@ class _ProfileViewState extends State<ProfileView> {
   void initState() {
     super.initState();
     _controller = Get.find<ProfileController>();
-    // ProfileView lives inside IndexedStack and mounts at app launch even when
-    // the profile tab is not visible. Guard the fetch so it only fires when the
-    // tab is actually active. BottomNavController.setBottomBarIndex() triggers
-    // fetchProfile() when the user taps the profile tab for the first time.
-    // The _hasFetched flag inside ProfileController prevents redundant re-fetches.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final navCtrl = Get.find<BottomNavController>();
         if (navCtrl.currentIndex == 3) {
-          // Profile tab is the active tab right now — fetch
           _controller.fetchProfile();
         }
-        // Otherwise do nothing — BottomNavController owns the trigger
       } catch (_) {
-        // Fallback: not inside IndexedStack (e.g. pushed directly via /profileView)
         _controller.fetchProfile();
       }
     });
@@ -299,13 +291,33 @@ class _ProfileViewState extends State<ProfileView> {
               .fade(duration: 280.ms)
               .slideX(begin: 0.05, end: 0, duration: 280.ms),
 
+          // ── Delete Account (above Logout) ───────────────────────────────
+          ProfileTile(
+                title: 'Delete Account',
+                svgIcon: referSvg, // swap for a delete/trash SVG when available
+                titleColor: AppColor.redColor,
+                onTap:
+                    () => ConfirmActionSheet.show(
+                      type: ConfirmActionType.deleteAccount,
+                      onConfirm: _controller.deleteAccount,
+                    ),
+              )
+              .animate(delay: 200.ms)
+              .fade(duration: 280.ms)
+              .slideX(begin: 0.05, end: 0, duration: 280.ms),
+
+          // ── Logout ──────────────────────────────────────────────────────
           ProfileTile(
                 title: 'Logout',
                 svgIcon: referSvg,
                 titleColor: AppColor.redColor,
-                onTap: _confirmLogout,
+                onTap:
+                    () => ConfirmActionSheet.show(
+                      type: ConfirmActionType.logout,
+                      onConfirm: _controller.logout,
+                    ),
               )
-              .animate(delay: 200.ms)
+              .animate(delay: 230.ms)
               .fade(duration: 280.ms)
               .slideX(begin: 0.05, end: 0, duration: 280.ms),
 
@@ -322,51 +334,6 @@ class _ProfileViewState extends State<ProfileView> {
       fontWeight: FontWeight.w600,
       color: AppColor.black.withOpacity(0.38),
       letterSpacing: 0.8,
-    );
-  }
-
-  void _confirmLogout() {
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: text(text: 'Logout?', size: 18, fontWeight: FontWeight.w700),
-        content: text(
-          text: 'Are you sure you want to logout?',
-          size: 14,
-          color: AppColor.black.withOpacity(0.55),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(Get.context!).pop(),
-            child: text(
-              text: 'Cancel',
-              size: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColor.black.withOpacity(0.5),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColor.redColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () async {
-              Navigator.of(Get.context!).pop();
-              await Store.clear();
-              Get.offAllNamed(Routes.splash);
-            },
-            child: text(
-              text: 'Logout',
-              size: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColor.white,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

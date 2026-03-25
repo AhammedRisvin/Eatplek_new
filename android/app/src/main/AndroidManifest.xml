@@ -1,42 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         NETWORK
-         Required for all API calls, Firebase, Maps, image loading
-    ═══════════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         LOCATION
-         ACCESS_FINE_LOCATION   — precise GPS for restaurant discovery
-         ACCESS_COARSE_LOCATION — fallback when GPS unavailable
-         ⚠️  ACCESS_BACKGROUND_LOCATION REMOVED — EatPlek only needs
-             location while the app is open (foreground). Background
-             location requires a Play Store special declaration and a
-             compelling justification. It is NOT needed here.
-    ═══════════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         NOTIFICATIONS (Firebase Cloud Messaging + Awesome Notifications)
-         POST_NOTIFICATIONS     — Android 13+ runtime permission
-         RECEIVE_BOOT_COMPLETED — reschedule notifications after reboot
-         VIBRATE                — vibration pattern for notifications
-         USE_FULL_SCREEN_INTENT — heads-up / full-screen alerts
-    ═══════════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-
-    <!-- ═══════════════════════════════════════════════════════════════════
-         REMOVED PERMISSIONS — and why:
-         ✗ CALL_PHONE   — not needed; url_launcher opens tel: URIs without it
-         ✗ SEND_SMS     — not needed; url_launcher opens sms: URIs without it
-         ✗ ACCESS_BACKGROUND_LOCATION — no background location use case
-    ═══════════════════════════════════════════════════════════════════ -->
 
     <application
         android:label="EatPlek"
@@ -44,7 +15,7 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 
-        <!-- ── Main Activity ───────────────────────────────────────────── -->
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -65,51 +36,42 @@
             </intent-filter>
         </activity>
 
-        <!-- ── Flutter Engine ──────────────────────────────────────────── -->
+        <!-- PhonePe Payment SDK -->
+        <activity
+            android:name="com.phonepe.intent.sdk.api.B2BPGActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eatplek" />
+            </intent-filter>
+        </activity>
+
+        <!-- Flutter Engine -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- ── Google Maps ─────────────────────────────────────────────── -->
-        <!--
-            ⚠️  SECURITY: Move this API key out of source control.
-            Recommended approach:
-            1. Add to android/local.properties:
-               MAPS_API_KEY=AIzaSyBOHuJ-4CqJBjmSi_RugeonwPU5cBVqbeA
-            2. In android/app/build.gradle read it:
-               def mapsKey = localProperties.getProperty('MAPS_API_KEY', '')
-            3. Replace the value below with: ${mapsKey}
-            Also restrict this key in Google Cloud Console to:
-            - Android apps only (add your package name + SHA-1)
-        -->
+        <!-- Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBOHuJ-4CqJBjmSi_RugeonwPU5cBVqbeA" />
 
-        <!-- ── Firebase Cloud Messaging ────────────────────────────────── -->
-        <!-- Must match channelKey in NotificationService.initialize() -->
+        <!-- Firebase Cloud Messaging -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="orders_channel" />
 
-        <!--
-            Use a dedicated small white icon (24×24dp) for notifications.
-            ic_launcher will display as a coloured square on Android 5+.
-            Add a white-on-transparent drawable at:
-            android/app/src/main/res/drawable/ic_notification.png
-            Then change the value to @drawable/ic_notification
-        -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />
 
-        <!-- ── Awesome Notifications — Scheduled Notification Support ─── -->
-        <!-- Fires scheduled notifications at the correct time -->
+        <!-- Awesome Notifications -->
         <receiver
             android:name="me.carda.awesome_notifications.core.broadcasters.receivers.ScheduledNotificationReceiver"
             android:exported="false" />
 
-        <!-- Reschedules notifications after device reboot or app update -->
         <receiver
             android:name="me.carda.awesome_notifications.core.broadcasters.receivers.RefreshScheduledNotificationsReceiver"
             android:exported="true">
@@ -121,37 +83,23 @@
 
     </application>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         QUERIES — Declare which external app intents EatPlek may invoke.
-         Required on Android 11+ (API 30+) for url_launcher to work.
-         All query intents merged into a single <queries> block.
-    ═══════════════════════════════════════════════════════════════════ -->
     <queries>
-        <!-- Plain text processing (Flutter text selection) -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
             <data android:mimeType="text/plain" />
         </intent>
-
-        <!-- SMS app — for OTP autofill and Refer & Earn share -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="sms" />
         </intent>
-
-        <!-- Phone dialler — for support / restaurant contact -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="tel" />
         </intent>
-
-        <!-- WhatsApp — for Refer & Earn share via WhatsApp -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" android:host="wa.me" />
         </intent>
-
-        <!-- Google Maps — for restaurant location deeplinks -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />

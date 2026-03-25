@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/network/api_client.dart';
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -73,6 +74,7 @@ class ProfileController extends GetxController {
       if (response['success'] == true) {
         if (userData.value != null) {
           userData.value = userData.value!.copyWith(name: newName.trim());
+          Store.name = newName.trim();
         }
         debugPrint('✅ ProfileController: Name updated to ${newName.trim()}');
         return true;
@@ -88,6 +90,44 @@ class ProfileController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> logout() async {
+    try {
+      debugPrint('👤 ProfileController: Logging out...');
+
+      await _apiClient.post(
+        endpoint: Urls.logout,
+        data: {},
+        headers: {'Authorization': 'Bearer ${Store.refreshToken}'},
+      );
+
+      debugPrint('✅ ProfileController: Logout API success');
+    } catch (e) {
+      debugPrint('⚠️ ProfileController: Logout API error (proceeding) — $e');
+    } finally {
+      await _clearSessionAndRedirect();
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      debugPrint('👤 ProfileController: Deleting account...');
+
+      await _apiClient.delete(endpoint: Urls.deleteAccount);
+
+      debugPrint('✅ ProfileController: Account deleted');
+    } catch (e) {
+      debugPrint('⚠️ ProfileController: Delete API error (proceeding) — $e');
+    } finally {
+      await _clearSessionAndRedirect();
+    }
+  }
+
+  /// Clears local storage and sends user to splash.
+  Future<void> _clearSessionAndRedirect() async {
+    await Store.clear();
+    Get.offAllNamed(Routes.splash);
   }
 
   @override

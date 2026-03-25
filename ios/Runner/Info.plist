@@ -3,13 +3,9 @@
 <plist version="1.0">
 <dict>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         APP IDENTITY
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
 
-    <!-- Display name shown under the app icon on home screen -->
     <key>CFBundleDisplayName</key>
     <string>EatPlek</string>
 
@@ -22,45 +18,27 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
 
-    <!-- Internal bundle name (no spaces, matches Xcode target) -->
     <key>CFBundleName</key>
     <string>eatplek_app</string>
 
     <key>CFBundlePackageType</key>
     <string>APPL</string>
 
-    <!-- Version string e.g. 1.0.0 — set via flutter build -->
     <key>CFBundleShortVersionString</key>
     <string>$(FLUTTER_BUILD_NAME)</string>
 
     <key>CFBundleSignature</key>
     <string>????</string>
 
-    <!-- Build number — set via flutter build -->
     <key>CFBundleVersion</key>
     <string>$(FLUTTER_BUILD_NUMBER)</string>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         APP STORE COMPLIANCE
-         Avoids the export compliance questionnaire on every submission.
-         EatPlek does not use custom encryption beyond HTTPS/TLS.
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         PLATFORM REQUIREMENTS
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         ORIENTATION
-         Portrait-only for phones — food delivery UI is designed portrait.
-         iPad retains all orientations for flexibility.
-         REMOVED: LandscapeLeft / LandscapeRight for iPhone — your layouts
-         are not designed for landscape and will break.
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -74,59 +52,46 @@
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         UI PERFORMANCE
-         Enables ProMotion (120fps) on iPhone 13 Pro and newer.
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
 
-    <!-- Enables keyboard, trackpad, and mouse support on iPad -->
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         UI APPEARANCE
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>UILaunchStoryboardName</key>
     <string>LaunchScreen</string>
 
     <key>UIMainStoryboardFile</key>
     <string>Main</string>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         LOCATION PERMISSIONS
-         Only NSLocationWhenInUseUsageDescription is needed.
-         EatPlek uses location only while the app is in the foreground
-         (restaurant discovery, delivery address). No background tracking.
-
-         REMOVED:
-         ✗ NSLocationAlwaysUsageDescription — not needed, no background use
-         ✗ Duplicate NSLocationWhenInUseUsageDescription (was silently
-           ignored — only the last value would have taken effect)
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>EatPlek uses your location to find nearby restaurants and estimate delivery times.</string>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         FIREBASE CLOUD MESSAGING
-         Prevents method swizzling conflicts between Firebase and Flutter.
-         Required when using Firebase Messaging in a Flutter app.
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>FirebaseAppDelegateProxyEnabled</key>
     <false/>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         URL SCHEMES — Apps EatPlek can open via url_launcher
-         sms    — OTP autofill, Refer & Earn share
-         tel    — Restaurant contact / support calls
-         whatsapp — Refer & Earn share via WhatsApp
-    ═══════════════════════════════════════════════════════════════════ -->
     <key>LSApplicationQueriesSchemes</key>
     <array>
         <string>sms</string>
         <string>tel</string>
         <string>whatsapp</string>
+        <string>ppemerchantsdkv1</string>
+        <string>ppemerchantsdkv2</string>
+        <string>ppemerchantsdkv3</string>
+        <string>paytmmp</string>
+        <string>gpay</string>
+    </array>
+
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>eatplek</string>
+            </array>
+        </dict>
     </array>
 
 </dict>

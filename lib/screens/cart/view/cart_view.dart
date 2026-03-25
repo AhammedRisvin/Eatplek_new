@@ -36,30 +36,18 @@ class _CartViewState extends State<CartView> {
     super.initState();
 
     if (widget.isFromBottomNav) {
-      // ── IndexedStack path ──────────────────────────────────────────────
-      // CartView is mounted at app launch (IndexedStack keeps all pages alive).
-      // Only start polling / fetch if the cart tab is ALREADY the active tab.
-      // The normal case (user taps cart tab) is handled by
-      // BottomNavController.setBottomBarIndex → CartService.onCartViewEntered,
-      // so we only need this guard for the initial mount edge-case.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
           final navCtrl = Get.find<BottomNavController>();
           if (navCtrl.currentIndex == 2) {
-            // Cart tab is visible right now — start polling and fetch
             Get.find<CartService>().onCartViewEntered();
             if (Get.isRegistered<CartController>()) {
               Get.find<CartController>().fetchCartData();
             }
           }
-          // If cart tab is NOT active: do nothing.
-          // BottomNavController.setBottomBarIndex will call onCartViewEntered
-          // when the user actually taps the cart tab.
         } catch (_) {}
       });
     } else {
-      // ── Pushed-route path (e.g. from restaurant detail) ───────────────
-      // Cart was navigated to directly — always fetch immediately.
       Get.find<CartService>().onCartViewEntered();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (Get.isRegistered<CartController>()) {
@@ -71,7 +59,6 @@ class _CartViewState extends State<CartView> {
 
   @override
   void dispose() {
-    // Tell CartService the user left CartView — stop polling
     Get.find<CartService>().onCartViewExited();
     super.dispose();
   }
@@ -88,7 +75,6 @@ class _CartViewState extends State<CartView> {
         appBar: _buildAppBar(),
         body: GetBuilder<CartController>(
           id: 'empty_cart',
-          // CartController registered via CartBindings — no init needed here
           builder: (controller) {
             if (controller.isLoading) return _buildLoadingState();
             if (controller.hasError) return _buildErrorState(controller);
@@ -214,7 +200,7 @@ class _CartViewState extends State<CartView> {
         top: responsive.spacing16,
         bottom:
             widget.isFromBottomNav
-                ? responsive.bottomPadding + responsive.spacing100
+                ? responsive.bottomPadding + responsive.spacing10
                 : responsive.spacing20,
       ),
       child: Column(

@@ -13,6 +13,11 @@ class AdditionalNotesWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Guard: if CartController is no longer registered (disposed during
+    //    route transition) skip rebuild entirely to avoid the
+    //    "TextEditingController used after disposed" crash.
+    if (!Get.isRegistered<CartController>()) return const SizedBox.shrink();
+
     final responsive = ResponsiveHelper();
 
     return GetBuilder<CartController>(
@@ -20,7 +25,10 @@ class AdditionalNotesWidget extends StatelessWidget {
       builder: (controller) {
         return Container(
           width: responsive.screenWidth,
-          padding: EdgeInsets.symmetric(vertical: responsive.spacing20, horizontal: responsive.spacing20),
+          padding: EdgeInsets.symmetric(
+            vertical: responsive.spacing20,
+            horizontal: responsive.spacing20,
+          ),
           margin: EdgeInsets.only(bottom: responsive.spacing20),
           decoration: BoxDecoration(
             color: AppColor.white,
@@ -43,7 +51,11 @@ class AdditionalNotesWidget extends StatelessWidget {
                   SizedBox(width: responsive.spacing10),
                   Text(
                     'Additional Notes',
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: responsive.fontSize16, color: Colors.black),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: responsive.fontSize16,
+                      color: Colors.black,
+                    ),
                   ),
                 ],
               ),
@@ -51,7 +63,10 @@ class AdditionalNotesWidget extends StatelessWidget {
               buildCommonTextFormField(
                 hintText: 'Write your instructions here (optional)',
                 hintTextColor: const Color(0XFF1D1D1D).withOpacity(0.6),
-                borderColor: controller.instructionsError.isNotEmpty ? Colors.red : AppColor.black.withOpacity(0.1),
+                borderColor:
+                    controller.instructionsError.isNotEmpty
+                        ? Colors.red
+                        : AppColor.black.withOpacity(0.1),
                 bgColor: AppColor.white,
                 keyboardType: TextInputType.multiline,
                 textInputAction: TextInputAction.done,
@@ -74,7 +89,11 @@ class AdditionalNotesWidget extends StatelessWidget {
                 SizedBox(height: responsive.spacing8),
                 Text(
                   controller.instructionsError,
-                  style: TextStyle(fontSize: responsive.fontSize12, color: Colors.red, fontWeight: FontWeight.w400),
+                  style: TextStyle(
+                    fontSize: responsive.fontSize12,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
               ],
             ],
