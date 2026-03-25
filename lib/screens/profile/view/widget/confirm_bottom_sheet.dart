@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
@@ -276,6 +277,12 @@ class _ConfirmActionSheetState extends State<ConfirmActionSheet> {
           controller: _deleteCtrl,
           autofocus: false,
           textCapitalization: TextCapitalization.characters,
+          inputFormatters: [
+            TextInputFormatter.withFunction(
+              (oldValue, newValue) =>
+                  newValue.copyWith(text: newValue.text.toUpperCase()),
+            ),
+          ],
           style: TextStyle(
             fontSize: responsive.fontSize15,
             fontWeight: FontWeight.w600,

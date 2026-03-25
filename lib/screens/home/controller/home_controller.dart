@@ -578,7 +578,9 @@ class HomeController extends GetxController {
       canDismiss: canDismiss,
       onPreferenceSelected: (String selected) {
         debugPrint('✅ Preference selected: $selected');
-        _onPreferenceSelected(selected);
+        // Pass canDismiss so _onPreferenceSelected knows whether to reopen
+        // the dialog on cancel (mandatory flow) or not (optional change flow).
+        _onPreferenceSelected(selected, canDismiss: canDismiss);
       },
       onDialogDismissed:
           canDismiss
@@ -593,12 +595,140 @@ class HomeController extends GetxController {
     );
   }
 
-  Future<void> _onPreferenceSelected(String selectedPreference) async {
+  /// Called when user taps a preference option in the dialog.
+  ///
+  /// [canDismiss] mirrors the dialog's canDismiss flag:
+  ///   - false → mandatory flow (post-location-change or first launch):
+  ///             if user cancels cart-clear, reopen dialog so they must pick.
+  ///   - true  → optional change flow ("Change" button on home):
+  ///             if user cancels cart-clear, do nothing (preference unchanged).
+  Future<void> _onPreferenceSelected(
+    String selectedPreference, {
+    bool canDismiss = true,
+  }) async {
+    // ── Cart conflict check ───────────────────────────────────────────────
+    // Cart is tied to a specific vendor. Any preference change (even to the
+    // same service type) at a new location means a different vendor → cart
+    // must be cleared.
+    if (_cartService.itemCount.value > 0) {
+      debugPrint(
+        '🛒 Cart has items — showing clear cart confirmation before changing preference',
+      );
+      _showClearCartForPreferenceDialog(
+        selectedPreference: selectedPreference,
+        canDismiss: canDismiss,
+      );
+      return;
+    }
+
+    // ── No cart conflict — proceed directly ───────────────────────────────
+    await _applyPreference(selectedPreference);
+  }
+
+  /// Shows the "clear cart to change preference" confirmation dialog.
+  ///
+  /// On confirm → clears cart via API + locally → applies new preference.
+  /// On cancel:
+  ///   - canDismiss = false → reopens preference dialog (user must pick)
+  ///   - canDismiss = true  → does nothing (user keeps existing preference)
+  void _showClearCartForPreferenceDialog({
+    required String selectedPreference,
+    required bool canDismiss,
+  }) {
+    final count = _cartService.itemCount.value;
+
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Clear Cart?',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+        ),
+        content: Text(
+          'You have $count item${count > 1 ? 's' : ''} in your cart. '
+          'Changing your order preference will clear your cart. '
+          'Do you want to continue?',
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(Get.context!).pop();
+              debugPrint('❌ Cart-clear cancelled by user');
+              if (!canDismiss) {
+                // Mandatory flow — reopen dialog so user must pick a preference
+                debugPrint(
+                  '🔄 Mandatory flow — reopening preference dialog after cancel',
+                );
+                Future.delayed(const Duration(milliseconds: 250), () {
+                  _showOrderPreferenceDialog(canDismiss: false);
+                });
+              }
+              // canDismiss = true → optional flow, do nothing on cancel
+            },
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Get.theme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              Navigator.of(Get.context!).pop();
+              await _clearCartAndApplyPreference(selectedPreference);
+            },
+            child: const Text(
+              'Yes, Clear & Change',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  /// Clears cart via API + locally, then applies the new preference.
+  Future<void> _clearCartAndApplyPreference(String selectedPreference) async {
+    try {
+      debugPrint('🗑️ Clearing cart before applying preference...');
+      final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
+
+      if (response != null &&
+          response is Map<String, dynamic> &&
+          response['success'] == true) {
+        _cartService.clearCart();
+        debugPrint('✅ Cart cleared — applying preference: $selectedPreference');
+        await _applyPreference(selectedPreference);
+      } else {
+        debugPrint('❌ Cart clear failed');
+        Get.snackbar('Error', 'Failed to clear cart. Please try again.');
+      }
+    } catch (e) {
+      debugPrint('❌ Error clearing cart: $e');
+      Get.snackbar('Error', 'Failed to clear cart. Please try again.');
+    }
+  }
+
+  /// Saves the preference and fetches vendors for the new service type.
+  /// This is the final step — only called after cart conflict is resolved.
+  Future<void> _applyPreference(String selectedPreference) async {
     orderPreference = selectedPreference;
     Store.deliveryPreference = selectedPreference;
     update([orderPreferenceId]);
 
-    debugPrint('💾 Preference saved: $selectedPreference');
+    debugPrint('💾 Preference applied: $selectedPreference');
 
     currentPage = 1;
     vendors.clear();
@@ -690,10 +820,25 @@ class HomeController extends GetxController {
       hasError = true;
       errorMessage =
           'No services available in your area.\nTry changing your location.';
-      // Also clear preference since it's invalid here
+      // Clear preference and cart since neither is valid here
       orderPreference = '';
       Store.deliveryPreference = '';
       update([vendorsId, orderPreferenceId]);
+
+      // ── Auto-clear cart when location has no services ─────────────────
+      // Cart is vendor-tied — the old vendor isn't reachable here anyway.
+      if (_cartService.itemCount.value > 0) {
+        debugPrint(
+          '🗑️ No services at new location — auto-clearing cart silently',
+        );
+        try {
+          await _apiClient.delete(endpoint: Urls.clearCartUrl);
+          _cartService.clearCart();
+          debugPrint('✅ Cart cleared due to unserviceable location');
+        } catch (e) {
+          debugPrint('⚠️ Cart clear on unserviceable location failed: $e');
+        }
+      }
       return;
     }
 
@@ -710,103 +855,41 @@ class HomeController extends GetxController {
 
     if (orderPreference.isEmpty) {
       // ── No valid preference — must pick one ───────────────────────────
+      // canDismiss: false — mandatory flow, cart-clear dialog will reopen
+      // this dialog on cancel if user has cart items.
       debugPrint('📋 No valid preference — showing mandatory dialog');
       _showOrderPreferenceDialog(canDismiss: false);
     } else {
       // ── Preference still valid — fetch vendors ────────────────────────
+      // _onPreferenceSelected is NOT called here — preference hasn't changed.
+      // But we do need a cart-clear check because the location (and therefore
+      // the vendor) has changed even if service type is the same.
       debugPrint(
-        '✅ Preference "$orderPreference" valid at new location — fetching vendors',
+        '✅ Preference "$orderPreference" valid at new location — checking cart',
       );
-      currentPage = 1;
-      final String? serviceType = _extractServiceType(orderPreference);
-      if (serviceType != null) {
-        await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+      if (_cartService.itemCount.value > 0) {
+        // Location changed = vendor changed = cart must clear
+        _showClearCartForPreferenceDialog(
+          selectedPreference: orderPreference,
+          canDismiss: false,
+        );
+      } else {
+        currentPage = 1;
+        final String? serviceType = _extractServiceType(orderPreference);
+        if (serviceType != null) {
+          await _fetchHomeData(serviceType: serviceType, isRefresh: true);
+        }
       }
     }
   }
 
-  /// Change order preference button tapped from home screen
+  /// Change order preference button tapped from home screen.
+  /// Cart check is now handled inside _onPreferenceSelected, so we open
+  /// the dialog directly without a pre-check here.
   void onOrderPreferenceChanged() {
     debugPrint('🔄 Change preference tapped');
-
-    if (_cartService.itemCount.value > 0) {
-      _showClearCartConfirmationDialog();
-    } else {
-      // canDismiss: true — preference already set, user can cancel
-      _showOrderPreferenceDialog(canDismiss: true);
-    }
-  }
-
-  void _showClearCartConfirmationDialog() {
-    final count = _cartService.itemCount.value;
-
-    Get.dialog(
-      AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Clear Cart?',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        content: Text(
-          'You have $count item${count > 1 ? 's' : ''} in your cart. '
-          'Changing your order preference will clear your cart. '
-          'Do you want to continue?',
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(Get.context!).pop(),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(
-                color: Colors.black54,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Get.theme.primaryColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            onPressed: () async {
-              Navigator.of(Get.context!).pop();
-              try {
-                final response = await _apiClient.delete(
-                  endpoint: Urls.clearCartUrl,
-                );
-                if (response != null &&
-                    response is Map<String, dynamic> &&
-                    response['success'] == true) {
-                  _cartService.clearCart();
-                  _showOrderPreferenceDialog(canDismiss: true);
-                } else {
-                  Get.snackbar(
-                    'Error',
-                    'Failed to clear cart. Please try again.',
-                  );
-                }
-              } catch (e) {
-                Get.snackbar(
-                  'Error',
-                  'Failed to clear cart. Please try again.',
-                );
-              }
-            },
-            child: const Text(
-              'Yes, Clear & Change',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-      barrierDismissible: false,
-    );
+    // canDismiss: true — optional change, user can cancel without picking
+    _showOrderPreferenceDialog(canDismiss: true);
   }
 
   void onViewAllRestaurants() {

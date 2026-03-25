@@ -15,6 +15,7 @@ import 'package:eatplek_app/screens/search/view/search_view.dart';
 import 'package:get/get.dart';
 
 import '../../screens/auth/view/login_view.dart';
+import '../../screens/auth/view/profile_completion_view.dart';
 import '../../screens/bottom_nav/view/bottom_nav_view.dart';
 import '../../screens/coupons/view/coupons_view.dart';
 import '../../screens/location_picker_view/view/location_picker_view.dart';
@@ -29,6 +30,7 @@ import '../bindings/notification_bindings.dart';
 import '../bindings/order_confirmation_bindings.dart';
 import '../bindings/orders_bindings.dart';
 import '../bindings/pre_book_details_bindings.dart';
+import '../bindings/profile_completion_bindings.dart';
 import '../bindings/refer_bindings.dart';
 
 class Routes {
@@ -39,6 +41,8 @@ class Routes {
 
   static const home = '/home';
   static const bottomNav = '/bottomNav';
+
+  static const profileCompletion = '/profileCompletion';
 
   static const restaurantDetail = '/restaurantDetail';
   static const preBookDetailView = '/preBookDetailView';
@@ -54,8 +58,6 @@ class Routes {
   static const locationPickerView = '/locationPickerView';
   static const notificationView = '/notificationView';
 
-  //notificationView
-
   static const String initialRoute = splash;
 
   static final routes = [
@@ -64,7 +66,6 @@ class Routes {
       page: () => const SplashScreen(),
       transition: Transition.fade,
     ),
-    // GetPage(name: bottomNav, page: () => const Example(), transition: Transition.circularReveal),
     GetPage(
       name: login,
       page: () => const AuthView(),
@@ -80,7 +81,15 @@ class Routes {
       name: home,
       page: () => const HomeView(),
       transition: Transition.circularReveal,
-      // No binding — HomeController registered by bottomNav binding
+    ),
+
+    // ── Profile completion — owns its own controller, fully independent
+    //    of AuthController. No shared state, no lifecycle dependency.
+    GetPage(
+      name: profileCompletion,
+      page: () => const ProfileCompletionScreen(),
+      transition: Transition.fadeIn,
+      binding: ProfileCompletionBinding(),
     ),
 
     GetPage(
@@ -128,7 +137,6 @@ class Routes {
       name: profileView,
       page: () => const ProfileView(),
       transition: Transition.circularReveal,
-      // No binding — ProfileController registered permanently in main.dart
     ),
     GetPage(
       name: searchView,
@@ -165,8 +173,5 @@ class Routes {
       transition: Transition.circularReveal,
       binding: NotificationBinding(),
     ),
-
-    //ReferScreen
-    //NotificationBindings
   ];
 }

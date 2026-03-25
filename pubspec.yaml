@@ -22,10 +22,7 @@ dependencies:
   skeletonizer: ^2.1.0+1
 
   # ── Animations ──────────────────────────────────────────────────────────────
-  # flutter_animate replaces animate_do — more powerful, better performance,
-  # composable effects (fade, slide, scale, shimmer) with zero boilerplate
   flutter_animate: ^4.5.0
-  # animate_do: ^4.2.0  # replaced by flutter_animate
 
   # ── Images ──────────────────────────────────────────────────────────────────
   cached_network_image: ^3.4.1
@@ -44,6 +41,9 @@ dependencies:
   # ── Platform & Device ───────────────────────────────────────────────────────
   device_info_plus:
   url_launcher: ^6.3.2
+
+  # ── Sharing ─────────────────────────────────────────────────────────────────
+  share_plus: ^10.1.4
 
   # ── Location & Maps ─────────────────────────────────────────────────────────
   google_maps_flutter: ^2.12.3

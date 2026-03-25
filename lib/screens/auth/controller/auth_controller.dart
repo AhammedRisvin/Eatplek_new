@@ -16,56 +16,68 @@ import '../../../core/service/notification_services.dart';
 enum AuthStep { form, otp }
 
 class AuthController extends GetxController {
-  // Text editing controllers
+  // ── Text editing controllers ───────────────────────────────────────────────
   late TextEditingController phoneController;
   late TextEditingController nameController;
   late TextEditingController otpController;
+  late TextEditingController referralCodeController;
 
-  // State variables
+  // ── State variables ────────────────────────────────────────────────────────
   AuthStep _currentStep = AuthStep.form;
   bool _isLoading = false;
   bool _isLocationLoading = false;
-  bool _showProfileBottomSheet = false;
   bool _isLocationPermissionGranted = false;
 
-  // Location variables
+  // ── Location variables ─────────────────────────────────────────────────────
   double? _latitude;
   double? _longitude;
   String? _placeName;
 
-  // Timer variables
+  // ── Timer variables ────────────────────────────────────────────────────────
   Timer? _timer;
   int _remainingTime = 45;
 
-  // Device info
+  // ── Device info ────────────────────────────────────────────────────────────
   late String _deviceOs = '';
   late String _deviceName = '';
 
-  // FCM token from NotificationService
+  // ── FCM token ──────────────────────────────────────────────────────────────
   String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
 
-  // API
+  // ── API ────────────────────────────────────────────────────────────────────
   late FittorConnect _apiClient;
 
-  // Getters - Auth State
+  // ── Getters — Auth State ───────────────────────────────────────────────────
+
   AuthStep get currentStep => _currentStep;
   bool get isFormStep => _currentStep == AuthStep.form;
   bool get isOtpStep => _currentStep == AuthStep.otp;
   bool get isLoading => _isLoading;
 
-  // Getters - Timer
+  // ── Getters — Timer ────────────────────────────────────────────────────────
+
   int get remainingTime => _remainingTime;
   bool get canResend => _remainingTime == 0;
 
-  // Getters - Location
+  // ── Getters — Location ─────────────────────────────────────────────────────
+
   bool get isLocationLoading => _isLocationLoading;
-  bool get showProfileBottomSheet => _showProfileBottomSheet;
   double? get latitude => _latitude;
   double? get longitude => _longitude;
   String? get placeName => _placeName;
   bool get isLocationPermissionGranted => _isLocationPermissionGranted;
 
-  // Dynamic Content Getters
+  // ── Getters — Referral ─────────────────────────────────────────────────────
+
+  /// Returns true when field is empty (optional) or matches EAT + 9 alphanumeric.
+  bool get isReferralCodeValid {
+    final code = referralCodeController.text.trim();
+    if (code.isEmpty) return true;
+    return RegExp(r'^EAT[A-Z0-9]{9}$', caseSensitive: false).hasMatch(code);
+  }
+
+  // ── Getters — Dynamic Content ──────────────────────────────────────────────
+
   String get title =>
       _currentStep == AuthStep.otp
           ? 'Verify Your Mobile Number'
@@ -99,7 +111,7 @@ class AuthController extends GetxController {
     return '+91 XXXXX XXXXX';
   }
 
-  // ==================== Lifecycle ====================
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void onInit() {
@@ -113,6 +125,7 @@ class AuthController extends GetxController {
     phoneController = TextEditingController();
     nameController = TextEditingController();
     otpController = TextEditingController();
+    referralCodeController = TextEditingController();
   }
 
   @override
@@ -120,11 +133,12 @@ class AuthController extends GetxController {
     phoneController.dispose();
     nameController.dispose();
     otpController.dispose();
+    referralCodeController.dispose();
     _stopTimer();
     super.onClose();
   }
 
-  // ==================== Device Info ====================
+  // ── Device Info ────────────────────────────────────────────────────────────
 
   Future<void> _initializeDeviceInfo() async {
     try {
@@ -145,12 +159,13 @@ class AuthController extends GetxController {
     }
   }
 
-  // ==================== Form Navigation ====================
+  // ── Form Navigation ────────────────────────────────────────────────────────
 
   void _reset() {
     phoneController.clear();
     nameController.clear();
     otpController.clear();
+    referralCodeController.clear();
     _latitude = null;
     _longitude = null;
     _placeName = null;
@@ -169,7 +184,7 @@ class AuthController extends GetxController {
     update(['auth_screen']);
   }
 
-  // ==================== Timer Management ====================
+  // ── Timer Management ───────────────────────────────────────────────────────
 
   void startTimer() {
     _remainingTime = 45;
@@ -189,12 +204,12 @@ class AuthController extends GetxController {
   }
 
   String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int secs = seconds % 60;
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  // ==================== OTP Handling ====================
+  // ── OTP Handling ───────────────────────────────────────────────────────────
 
   Future<void> resendOtp() async {
     if (!canResend) return;
@@ -225,7 +240,7 @@ class AuthController extends GetxController {
     }
   }
 
-  // ==================== Authentication Flow ====================
+  // ── Authentication Flow ────────────────────────────────────────────────────
 
   void handleAuthAction() {
     if (_currentStep == AuthStep.otp) {
@@ -316,15 +331,9 @@ class AuthController extends GetxController {
         debugPrint('OTP Verification Response: $response');
 
         if (status == 'pending') {
-          // New user — save tokens immediately so the profile PUT is authed,
-          // then show the profile completion bottom sheet.
           await _storeUserData(response);
-          _showProfileBottomSheet = true;
-          update(['auth_screen']);
-
-          Future.delayed(const Duration(milliseconds: 500), () {
-            _requestLocationPermission();
-          });
+          Get.put<AuthController>(this, permanent: true);
+          Get.offAllNamed(Routes.profileCompletion);
         } else if (status == 'registered') {
           // Existing user — persist everything and go to home.
           await _storeUserData(response);
@@ -344,7 +353,12 @@ class AuthController extends GetxController {
     }
   }
 
-  // ==================== Location Management ====================
+  // ── Location Management ────────────────────────────────────────────────────
+
+  /// Public entry point — called from ProfileCompletionScreen.initState()
+  /// so location permission fires as soon as the screen mounts.
+  Future<void> requestLocationPermissionPublic() =>
+      _requestLocationPermission();
 
   Future<void> _requestLocationPermission() async {
     try {
@@ -486,7 +500,7 @@ class AuthController extends GetxController {
   }
 
   String _buildPlaceNameString(Placemark placemark) {
-    List<String> addressParts = [];
+    final List<String> addressParts = [];
 
     if (placemark.locality?.isNotEmpty == true) {
       addressParts.add(placemark.locality!);
@@ -503,7 +517,7 @@ class AuthController extends GetxController {
         : 'Current Location';
   }
 
-  // ==================== Profile Completion ====================
+  // ── Profile Completion ─────────────────────────────────────────────────────
 
   Future<void> handleProfileCompletion() async {
     if (nameController.text.trim().isEmpty) {
@@ -521,16 +535,29 @@ class AuthController extends GetxController {
       return;
     }
 
+    // Defensive guard — UI should already block this via isReferralCodeValid
+    if (!isReferralCodeValid) {
+      _showErrorSnackbar(
+        'Invalid Referral Code',
+        'Please enter a valid referral code or leave the field empty.',
+      );
+      return;
+    }
+
     try {
       _setLoading(true);
 
-      final body = {
+      final referral = referralCodeController.text.trim();
+
+      final body = <String, dynamic>{
         'name': nameController.text.trim(),
         'latitude': _latitude,
         'longitude': _longitude,
         'firebaseToken': _firebaseToken,
         'deviceOs': _deviceOs,
         'deviceName': _deviceName,
+        // Only include referralCode key when the user actually typed one
+        if (referral.isNotEmpty) 'referralCode': referral.toUpperCase(),
       };
 
       // Token is already saved and set on _apiClient from the OTP step,
@@ -547,7 +574,6 @@ class AuthController extends GetxController {
           response['message'] ?? 'Profile updated successfully!',
         );
 
-        _showProfileBottomSheet = false;
         _reset();
         Get.offAllNamed(Routes.bottomNav);
       } else {
@@ -563,7 +589,7 @@ class AuthController extends GetxController {
     }
   }
 
-  // ==================== Data Storage ====================
+  // ── Data Storage ───────────────────────────────────────────────────────────
 
   /// Persists all user data from any auth response (OTP verify or profile PUT).
   ///
@@ -614,7 +640,7 @@ class AuthController extends GetxController {
     }
   }
 
-  // ==================== UI State Management ====================
+  // ── UI State Management ────────────────────────────────────────────────────
 
   void _setLoading(bool value) {
     _isLoading = value;

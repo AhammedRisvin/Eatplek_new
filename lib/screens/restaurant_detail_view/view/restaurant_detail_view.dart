@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
 import '../../../core/util/responsive_helper.dart';
+import '../../home/model/new_home_model.dart';
 import '../controller/restaurant_detail_view_controller.dart';
 import 'widget/banner_section.dart';
 import 'widget/bottom_cart_bar.dart';
@@ -25,10 +28,19 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolled = false;
 
+  // ── Resolved from Get.arguments (Vendor) ─────────────────────────────────
+  Vendor? _vendor;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+
+    // Extract vendor passed as argument — same object used in onRestaurantTapped
+    final args = Get.arguments;
+    if (args is Vendor) {
+      _vendor = args;
+    }
   }
 
   void _onScroll() {
@@ -45,6 +57,42 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     super.dispose();
   }
 
+  // ── Open Google Maps with vendor lat/lng ───────────────────────────────────
+  Future<void> _openMap() async {
+    final lat = _vendor?.location?.latitude;
+    final lng = _vendor?.location?.longitude;
+    if (lat == null || lng == null) return;
+
+    final name = Uri.encodeComponent(_vendor?.hotelName ?? 'Restaurant');
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng&query_place_id=$name',
+    );
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      // Fallback: plain coordinates link
+      final fallback = Uri.parse('geo:$lat,$lng?q=$lat,$lng($name)');
+      if (await canLaunchUrl(fallback)) {
+        await launchUrl(fallback, mode: LaunchMode.externalApplication);
+      }
+    }
+  }
+
+  // ── Share restaurant name + place as plain text ───────────────────────────
+  Future<void> _shareRestaurant() async {
+    final name = _vendor?.hotelName;
+    final place = _vendor?.place;
+    if (name == null && place == null) return;
+
+    final parts = [if (name != null) name, if (place != null) place];
+
+    await Share.share(
+      'Check out ${parts.join(', ')} on EatPlek! 🍽️',
+      subject: name ?? 'EatPlek Restaurant',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
@@ -55,7 +103,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
         return Scaffold(
           body: Stack(
             children: [
-              // ── Full screen background + header + content card ──────────
               SizedBox(
                 height: responsive.screenHeight,
                 width: responsive.screenWidth,
@@ -68,8 +115,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
                   ],
                 ),
               ),
-
-              // ── Floating bottom cart bar ───────────────────────────────
               const Positioned(
                 bottom: 0,
                 left: 0,
@@ -83,11 +128,9 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Background image (full header area) ──────────────────────────────────
   Widget _buildHeaderBg(ResponsiveHelper responsive) {
     if (_isScrolled) return const SizedBox.shrink();
 
-    // Use a fixed pixel height that accounts for status bar
     final double headerH = responsive.topPadding + responsive.spacing160;
 
     return Container(
@@ -102,10 +145,14 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Buttons row (back, title, map, share) ─────────────────────────────────
-  // Separated from bg so SafeArea works correctly on all devices
   Widget _buildHeaderButtons(ResponsiveHelper responsive) {
     if (_isScrolled) return const SizedBox.shrink();
+
+    final hasLocation =
+        _vendor?.location?.latitude != null &&
+        _vendor?.location?.longitude != null;
+
+    final hasShareInfo = _vendor?.hotelName != null || _vendor?.place != null;
 
     return SafeArea(
       bottom: false,
@@ -129,39 +176,45 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
 
             SizedBox(width: responsive.spacing10),
 
-            // Title
-            text(
-              text: 'Restaurant',
-              color: AppColor.white,
-              size: responsive.fontSize18,
-              fontWeight: FontWeight.w600,
-            ),
-
-            const Spacer(),
-
-            // Map button
-            _circleBtn(
-              child: Image.asset(
-                mapPng,
-                width: responsive.spacing20,
-                height: responsive.spacing20,
+            // Restaurant name from vendor
+            Expanded(
+              child: text(
+                text: _vendor?.hotelName ?? 'Restaurant',
+                color: AppColor.white,
+                size: responsive.fontSize18,
+                fontWeight: FontWeight.w600,
+                maxLines: 1,
+                overFlow: TextOverflow.ellipsis,
               ),
-              onTap: () {},
-              responsive: responsive,
             ),
 
-            SizedBox(width: responsive.spacing8),
-
-            // Share button
-            _circleBtn(
-              child: Image.asset(
-                sharePng,
-                width: responsive.spacing20,
-                height: responsive.spacing20,
+            // Map button — only shown when lat/lng available
+            if (hasLocation) ...[
+              SizedBox(width: responsive.spacing8),
+              _circleBtn(
+                child: Image.asset(
+                  mapPng,
+                  width: responsive.spacing20,
+                  height: responsive.spacing20,
+                ),
+                onTap: _openMap,
+                responsive: responsive,
               ),
-              onTap: () {},
-              responsive: responsive,
-            ),
+            ],
+
+            // Share button — only shown when name or place available
+            if (hasShareInfo) ...[
+              SizedBox(width: responsive.spacing8),
+              _circleBtn(
+                child: Image.asset(
+                  sharePng,
+                  width: responsive.spacing20,
+                  height: responsive.spacing20,
+                ),
+                onTap: _shareRestaurant,
+                responsive: responsive,
+              ),
+            ],
           ],
         ),
       ),
@@ -188,7 +241,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Collapsible app bar (appears after scroll) ────────────────────────────
   Widget _buildCollapsibleAppBar(ResponsiveHelper responsive) {
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 250),
@@ -237,11 +289,15 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
                     ),
                   ),
                   SizedBox(width: responsive.spacing16),
-                  text(
-                    text: 'Restaurant',
-                    color: AppColor.white,
-                    size: responsive.fontSize16,
-                    fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: text(
+                      text: _vendor?.hotelName ?? 'Restaurant',
+                      color: AppColor.white,
+                      size: responsive.fontSize16,
+                      fontWeight: FontWeight.w600,
+                      maxLines: 1,
+                      overFlow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -252,7 +308,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Main content card ─────────────────────────────────────────────────────
   Widget _buildContentCard(
     RestaurantDetailViewController controller,
     ResponsiveHelper responsive,
@@ -338,7 +393,6 @@ class _RestaurantDetailViewState extends State<RestaurantDetailView> {
     );
   }
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
   Widget _buildLoadingSkeleton(ResponsiveHelper responsive) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

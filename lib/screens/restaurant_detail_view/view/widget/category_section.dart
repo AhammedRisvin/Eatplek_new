@@ -42,9 +42,10 @@ class CategorySection extends StatelessWidget {
         if (controller.categories.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: responsive.spacing48,
+          height: responsive.spacing40,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
             padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
             physics: const BouncingScrollPhysics(),
             itemCount: controller.categories.length,
@@ -77,9 +78,10 @@ class CategorySection extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOut,
-            padding: EdgeInsets.symmetric(
-              horizontal: responsive.spacing14,
-              vertical: responsive.spacing8,
+            padding: EdgeInsets.only(
+              left: responsive.spacing14,
+              right: responsive.spacing14,
+              top: responsive.spacing10,
             ),
             decoration: BoxDecoration(
               color: isSelected ? AppColor.appPrimary : AppColor.white,

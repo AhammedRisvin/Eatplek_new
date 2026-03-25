@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/util/storage.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
@@ -766,7 +766,7 @@ class RestaurantDetailViewController extends GetxController {
     }
   }
 
-  /// ✅ NEW: Optimistically updates CartService so BottomCartBar reacts instantly.
+  /// ✅ Optimistically updates CartService so BottomCartBar reacts instantly.
   ///
   /// This runs BEFORE the debounce/API call so the UI is never waiting on the
   /// network for a simple +/- tap. If the API later fails, [_revertScenario1Change]
@@ -1009,15 +1009,90 @@ class RestaurantDetailViewController extends GetxController {
           resetBottomSheetState();
           Navigator.pop(Get.context!);
         } else {
-          Get.snackbar(
-            'Error',
-            response['message'] ?? 'Failed to add item to cart',
-          );
+          final msg = response['message'] ?? 'Failed to add item to cart';
+          _showErrorSnackbar(msg);
         }
+      } else {
+        _showErrorSnackbar('Failed to add item to cart');
       }
     } catch (e) {
-      Get.snackbar('Error', 'Failed to add item to cart');
+      debugPrint('❌ addOrUpdateItemToCart error: $e');
+      _showErrorSnackbar('Something went wrong. Please try again.');
     }
+  }
+
+  // ============================================================================
+  // ERROR SNACKBAR — dark background with red border, used for all cart errors
+  // ============================================================================
+
+  /// All cart errors go through here — vendor conflict, network errors, etc.
+  /// Uses [Get.rawSnackbar] for full layout control over an open bottom sheet.
+  void _showErrorSnackbar(String message) {
+    final isVendorConflict =
+        message.toLowerCase().contains('another vendor') ||
+        message.toLowerCase().contains('clear cart');
+
+    final icon =
+        isVendorConflict
+            ? Icons.remove_shopping_cart_rounded
+            : Icons.error_rounded;
+
+    Get.rawSnackbar(
+      messageText: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD32F2F).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: const Color(0xFFFF5252), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Something went wrong',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFF1A1A1A),
+      borderRadius: 14,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      duration: const Duration(seconds: 4),
+      snackPosition: SnackPosition.TOP,
+      boxShadows: [
+        BoxShadow(
+          color: const Color(0xFFD32F2F).withOpacity(0.2),
+          blurRadius: 20,
+          offset: const Offset(0, 2),
+        ),
+      ],
+      borderWidth: 1.5,
+    );
   }
 
   Future<void> _callRemoveItemWithQtyZero(String foodId) async {

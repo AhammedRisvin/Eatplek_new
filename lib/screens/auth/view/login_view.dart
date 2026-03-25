@@ -8,7 +8,6 @@ import 'package:get/get.dart';
 import '../controller/auth_controller.dart';
 import 'widget/login_form_widget.dart';
 import 'widget/otp_verification_widget.dart';
-import 'widget/profile_completion_widget.dart';
 
 class AuthView extends StatelessWidget {
   const AuthView({super.key});
@@ -21,14 +20,7 @@ class AuthView extends StatelessWidget {
       resizeToAvoidBottomInset: false,
       body: GetBuilder<AuthController>(
         id: 'auth_screen',
-        builder:
-            (controller) => Stack(
-              children: [
-                _buildContent(context, controller, responsive),
-                if (controller.showProfileBottomSheet)
-                  ProfileCompletionWidget(controller: controller),
-              ],
-            ),
+        builder: (controller) => _buildContent(context, controller, responsive),
       ),
     );
   }

@@ -49,7 +49,12 @@ class _ProfileViewState extends State<ProfileView> {
       body: Column(
         children: [
           _buildHeader(responsive),
-          Expanded(child: _buildContentCard(responsive)),
+          Expanded(
+            child: Transform.translate(
+              offset: const Offset(0, -20),
+              child: _buildContentCard(responsive),
+            ),
+          ),
         ],
       ),
     );
