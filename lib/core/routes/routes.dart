@@ -18,12 +18,14 @@ import '../../screens/auth/view/login_view.dart';
 import '../../screens/bottom_nav/view/bottom_nav_view.dart';
 import '../../screens/coupons/view/coupons_view.dart';
 import '../../screens/location_picker_view/view/location_picker_view.dart';
+import '../../screens/notification/view/notification_view.dart';
 import '../../screens/on_boarding_view/view/on_boarding_view.dart';
 import '../../screens/refer_view/view/refer_view.dart';
 import '../../screens/splash_view/view/splash_screen.dart';
 import '../bindings/cart_bindings.dart';
 import '../bindings/home_bindings.dart';
 import '../bindings/location_picker_bindings.dart';
+import '../bindings/notification_bindings.dart';
 import '../bindings/order_confirmation_bindings.dart';
 import '../bindings/orders_bindings.dart';
 import '../bindings/pre_book_details_bindings.dart';
@@ -50,8 +52,9 @@ class Routes {
   static const couponsView = '/couponsView';
   static const referScreen = '/referScreen';
   static const locationPickerView = '/locationPickerView';
+  static const notificationView = '/notificationView';
 
-  //referScreen
+  //notificationView
 
   static const String initialRoute = splash;
 
@@ -156,7 +159,14 @@ class Routes {
       transition: Transition.circularReveal,
       binding: LocationPickerBindings(),
     ),
+    GetPage(
+      name: notificationView,
+      page: () => const NotificationView(),
+      transition: Transition.circularReveal,
+      binding: NotificationBinding(),
+    ),
 
     //ReferScreen
+    //NotificationBindings
   ];
 }

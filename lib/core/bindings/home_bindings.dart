@@ -5,6 +5,8 @@ import 'package:eatplek_app/screens/home/controller/home_controller.dart';
 import 'package:eatplek_app/screens/orders/controller/orders_controller.dart';
 import 'package:get/get.dart';
 
+import '../../screens/notification/cotroller/notification_controller.dart';
+
 class HomeBindings extends Bindings {
   @override
   void dependencies() {
@@ -13,5 +15,6 @@ class HomeBindings extends Bindings {
     Get.lazyPut<OrdersController>(() => OrdersController());
     Get.put<CartController>(CartController());
     Get.put<CartExtrasController>(CartExtrasController());
+    Get.lazyPut<NotificationController>(() => NotificationController());
   }
 }

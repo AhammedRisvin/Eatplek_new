@@ -7,6 +7,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/responsive_helper.dart';
+import '../../../notification/cotroller/notification_controller.dart';
 import '../../controller/home_controller.dart';
 
 class HomeHeaderSection extends StatelessWidget {
@@ -27,7 +28,6 @@ class HomeHeaderSection extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: AppColor.scaffoldColor,
-        // Subtle bottom border — cleaner than a hard shadow
         border: Border(
           bottom: BorderSide(color: AppColor.black.withOpacity(0.04), width: 1),
         ),
@@ -47,7 +47,7 @@ class HomeHeaderSection extends StatelessWidget {
                 curve: Curves.easeOut,
               ),
           SizedBox(width: responsive.spacing10),
-          _buildIconButton(bellSvg, controller.onNotificationTapped, responsive)
+          _buildBellButton(responsive)
               .animate()
               .fade(duration: 400.ms, delay: 300.ms)
               .slideX(
@@ -147,6 +147,88 @@ class HomeHeaderSection extends StatelessWidget {
               duration: 400.ms,
               curve: Curves.easeOut,
             );
+      },
+    );
+  }
+
+  /// Bell button with unread badge overlay
+  Widget _buildBellButton(ResponsiveHelper responsive) {
+    return GetBuilder<NotificationController>(
+      id: NotificationController.unreadBadgeId,
+      builder: (notifController) {
+        final int count = notifController.unreadCount;
+
+        return GestureDetector(
+          onTap: controller.onNotificationTapped,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: EdgeInsets.all(responsive.spacing10),
+                decoration: BoxDecoration(
+                  color: AppColor.white,
+                  borderRadius: BorderRadius.circular(
+                    responsive.cardBorderRadius,
+                  ),
+                  border: Border.all(
+                    color: AppColor.black.withOpacity(0.08),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: SvgPicture.string(
+                  bellSvg,
+                  width: responsive.spacing20,
+                  height: responsive.spacing20,
+                ),
+              ),
+
+              // ── Unread badge ─────────────────────────────────────────────
+              if (count > 0)
+                Positioned(
+                  top: -4,
+                  right: -4,
+                  child: Container(
+                    constraints: BoxConstraints(
+                      minWidth: responsive.spacing16,
+                      minHeight: responsive.spacing16,
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: count > 9 ? responsive.spacing4 : 0,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: count > 9 ? BoxShape.rectangle : BoxShape.circle,
+                      borderRadius:
+                          count > 9
+                              ? BorderRadius.circular(
+                                responsive.largeBorderRadius,
+                              )
+                              : null,
+                      border: Border.all(
+                        color: AppColor.scaffoldColor,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: text(
+                        text: count > 99 ? '99+' : '$count',
+                        size: responsive.fontSize9,
+                        fontWeight: FontWeight.w700,
+                        color: AppColor.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
       },
     );
   }

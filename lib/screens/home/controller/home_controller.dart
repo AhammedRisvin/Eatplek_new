@@ -12,6 +12,7 @@ import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/util/storage.dart';
+import '../../notification/cotroller/notification_controller.dart';
 import '../model/new_home_model.dart';
 import '../view/widget/multiple_branch_bottom_sheet.dart';
 import '../view/widget/order_preference_dialog.dart';
@@ -195,6 +196,8 @@ class HomeController extends GetxController {
       // itemCount in sync via its own polling when CartView is open.
       await _checkPendingInvites();
 
+      await _fetchUnreadNotificationCount();
+
       debugPrint('✅ Initialization complete');
     } catch (e) {
       debugPrint('❌ Initialization error: $e');
@@ -202,6 +205,22 @@ class HomeController extends GetxController {
       hasError = true;
       errorMessage = 'Failed to initialize. Please try again.';
       update([carouselId, vendorsId]);
+    }
+  }
+
+  Future<void> _fetchUnreadNotificationCount() async {
+    try {
+      // NotificationController may not be registered yet on home screen init.
+      // We register it permanently here so the badge is always reactive.
+      if (!Get.isRegistered<NotificationController>()) {
+        Get.put<NotificationController>(
+          NotificationController(),
+          permanent: false,
+        );
+      }
+      await Get.find<NotificationController>().fetchUnreadCount();
+    } catch (e) {
+      debugPrint('⚠️ Could not fetch unread notification count: $e');
     }
   }
 
@@ -613,7 +632,7 @@ class HomeController extends GetxController {
   }
 
   void onNotificationTapped() {
-    Get.snackbar('Notifications', 'Notification panel opened');
+    Get.toNamed(Routes.notificationView);
   }
 
   /// Opens location picker. After confirm:

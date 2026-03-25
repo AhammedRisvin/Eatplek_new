@@ -47,6 +47,13 @@ mixin Urls {
   static const String initiatePaymentUrl = 'api/payments/initiate';
   static const String confirmPaymentUrl = 'api/payments/confirm';
 
-  static const String logout = '/api/users/logout';
-  static const String deleteAccount = '/api/users/me/hard';
+  static const String logout = 'api/users/logout';
+  static const String deleteAccount = 'api/users/me/hard';
+
+  //notifications
+  static const String getNotificationsUrl = 'api/users/notifications?limit=20';
+  static const String getUnreadCountUrl =
+      'api/users/notifications/unread-count';
+  static const String readAllNotificationUrl =
+      'api/users/notifications/read-all';
 }
