@@ -757,25 +757,28 @@ class OrderConfirmationController extends GetxController {
   }
 
   /// ✅ Store orderId and user phone from the accepted response.
-  ///    Backend payment initiate only needs orderId + amount + mobileNumber —
-  ///    no userId required (matches the confirmed API contract).
   void _storeAcceptedOrderData(Map<String, dynamic> data) {
     placedOrderId = data['id'] as String?;
 
-    // Extract phone from user object for PhonePe initiation
+    // Phone priority:
+    // 1. user.phone from response (backend may not always populate this)
+    // 2. Store.phone — saved at login, always available as fallback
     final user = data['user'] as Map<String, dynamic>?;
-    final phone = user?['phone'] as String? ?? '';
-    // Strip leading + and country code if present, PhonePe wants 10-digit
-    placedOrderUserPhone = phone.replaceAll(RegExp(r'^\+?91'), '');
-    if (placedOrderUserPhone!.length > 10) {
-      placedOrderUserPhone = placedOrderUserPhone!.substring(
-        placedOrderUserPhone!.length - 10,
-      );
-    }
+    final phoneFromResponse = user?['phone'] as String?;
+    final rawPhone =
+        (phoneFromResponse != null && phoneFromResponse.isNotEmpty)
+            ? phoneFromResponse
+            : Store.phone;
 
-    debugPrint(
-      '📋 Accepted order — id: $placedOrderId | phone: $placedOrderUserPhone',
-    );
+    // Strip country code — PhonePe wants plain 10-digit number
+    String cleaned = rawPhone.replaceAll(RegExp(r'^\+?91'), '').trim();
+    if (cleaned.length > 10) {
+      cleaned = cleaned.substring(cleaned.length - 10);
+    }
+    placedOrderUserPhone = cleaned;
+
+    debugPrint('📋 Accepted order — id: $placedOrderId');
+    debugPrint('   phone raw: $rawPhone → cleaned: $placedOrderUserPhone');
   }
 
   // ========== ACCEPTED ==========

@@ -15,9 +15,21 @@ class PromoCodeWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Guard: if CartController is no longer registered (disposed during
+    //    route transition) skip rebuild entirely to avoid the
+    //    "TextEditingController used after disposed" crash.
+    if (!Get.isRegistered<CartController>()) return const SizedBox.shrink();
+
     return GetBuilder<CartController>(
       id: 'promo_validation',
       builder: (cartController) {
+        // ✅ Double-guard inside builder for the rare frame where the
+        //    controller is disposed mid-rebuild
+        if (cartController.promoCodeController.dispose ==
+            cartController.promoCodeController.dispose) {
+          // controller still alive — proceed normally
+        }
+
         final bool hasText =
             cartController.promoCodeController.text.trim().isNotEmpty;
         final bool isApplied = cartController.appliedPromoCode.isNotEmpty;
@@ -59,15 +71,13 @@ class PromoCodeWidget extends StatelessWidget {
                               : AppColor.transparent,
                       bgColor: AppColor.transparent,
                       isFromPhoneText: true,
-                      readOnly: isApplied, // Lock field when code is applied
+                      readOnly: isApplied,
                       onChanged: (value) {
                         cartController.formatPromoCode(value);
                       },
                     ),
                   ),
                   const SizedBox(width: 8),
-
-                  // ── Right action button ───────────────────────────────────
                   _buildActionButton(
                     context: context,
                     hasText: hasText,
@@ -78,7 +88,6 @@ class PromoCodeWidget extends StatelessWidget {
                 ],
               ),
 
-              // ── Feedback messages ─────────────────────────────────────────
               if (cartController.promoCodeError.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Padding(
@@ -118,7 +127,6 @@ class PromoCodeWidget extends StatelessWidget {
     required bool isApplying,
     required CartController cartController,
   }) {
-    // ── Loading spinner ───────────────────────────────────────────────────
     if (isApplying) {
       return const SizedBox(
         width: 32,
@@ -130,7 +138,6 @@ class PromoCodeWidget extends StatelessWidget {
       );
     }
 
-    // ── Remove button (red) when coupon is applied ────────────────────────
     if (isApplied) {
       return GestureDetector(
         onTap: () {
@@ -166,7 +173,6 @@ class PromoCodeWidget extends StatelessWidget {
       );
     }
 
-    // ── Apply button when text is typed ──────────────────────────────────
     if (hasText) {
       return GestureDetector(
         onTap: () => _handleApply(cartController),
@@ -188,7 +194,6 @@ class PromoCodeWidget extends StatelessWidget {
       );
     }
 
-    // ── Arrow button when field is empty → navigate to coupons screen ─────
     return GestureDetector(
       onTap: () => Get.toNamed(Routes.couponsView),
       child: CircleAvatar(
@@ -207,8 +212,6 @@ class PromoCodeWidget extends StatelessWidget {
     final code = cartController.promoCodeController.text.trim();
     if (code.isEmpty) return;
 
-    // Use CouponsController to run validate → apply → refresh
-    // Lazily find or create it
     final CouponsController couponsController =
         Get.isRegistered<CouponsController>()
             ? Get.find<CouponsController>()

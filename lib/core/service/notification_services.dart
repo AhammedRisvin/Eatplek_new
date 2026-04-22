@@ -1,4 +1,4 @@
-// lib/services/notification_service.dart
+// lib/core/service/notification_services.dart
 
 import 'dart:async';
 import 'dart:developer';
@@ -7,11 +7,8 @@ import 'package:awesome_notifications/awesome_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart'; // ← ADD THIS
 
-// TODO: Replace with your actual route constants
-// import 'package:eatplek_app/core/routes/routes.dart';
-
-/// Notification types EatPlek sends from backend
 enum EatPlekNotificationType {
   orderAccepted,
   orderRejected,
@@ -58,10 +55,6 @@ EatPlekNotificationType _parseNotificationType(String? raw) {
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   log('[BG] message received: ${message.messageId} | data: ${message.data}');
 
-  // If FCM message has a 'notification' payload (e.g. sent from Firebase Console),
-  // Android already auto-shows its own system notification when app is background/killed.
-  // Skip creating an Awesome Notification to avoid showing a duplicate.
-  // ✅ Real backend sends data-only so Awesome Notifications will always fire in production.
   if (message.notification != null) {
     log(
       '[BG] notification payload present — FCM handles display, skipping duplicate',
@@ -73,8 +66,6 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await _showBackgroundNotification(message, type);
 }
 
-/// Creates an Awesome Notification banner for background data-only messages.
-/// Channels must be re-declared here because the isolate is a fresh context.
 Future<void> _showBackgroundNotification(
   RemoteMessage message,
   EatPlekNotificationType type,
@@ -112,22 +103,15 @@ class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
+  // ── ADD: OneSignal App ID ─────────────────────────────────
+  static const String _oneSignalAppId = '84f1ab18-029d-4b73-afa1-8030e50ed0dc';
+
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   String? fcmToken;
-
-  /// Set in main.dart and passed to initialize().
-  /// Used to push routes when a notification is tapped.
   GlobalKey<NavigatorState>? navigatorKey;
 
   // ── Public API ──────────────────────────────────────────────
 
-  /// Call once from main.dart AFTER Firebase.initializeApp().
-  ///
-  /// ```dart
-  /// await NotificationService.instance.initialize(
-  ///   navigatorKey: navigatorKey,
-  /// );
-  /// ```
   Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
@@ -141,14 +125,17 @@ class NotificationService {
     await _handleTerminatedStateTap();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+    // ── ADD: OneSignal init after everything else ──────────
+    await _initOneSignal();
+
     log('[NotificationService] initialised ✓');
   }
 
-  // ── Private helpers ─────────────────────────────────────────
+  // ── Existing methods — UNCHANGED ────────────────────────────
 
   Future<void> _initAwesomeNotifications() async {
     await AwesomeNotifications().initialize(
-      null, // use default launcher icon
+      null,
       [_buildOrderChannel(), _buildPromoChannel()],
       channelGroups: [
         NotificationChannelGroup(
@@ -170,7 +157,6 @@ class NotificationService {
       onDismissActionReceivedMethod: _onDismissActionReceived,
     );
 
-    // Request permission after first frame so UI is ready
     final allowed = await AwesomeNotifications().isNotificationAllowed();
     if (!allowed) {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -205,18 +191,15 @@ class NotificationService {
         fcmToken = await _fcm.getToken();
         log('[FCM] token: $fcmToken');
 
-        // TODO: Send fcmToken to your backend so it can target this device.
-        // Example:
         // final connect = Get.find<FittorConnect>();
         // await connect.post('/user/fcm-token', body: {'fcmToken': fcmToken});
 
         _fcm.onTokenRefresh.listen((token) {
           fcmToken = token;
           log('[FCM] token refreshed: $token');
-          // TODO: re-send refreshed token to backend
         });
 
-        return; // success
+        return;
       } catch (e) {
         log('[FCM] Token fetch attempt $attempt/$maxRetries failed: $e');
         if (attempt < maxRetries) {
@@ -228,16 +211,95 @@ class NotificationService {
     }
   }
 
-  /// Fires while the app is in the FOREGROUND
+  // ── ADD: OneSignal initialisation ───────────────────────────
+  Future<void> _initOneSignal() async {
+    OneSignal.Debug.setLogLevel(
+      kDebugMode ? OSLogLevel.verbose : OSLogLevel.none,
+    );
+
+    OneSignal.initialize(_oneSignalAppId);
+
+    OneSignal.Notifications.addForegroundWillDisplayListener((event) async {
+      log('[OneSignal] foreground received — showing via AwesomeNotifications');
+
+      final notification = event.notification;
+      final title = notification.title ?? 'EatPlek';
+      final body = notification.body ?? '';
+      final data = notification.additionalData ?? {};
+      final type = _parseNotificationType(data['type']?.toString());
+      final id =
+          notification.notificationId.hashCode ??
+          DateTime.now().millisecondsSinceEpoch;
+
+      await AwesomeNotifications().createNotification(
+        content: NotificationContent(
+          id: id,
+          channelKey: _channelKeyForType(type),
+          title: title,
+          body: body,
+          notificationLayout: NotificationLayout.Default,
+          payload: data.map((k, v) => MapEntry(k, v.toString())),
+          category: _categoryForType(type),
+          autoDismissible: true,
+        ),
+        actionButtons: _actionButtonsForType(type),
+      );
+    });
+
+    await OneSignal.Notifications.requestPermission(true);
+
+    OneSignal.Notifications.addClickListener((event) {
+      log('[OneSignal] tapped: ${event.notification.additionalData}');
+      _navigateFromPayload(event.notification.additionalData ?? {});
+    });
+
+    log('[OneSignal] initialised ✓ | AppId: $_oneSignalAppId');
+  }
+
+  // ── ADD: Identify user to OneSignal after login ─────────────
+
+  /// Call this in your LoginController after successful login.
+  /// OneSignal will associate this device's push token with the user ID
+  /// so your backend can send targeted pushes.
+  ///
+  /// ```dart
+  /// // In LoginController, after saving user:
+  /// NotificationService.instance.setUser(user.id.toString());
+  /// ```
+  void setUser(String userId) {
+    OneSignal.login(userId);
+    log('[OneSignal] user set: $userId');
+  }
+
+  /// Call this in your logout flow.
+  void clearUser() {
+    OneSignal.logout();
+    log('[OneSignal] user cleared');
+  }
+
+  /// Tag this device for segmented campaigns (city, plan type, etc.)
+  ///
+  /// ```dart
+  /// NotificationService.instance.setTags({
+  ///   'city': 'Malappuram',
+  ///   'user_type': 'customer',
+  /// });
+  /// ```
+  void setTags(Map<String, dynamic> tags) {
+    OneSignal.User.addTags(tags);
+    log('[OneSignal] tags set: $tags');
+  }
+
+  // ── Existing methods — UNCHANGED ────────────────────────────
   void _listenForeground() {
     FirebaseMessaging.onMessage.listen((message) async {
       log('[FCM Foreground] ${message.messageId} | ${message.data}');
+      // OneSignal handles background/killed — FCM handles foreground display
       final type = _parseNotificationType(message.data['type']);
       await _showForegroundNotification(message, type);
     });
   }
 
-  /// Fires when the app is in BACKGROUND and user taps the notification
   void _listenTapFromBackground() {
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       log('[FCM] opened from background tap: ${message.data}');
@@ -245,7 +307,6 @@ class NotificationService {
     });
   }
 
-  /// Fires when app was TERMINATED and launched via notification tap
   Future<void> _handleTerminatedStateTap() async {
     final initial = await _fcm.getInitialMessage();
     if (initial != null) {
@@ -256,14 +317,10 @@ class NotificationService {
     }
   }
 
-  // ── Foreground notification display ─────────────────────────
-
   Future<void> _showForegroundNotification(
     RemoteMessage message,
     EatPlekNotificationType type,
   ) async {
-    // Prefer title/body from data payload (backend data-only messages),
-    // fall back to notification payload (Firebase Console test messages)
     final title =
         message.data['title']?.toString() ??
         message.notification?.title ??
@@ -289,15 +346,6 @@ class NotificationService {
     );
   }
 
-  // ── Navigation ───────────────────────────────────────────────
-
-  /// Called when the user TAPS a notification.
-  ///
-  /// Expected payload keys from backend:
-  ///   type        → one of the EatPlekNotificationType strings
-  ///   orderId     → e.g. "ORD-1234"
-  ///   productId   → e.g. "PROD-567"
-  ///   vendorId    → e.g. "VND-89"
   void _navigateFromPayload(Map<String, dynamic> payload) {
     final navigator = navigatorKey?.currentState;
     if (navigator == null) {
@@ -323,23 +371,14 @@ class NotificationService {
       case EatPlekNotificationType.orderCancelled:
       case EatPlekNotificationType.timeSuggestion:
         if (orderId != null) {
-          // TODO: replace with your actual GetX route
-          // Get.toNamed(Routes.orderDetails, arguments: orderId);
           log('[Nav] → Order Details: $orderId');
         }
         break;
 
       case EatPlekNotificationType.promo:
         if (productId != null && vendorId != null) {
-          // TODO: navigate to product detail
-          // Get.toNamed(Routes.productDetail, arguments: {
-          //   'productId': productId,
-          //   'vendorId': vendorId,
-          // });
           log('[Nav] → Product Detail: product=$productId vendor=$vendorId');
         } else {
-          // TODO: navigate to promos screen
-          // Get.toNamed(Routes.promos);
           log('[Nav] → Promos screen');
         }
         break;
@@ -350,8 +389,6 @@ class NotificationService {
     }
   }
 
-  // ── Awesome Notifications listeners ─────────────────────────
-
   @pragma('vm:entry-point')
   static Future<void> _onActionReceived(ReceivedAction action) async {
     log(
@@ -361,7 +398,6 @@ class NotificationService {
     final payload = action.payload ?? {};
     final buttonKey = action.buttonKeyPressed;
 
-    // Empty buttonKey = notification body tapped (not an action button)
     if (buttonKey == 'view_order' || buttonKey == '') {
       NotificationService.instance._navigateFromPayload(
         payload.map((k, v) => MapEntry(k, v as dynamic)),
@@ -388,7 +424,7 @@ class NotificationService {
     log('[AwesomeNotif] dismissed: ${action.id}');
   }
 
-  // ── Public utility methods ───────────────────────────────────
+  // ── Utility ──────────────────────────────────────────────────
 
   Future<void> cancelNotification(int id) async {
     await AwesomeNotifications().cancel(id);
@@ -410,7 +446,7 @@ class NotificationService {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Channel builders — shared between foreground and background
+// Channel builders — UNCHANGED
 // ─────────────────────────────────────────────────────────────
 
 NotificationChannel _buildOrderChannel() => NotificationChannel(
@@ -420,7 +456,7 @@ NotificationChannel _buildOrderChannel() => NotificationChannel(
   channelDescription: 'Updates about your food orders',
   defaultColor: const Color(0xFFFF6B35),
   ledColor: Colors.orange,
-  importance: NotificationImportance.Max, // Max = always shows heads-up popup
+  importance: NotificationImportance.Max,
   channelShowBadge: true,
   playSound: true,
   enableVibration: true,
@@ -435,7 +471,7 @@ NotificationChannel _buildPromoChannel() => NotificationChannel(
   channelDescription: 'Deals, discounts, and new restaurants near you',
   defaultColor: const Color(0xFFFF6B35),
   ledColor: Colors.orange,
-  importance: NotificationImportance.High, // High = shows heads-up popup
+  importance: NotificationImportance.High,
   channelShowBadge: true,
   playSound: true,
   enableVibration: true,
@@ -444,7 +480,7 @@ NotificationChannel _buildPromoChannel() => NotificationChannel(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Helpers shared between service and background handler
+// Helpers — UNCHANGED
 // ─────────────────────────────────────────────────────────────
 
 String _channelKeyForType(EatPlekNotificationType type) {

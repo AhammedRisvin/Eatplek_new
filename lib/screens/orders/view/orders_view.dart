@@ -1,8 +1,9 @@
 import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
-import '../../../core/util/common_widgets.dart';
 import '../controller/orders_controller.dart';
 import 'widget/orders_list.dart';
 
@@ -14,10 +15,7 @@ class OrdersView extends StatefulWidget {
 }
 
 class _OrdersViewState extends State<OrdersView> {
-  // One GlobalKey per tab pill — used to measure each pill's position/size
   late List<GlobalKey> _tabKeys;
-
-  // ScrollController for the horizontal pill row
   final ScrollController _tabScrollController = ScrollController();
 
   @override
@@ -32,25 +30,19 @@ class _OrdersViewState extends State<OrdersView> {
     super.dispose();
   }
 
-  /// Auto-scrolls the pill row so the selected tab is fully visible.
-  /// Leaves a 30 px "peek" of the adjacent pill as a scroll hint.
   void _scrollToTab(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_tabScrollController.hasClients) return;
-
       final key = _tabKeys[index];
       final ctx = key.currentContext;
       if (ctx == null) return;
-
       final pillBox = ctx.findRenderObject() as RenderBox?;
       if (pillBox == null) return;
-
       final scrollBox =
           _tabScrollController.position.context.storageContext
                   .findRenderObject()
               as RenderBox?;
       if (scrollBox == null) return;
-
       final pillOffset = pillBox.localToGlobal(
         Offset.zero,
         ancestor: scrollBox,
@@ -59,21 +51,15 @@ class _OrdersViewState extends State<OrdersView> {
       final pillWidth = pillBox.size.width;
       final viewportWidth = scrollBox.size.width;
       final currentScroll = _tabScrollController.offset;
-
-      const double peekWidth = 30.0; // peek of next pill on the right
-      const double edgePadding = 16.0; // breathing room on the left
-
+      const peekWidth = 30.0;
+      const edgePadding = 16.0;
       double targetScroll = currentScroll;
-
       if (pillLeft + pillWidth > viewportWidth - peekWidth) {
-        // Pill bleeds off the right → scroll right
         targetScroll =
             currentScroll + (pillLeft + pillWidth) - viewportWidth + peekWidth;
       } else if (pillLeft < edgePadding) {
-        // Pill bleeds off the left → scroll left
         targetScroll = currentScroll + pillLeft - edgePadding;
       }
-
       _tabScrollController.animateTo(
         targetScroll.clamp(0.0, _tabScrollController.position.maxScrollExtent),
         duration: const Duration(milliseconds: 300),
@@ -85,25 +71,32 @@ class _OrdersViewState extends State<OrdersView> {
   @override
   Widget build(BuildContext context) {
     return GetBuilder<OrdersController>(
-      init: OrdersController(),
+      // OrdersController registered via HomeBindings — no init needed here
       builder: (controller) {
         return Scaffold(
           backgroundColor: AppColor.scaffoldColor,
           appBar: _buildAppBar(),
           body: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               child: Column(
                 children: [
-                  _buildTabContainer(controller, context),
-                  const SizedBox(height: 20),
+                  _buildTabBar(controller, context)
+                      .animate()
+                      .fade(duration: 350.ms)
+                      .slideY(
+                        begin: -0.1,
+                        end: 0,
+                        duration: 350.ms,
+                        curve: Curves.easeOut,
+                      ),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: Theme(
                       data: Theme.of(context).copyWith(
+                        splashFactory: NoSplash.splashFactory,
                         splashColor: Colors.transparent,
                         highlightColor: Colors.transparent,
-                        hoverColor: Colors.transparent,
-                        splashFactory: NoSplash.splashFactory,
                       ),
                       child: TabBarView(
                         controller: controller.tabController,
@@ -134,40 +127,34 @@ class _OrdersViewState extends State<OrdersView> {
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       elevation: 0,
+      scrolledUnderElevation: 0,
       backgroundColor: AppColor.scaffoldColor,
       centerTitle: true,
-      leadingWidth: 80,
-      title: text(text: 'My Orders', size: 18, fontWeight: FontWeight.w600),
+      title: text(
+        text: 'My Orders',
+        size: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColor.black,
+      ),
     );
   }
 
-  Widget _buildTabContainer(OrdersController controller, BuildContext context) {
+  Widget _buildTabBar(OrdersController controller, BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColor.white,
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppColor.black.withOpacity(0.03), width: 1),
+        border: Border.all(color: AppColor.black.withOpacity(0.04)),
         boxShadow: [
-          BoxShadow(
-            color: AppColor.black.withOpacity(0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 0),
-          ),
+          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 20),
         ],
       ),
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-          hoverColor: Colors.transparent,
-          splashFactory: NoSplash.splashFactory,
-        ),
-        child: GetBuilder<OrdersController>(
-          id: 'tab_bar',
-          builder: (ctrl) {
-            return SingleChildScrollView(
+      child: GetBuilder<OrdersController>(
+        id: 'tab_bar',
+        builder:
+            (ctrl) => SingleChildScrollView(
               controller: _tabScrollController,
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -176,20 +163,15 @@ class _OrdersViewState extends State<OrdersView> {
                   final isSelected = ctrl.tabController.index == index;
                   final label = ctrl.tabs[index]['label']!;
 
-                  return InkWell(
+                  return GestureDetector(
                     key: _tabKeys[index],
                     onTap: () {
                       ctrl.tabController.animateTo(index);
                       _scrollToTab(index);
                     },
-                    splashColor: Colors.transparent,
-                    highlightColor: Colors.transparent,
-                    hoverColor: Colors.transparent,
-                    overlayColor: WidgetStateProperty.all(Colors.transparent),
-                    borderRadius: BorderRadius.circular(100),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOut,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 18,
                         vertical: 10,
@@ -197,35 +179,36 @@ class _OrdersViewState extends State<OrdersView> {
                       decoration: BoxDecoration(
                         color:
                             isSelected
-                                ? AppColor.scaffoldColor
+                                ? AppColor.appPrimary
                                 : Colors.transparent,
                         borderRadius: BorderRadius.circular(100),
-                        border:
+                        boxShadow:
                             isSelected
-                                ? Border.all(
-                                  color: AppColor.black.withOpacity(0.04),
-                                  width: 1,
-                                )
+                                ? [
+                                  BoxShadow(
+                                    color: AppColor.appPrimary.withOpacity(0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ]
                                 : null,
                       ),
                       child: Text(
                         label,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color:
                               isSelected
-                                  ? AppColor.black
-                                  : AppColor.black.withOpacity(0.6),
+                                  ? AppColor.white
+                                  : AppColor.black.withOpacity(0.55),
                         ),
                       ),
                     ),
                   );
                 }),
               ),
-            );
-          },
-        ),
+            ),
       ),
     );
   }

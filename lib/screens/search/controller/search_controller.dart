@@ -275,6 +275,7 @@ class SearchVendorController extends GetxController {
     if (preference.contains('Dine-in')) return 'dine-in';
     if (preference.contains('SpecialBooking') ||
         preference.contains('Special Booking'))
+      // ignore: curly_braces_in_flow_control_structures
       return 'car-dine-in';
     if (preference.contains('Pickup')) return 'pickup';
     return 'delivery';

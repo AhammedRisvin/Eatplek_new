@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
@@ -11,176 +13,234 @@ import 'quantity_control_widget.dart';
 
 class FoodWidget extends StatelessWidget {
   final Food foodItem;
+  final int animationIndex;
 
-  const FoodWidget({super.key, required this.foodItem});
+  const FoodWidget({
+    super.key,
+    required this.foodItem,
+    this.animationIndex = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
     final controller = Get.find<RestaurantDetailViewController>();
-    final hasCustomizations = foodItem.customizations != null && foodItem.customizations!.isNotEmpty;
-    final hasAddOns = foodItem.addOns != null && foodItem.addOns!.isNotEmpty;
-
-    // ✅ Capitalize first letter of food name
-    final capitalizedFoodName = _capitalizeFirstLetter(foodItem.foodName ?? '');
+    final hasCustomizations = foodItem.customizations?.isNotEmpty ?? false;
+    final hasAddOns = foodItem.addOns?.isNotEmpty ?? false;
+    final foodName = _capitalize(foodItem.foodName ?? '');
 
     return Container(
-      width: responsive.screenWidth,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
-        color: AppColor.white,
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 12, offset: Offset(0, 4))],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Food Image with Location & Share buttons overlay
-          _buildImageWithButtons(context, controller, hasCustomizations, hasAddOns, responsive),
-
-          // Food Details Section
-          Padding(
-            padding: EdgeInsets.all(responsive.spacing12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Food Name
-                text(
-                  text: capitalizedFoodName,
-                  size: responsive.fontSize14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColor.black,
-                  maxLines: 1,
-                  overFlow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: responsive.spacing8),
-
-                // Price Section
-                _buildPriceSection(responsive),
-                SizedBox(height: responsive.spacing10),
-
-                // Action Button (Add/Edit or QuantityControl)
-                _buildActionButton(context, controller, hasCustomizations, hasAddOns, responsive),
-              ],
-            ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+            color: AppColor.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Image ──────────────────────────────────────────────────────
+              _buildImage(
+                context,
+                controller,
+                hasCustomizations,
+                hasAddOns,
+                responsive,
+              ),
+
+              // ── Details ────────────────────────────────────────────────────
+              Padding(
+                padding: EdgeInsets.all(responsive.spacing10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildVegIndicator(responsive),
+                        SizedBox(width: responsive.spacing5),
+                        Expanded(
+                          child: text(
+                            text: foodName,
+                            size: responsive.fontSize13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColor.black,
+                            maxLines: 2,
+                            overFlow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: responsive.spacing6),
+                    _buildPrice(responsive),
+                    SizedBox(height: responsive.spacing8),
+                    _buildAction(
+                      context,
+                      controller,
+                      hasCustomizations,
+                      hasAddOns,
+                      responsive,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        )
+        .animate(delay: Duration(milliseconds: 50 * animationIndex))
+        .fade(duration: 300.ms, curve: Curves.easeOut)
+        .slideY(begin: 0.08, end: 0, duration: 300.ms, curve: Curves.easeOut);
+  }
+
+  Widget _buildVegIndicator(ResponsiveHelper responsive) {
+    return Container(
+      width: responsive.spacing12,
+      height: responsive.spacing12,
+      margin: const EdgeInsets.only(top: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFF27ae60), width: 1.5),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Center(
+        child: Container(
+          width: responsive.spacing6,
+          height: responsive.spacing6,
+          decoration: const BoxDecoration(
+            color: Color(0xFF27ae60),
+            shape: BoxShape.circle,
+          ),
+        ),
       ),
     );
   }
 
-  // ✅ Image with Location & Share buttons on top-right corner
-  Widget _buildImageWithButtons(
+  Widget _buildImage(
     BuildContext context,
     RestaurantDetailViewController controller,
     bool hasCustomizations,
     bool hasAddOns,
     ResponsiveHelper responsive,
   ) {
+    // Share overlay is only shown when food.shareLink is non-null and non-empty
+    final hasShareLink =
+        foodItem.shareLink != null && foodItem.shareLink!.isNotEmpty;
+
     return GestureDetector(
-      onTap: () {
-        debugPrint('🍔 Food image tapped - Opening bottom sheet');
-        _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, responsive, isEdit: false);
-      },
+      onTap:
+          () => _openSheet(
+            context,
+            controller,
+            hasCustomizations,
+            hasAddOns,
+            responsive,
+            isEdit: false,
+          ),
       child: Stack(
         children: [
-          // Food Image
           ClipRRect(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.cardBorderRadius)),
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(responsive.cardBorderRadius),
+            ),
             child: image(
               url: foodItem.foodImage ?? '',
               height: responsive.cardImageHeight,
-              width: responsive.screenWidth,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.cardBorderRadius)),
+              width: double.infinity,
             ),
           ),
 
-          Positioned(
-            top: responsive.spacing10,
-            right: responsive.spacing10,
-            child: Row(
-              children: [
-                _buildOverlayButton(
-                  responsive: responsive,
-                  onTap: () => _shareFood(),
-                  icon: Icons.share_outlined,
-                  label: 'Share',
+          // Share button — hidden when shareLink is null/empty
+          if (hasShareLink)
+            Positioned(
+              top: responsive.spacing8,
+              right: responsive.spacing8,
+              child: GestureDetector(
+                onTap: _shareFood,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.spacing7,
+                    vertical: responsive.spacing5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColor.white.withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(
+                      responsive.largeBorderRadius,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.share_outlined,
+                        size: responsive.fontSize11,
+                        color: AppColor.appPrimary,
+                      ),
+                      SizedBox(width: responsive.spacing3),
+                      text(
+                        text: 'Share',
+                        size: responsive.fontSize9,
+                        fontWeight: FontWeight.w600,
+                        color: AppColor.appPrimary,
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  // ✅ Overlay button - appears on image
-  Widget _buildOverlayButton({
-    required ResponsiveHelper responsive,
-    required VoidCallback onTap,
-    required IconData icon,
-    required String label,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: responsive.spacing8, vertical: responsive.spacing6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-          color: AppColor.white.withOpacity(0.95),
-          boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.12), blurRadius: 8, offset: Offset(0, 2))],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: responsive.fontSize14, color: AppColor.appPrimary),
-            SizedBox(width: responsive.spacing4),
-            text(text: label, size: responsive.fontSize10, fontWeight: FontWeight.w600, color: AppColor.appPrimary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ✅ Price Section with discount display
-  Widget _buildPriceSection(ResponsiveHelper responsive) {
-    final discountPrice = foodItem.discountPrice ?? foodItem.foodPrice ?? 0;
-    final actualPrice = foodItem.actualPrice ?? foodItem.foodPrice ?? 0;
-    final hasDiscount = actualPrice > discountPrice;
+  Widget _buildPrice(ResponsiveHelper responsive) {
+    final discounted = (foodItem.discountPrice ?? foodItem.foodPrice ?? 0);
+    final actual = (foodItem.actualPrice ?? foodItem.foodPrice ?? 0);
+    final hasDiscount = actual > discounted;
 
     return Row(
       children: [
-        // Current Price
         text(
-          text: '₹${discountPrice.toInt()}',
-          size: responsive.fontSize14,
+          text: '₹${discounted.toInt()}',
+          size: responsive.fontSize13,
           fontWeight: FontWeight.w700,
           color: AppColor.appPrimary,
         ),
-
-        // Original Price (if discount exists)
         if (hasDiscount) ...[
-          SizedBox(width: responsive.spacing8),
+          SizedBox(width: responsive.spacing6),
           text(
-            text: '₹${actualPrice.toInt()}',
-            size: responsive.fontSize11,
+            text: '₹${actual.toInt()}',
+            size: responsive.fontSize10,
             fontWeight: FontWeight.w400,
-            color: AppColor.black.withOpacity(0.4),
+            color: AppColor.black.withOpacity(0.35),
             decoration: TextDecoration.lineThrough,
-            decorationColor: AppColor.black.withOpacity(0.4),
+            decorationColor: AppColor.black.withOpacity(0.35),
           ),
-          SizedBox(width: responsive.spacing8),
-          // Discount percentage
+          SizedBox(width: responsive.spacing5),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: responsive.spacing6, vertical: responsive.spacing2),
+            padding: EdgeInsets.symmetric(
+              horizontal: responsive.spacing5,
+              vertical: responsive.spacing2,
+            ),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(responsive.spacing4),
-              color: Color(0xFFFF6B6B).withOpacity(0.15),
+              color: const Color(0xFFFF6B6B).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(responsive.spacing3),
             ),
             child: text(
-              text: '${_calculateDiscount(actualPrice, discountPrice).toInt()}% off',
-              size: responsive.fontSize10,
+              text:
+                  '${_calcDiscount(actual.toDouble(), discounted.toDouble()).toInt()}% off',
+              size: responsive.fontSize9,
               fontWeight: FontWeight.w600,
-              color: Color(0xFFFF6B6B),
+              color: const Color(0xFFFF6B6B),
             ),
           ),
         ],
@@ -188,8 +248,7 @@ class FoodWidget extends StatelessWidget {
     );
   }
 
-  // ✅ Action Button - Show QuantityControlWidget for Scenario 1, Add/Edit button for others
-  Widget _buildActionButton(
+  Widget _buildAction(
     BuildContext context,
     RestaurantDetailViewController controller,
     bool hasCustomizations,
@@ -197,104 +256,88 @@ class FoodWidget extends StatelessWidget {
     ResponsiveHelper responsive,
   ) {
     final foodId = foodItem.foodId ?? '';
-    if (foodId.isEmpty) return SizedBox();
+    if (foodId.isEmpty) return const SizedBox.shrink();
 
     final isScenario1 = !hasCustomizations && !hasAddOns;
 
-    // ✅ SCENARIO 1: Show QuantityControlWidget - Full width and centered
     if (isScenario1) {
       return Obx(() {
-        final quantity = controller.cartFoodQuantity[foodId] ?? 0;
-
-        return Container(
-          width: responsive.screenWidth,
+        final qty = controller.cartFoodQuantity[foodId] ?? 0;
+        return SizedBox(
           height: responsive.spacing36,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-            color: AppColor.white,
-          ),
-          child: Center(
-            child: QuantityControlWidget(
-              quantity: quantity,
-              onIncrease: () {
-                debugPrint('🍕 Increase quantity: ${foodItem.foodName}');
-                controller.increaseScenario1Quantity(foodId);
-              },
-              onDecrease: () {
-                debugPrint('🍕 Decrease quantity: ${foodItem.foodName}');
-                controller.decreaseScenario1Quantity(foodId);
-              },
-              showRemoveButton: true,
-              buttonSize: responsive.spacing28,
-              iconSize: responsive.fontSize14,
-              addButtonText: 'Add',
-            ),
+          child: QuantityControlWidget(
+            quantity: qty,
+            onIncrease: () => controller.increaseScenario1Quantity(foodId),
+            onDecrease: () => controller.decreaseScenario1Quantity(foodId),
+            showRemoveButton: true,
+            buttonSize: responsive.spacing28,
+            iconSize: responsive.fontSize13,
+            addButtonText: 'Add',
           ),
         );
       });
     }
 
-    // ✅ SCENARIOS 2-4: Show Add/Edit button with bottom sheet
     return Obx(() {
-      final foodId = foodItem.foodId ?? '';
-      if (foodId.isEmpty) {
-        return GestureDetector(
-          onTap: () {
-            debugPrint('🔵 Add button tapped (no food ID)');
-            _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, responsive, isEdit: false);
-          },
-          child: Container(
-            width: responsive.screenWidth,
-            height: responsive.spacing36,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-              color: AppColor.appPrimary,
-            ),
-            child: Center(
-              child: text(text: 'Add', size: responsive.fontSize13, fontWeight: FontWeight.w600, color: AppColor.white),
-            ),
-          ),
-        );
-      }
+      final inCart =
+          (controller.cartFoodQuantity[foodId] ?? 0) > 0 ||
+          (controller.cartCustomizationQuantity[foodId]?.values.any(
+                (q) => q > 0,
+              ) ??
+              false);
 
-      // ✅ Check all conditions for item in cart
-      final hasFoodInCart = controller.cartFoodQuantity.containsKey(foodId) && controller.cartFoodQuantity[foodId]! > 0;
-
-      final hasCustomizationsInCart =
-          controller.cartCustomizationQuantity.containsKey(foodId) &&
-          controller.cartCustomizationQuantity[foodId]!.isNotEmpty &&
-          controller.cartCustomizationQuantity[foodId]!.values.any((qty) => qty > 0);
-
-      final isInCart = hasFoodInCart || hasCustomizationsInCart;
-
-      final isEditMode = isInCart;
-      final buttonText = isEditMode ? 'Edit' : 'Add';
-      final bgColor = isEditMode ? AppColor.appPrimary.withOpacity(0.15) : AppColor.appPrimary;
-      final textColor = isEditMode ? AppColor.appPrimary : AppColor.white;
+      final isEdit = inCart;
+      final label = isEdit ? 'Edit' : 'Add';
+      final bg =
+          isEdit ? AppColor.appPrimary.withOpacity(0.12) : AppColor.appPrimary;
+      final fg = isEdit ? AppColor.appPrimary : AppColor.white;
 
       return GestureDetector(
-        onTap: () {
-          debugPrint('🔵 $buttonText button tapped: ${foodItem.foodName}');
-          _showFoodBottomSheet(context, controller, hasCustomizations, hasAddOns, responsive, isEdit: isEditMode);
-        },
-        child: Container(
-          width: responsive.screenWidth,
+        onTap:
+            () => _openSheet(
+              context,
+              controller,
+              hasCustomizations,
+              hasAddOns,
+              responsive,
+              isEdit: isEdit,
+            ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: double.infinity,
           height: responsive.spacing36,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-            color: bgColor,
-            border: isEditMode ? Border.all(color: AppColor.appPrimary, width: 1.5) : null,
+            color: bg,
+            border:
+                isEdit
+                    ? Border.all(color: AppColor.appPrimary, width: 1.2)
+                    : null,
+            boxShadow:
+                isEdit
+                    ? null
+                    : [
+                      BoxShadow(
+                        color: AppColor.appPrimary.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
           ),
           child: Center(
-            child: text(text: buttonText, size: responsive.fontSize13, fontWeight: FontWeight.w600, color: textColor),
+            child: text(
+              text: label,
+              size: responsive.fontSize12,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
           ),
         ),
       );
     });
   }
 
-  // ✅ Show appropriate bottom sheet based on scenario
-  void _showFoodBottomSheet(
+  void _openSheet(
     BuildContext context,
     RestaurantDetailViewController controller,
     bool hasCustomizations,
@@ -302,50 +345,30 @@ class FoodWidget extends StatelessWidget {
     ResponsiveHelper responsive, {
     required bool isEdit,
   }) {
-    debugPrint('🔵 _showFoodBottomSheet called - isEdit: $isEdit, food: ${foodItem.foodName}');
-
     controller.selectFoodItem(foodItem, isEdit: isEdit);
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       enableDrag: true,
-      isDismissible: true,
-      builder: (context) {
-        debugPrint('🔵 Bottom sheet builder called');
-        return FoodDetailsBottomSheet();
-      },
-    ).then((_) {
-      debugPrint('🔵 Bottom sheet closed');
-      controller.resetBottomSheetState();
-    });
+      builder: (_) => const FoodDetailsBottomSheet(),
+    ).then((_) => controller.resetBottomSheetState());
   }
 
-  // ✅ Share food using shareLink
-  void _shareFood() {
-    debugPrint('📤 Sharing food item');
-    if (foodItem.shareLink != null && foodItem.shareLink!.isNotEmpty) {
-      debugPrint('Share Link: ${foodItem.shareLink}');
-      Get.snackbar(
-        'Share',
-        'Sharing: ${foodItem.foodName}',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: Duration(seconds: 2),
-      );
-    } else {
-      Get.snackbar('Share', 'Share link not available');
-    }
+  /// Opens native share sheet with the food's shareLink.
+  /// Only called when shareLink is confirmed non-null/non-empty.
+  Future<void> _shareFood() async {
+    final link = foodItem.shareLink;
+    if (link == null || link.isEmpty) return;
+
+    final name = foodItem.foodName ?? 'this dish';
+    await Share.share('Check out $name on EatPlek! 🍽️\n$link', subject: name);
   }
 
-  // ✅ Capitalize first letter of food name
-  String _capitalizeFirstLetter(String text) {
-    if (text.isEmpty) return text;
-    return text[0].toUpperCase() + text.substring(1);
-  }
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 
-  // ✅ Calculate discount percentage
-  double _calculateDiscount(double actual, double discounted) {
+  double _calcDiscount(double actual, double discounted) {
     if (actual == 0) return 0;
     return ((actual - discounted) / actual) * 100;
   }

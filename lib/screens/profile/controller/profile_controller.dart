@@ -1,8 +1,11 @@
 import 'package:eatplek_app/core/network/api_client.dart';
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/routes/routes.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../core/service/notification_services.dart';
 import '../model/user_profile_model.dart';
 
 class ProfileController extends GetxController {
@@ -16,15 +19,17 @@ class ProfileController extends GetxController {
 
   bool _hasFetched = false;
 
-  @override
-  void onInit() {
-    super.onInit();
-    fetchProfile();
-  }
-
+  /// Called from ProfileView.initState() — safe because by then the user is
+  /// logged in and the bottom nav is visible.
   Future<void> fetchProfile({bool forceRefresh = false}) async {
     if (_hasFetched && !forceRefresh) {
       debugPrint('👤 ProfileController: Using cached profile data');
+      return;
+    }
+
+    // Guard — no token means the user isn't logged in yet
+    if (Store.userToken.isEmpty) {
+      debugPrint('👤 ProfileController: skipping fetch — no token');
       return;
     }
 
@@ -70,6 +75,7 @@ class ProfileController extends GetxController {
       if (response['success'] == true) {
         if (userData.value != null) {
           userData.value = userData.value!.copyWith(name: newName.trim());
+          Store.name = newName.trim();
         }
         debugPrint('✅ ProfileController: Name updated to ${newName.trim()}');
         return true;
@@ -85,6 +91,54 @@ class ProfileController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  Future<void> logout() async {
+    try {
+      debugPrint('👤 ProfileController: Logging out...');
+
+      await _apiClient.post(
+        endpoint: Urls.logout,
+        data: {},
+        headers: {'Authorization': 'Bearer ${Store.refreshToken}'},
+      );
+
+      // ── OneSignal: dissociate this device from the user ──────────
+      NotificationService.instance.clearUser();
+
+      await Store.clear();
+      debugPrint('✅ ProfileController: Logout API success');
+    } catch (e) {
+      debugPrint('⚠️ ProfileController: Logout API error (proceeding) — $e');
+      // Still clear OneSignal even if API call fails
+      NotificationService.instance.clearUser();
+    } finally {
+      await _clearSessionAndRedirect();
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      debugPrint('👤 ProfileController: Deleting account...');
+
+      await _apiClient.delete(endpoint: Urls.deleteAccount);
+
+      // ── OneSignal: dissociate this device from the deleted user ──
+      NotificationService.instance.clearUser();
+
+      debugPrint('✅ ProfileController: Account deleted');
+    } catch (e) {
+      debugPrint('⚠️ ProfileController: Delete API error (proceeding) — $e');
+      NotificationService.instance.clearUser();
+    } finally {
+      await _clearSessionAndRedirect();
+    }
+  }
+
+  /// Clears local storage and sends user to splash.
+  Future<void> _clearSessionAndRedirect() async {
+    await Store.clear();
+    Get.offAllNamed(Routes.splash);
   }
 
   @override

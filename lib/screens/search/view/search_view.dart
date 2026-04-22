@@ -161,7 +161,7 @@ class SearchVendorView extends StatelessWidget {
     ResponsiveHelper responsive,
   ) {
     return Container(
-      height: responsive.spacing48 ?? 48,
+      height: responsive.spacing48,
       decoration: BoxDecoration(
         color: AppColor.white,
         borderRadius: BorderRadius.circular(responsive.cardBorderRadius),

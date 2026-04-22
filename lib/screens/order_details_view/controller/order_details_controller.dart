@@ -124,7 +124,6 @@ class OrderDetailsController extends GetxController {
     );
 
     if (confirm == true) {
-      // TODO: wire up cancel API
       Get.snackbar('Success', 'Order has been cancelled');
     }
   }

@@ -78,8 +78,20 @@ class OrdersController extends GetxController
       }
     });
 
-    // Fetch first tab immediately
-    _fetchOrders(0);
+    // ✅ Do NOT call _fetchOrders(0) here.
+    // OrdersView is mounted inside IndexedStack at app start even when the
+    // orders tab is not visible. Fetching here fires the API on every app
+    // launch regardless of which tab the user is on.
+    // BottomNavController.setBottomBarIndex() calls fetchFirstTabIfNeeded()
+    // when the user actually taps the orders tab for the first time.
+  }
+
+  /// Called by BottomNavController when the orders tab becomes active.
+  /// Fetches the first tab only if it hasn't been loaded yet.
+  void fetchFirstTabIfNeeded() {
+    if (!tabStates[0].isFetched && !tabStates[0].isInitialLoading) {
+      _fetchOrders(0);
+    }
   }
 
   @override

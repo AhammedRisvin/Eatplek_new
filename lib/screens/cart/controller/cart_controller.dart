@@ -57,7 +57,10 @@ class CartController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _fetchCartData();
+    // ✅ DO NOT call _fetchCartData() here.
+    // CartView is mounted inside IndexedStack at app start even when not visible.
+    // Fetching here would fire the cart API on every app launch regardless of screen.
+    // CartView.initState() calls fetchCartData() explicitly when user opens cart.
     _listenToCartServiceUpdates();
   }
 

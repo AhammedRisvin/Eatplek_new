@@ -3,6 +3,7 @@ import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../core/routes/routes.dart';
 import '../../../../core/util/responsive_helper.dart';
 import '../../controller/order_confirmation_controller.dart';
 import '../../service/phonepay_service.dart';
@@ -35,7 +36,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // ── Drag handle ──
+            // Drag handle
             Container(
               width: responsive.spacing120,
               height: responsive.spacing4,
@@ -50,7 +51,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
             SizedBox(height: responsive.spacing8),
 
-            // ── Status icon ──
+            // Status icon
             Container(
               width: 80,
               height: 80,
@@ -63,7 +64,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
             SizedBox(height: responsive.spacing20),
 
-            // ── Title ──
+            // Title
             text(
               text: _titleText,
               size: responsive.fontSize20,
@@ -74,7 +75,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
             SizedBox(height: responsive.spacing8),
 
-            // ── Subtitle ──
+            // Subtitle
             text(
               text: _subtitleText,
               size: responsive.fontSize14,
@@ -83,7 +84,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
 
-            // ── Transaction reference (success + pending only) ──
+            // Order reference
             if (result.merchantOrderId != null &&
                 result.merchantOrderId!.isNotEmpty) ...[
               SizedBox(height: responsive.spacing16),
@@ -123,7 +124,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
             SizedBox(height: responsive.spacing24),
 
-            // ── Primary CTA ──
+            // Primary CTA
             button(
               name: _primaryButtonText,
               width: responsive.widthPercent(100),
@@ -139,7 +140,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
             SizedBox(height: responsive.spacing12),
 
-            // ── Secondary CTA — failure and pending only ──
+            // Secondary CTA — failure and pending only
             if (!result.isSuccess) ...[
               GestureDetector(
                 onTap: () => _onSecondaryTap(),
@@ -167,7 +168,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
               SizedBox(height: responsive.spacing12),
             ],
 
-            // ── Security badge ──
+            // Security badge
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -220,7 +221,6 @@ class PaymentResultBottomSheet extends StatelessWidget {
     if (result.isPending) {
       return 'Your payment is being processed.\nWe\'ll update your order once confirmed.';
     }
-    // For failure, show the backend error message if available
     if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
       return result.errorMessage!;
     }
@@ -234,25 +234,33 @@ class PaymentResultBottomSheet extends StatelessWidget {
   }
 
   void _onPrimaryTap() {
-    Navigator.of(Get.context!).pop();
+    // Dismiss the bottom sheet first
+    if (Get.isBottomSheetOpen ?? false) Get.back();
 
     if (result.isSuccess) {
-      // Clear cart then navigate to order tracking
+      // Clear cart first (non-blocking)
       controller.clearCartAfterPayment();
-      // TODO: replace '/home' with your actual order tracking route when ready
-      // e.g. Get.offAllNamed(AppRoutes.orderTracking, arguments: {'orderId': controller.placedOrderId})
-      Get.offAllNamed('/home');
+
+      // ✅ SUCCESS NAVIGATION:
+      // 1. offAllNamed to bottomNav — clears entire stack, starts fresh
+      // 2. Then immediately push ordersView on top
+      // Result: back button from ordersView → bottomNav (home tab) → device back exits app
+      Get.offAllNamed(Routes.bottomNav);
+      Get.toNamed(Routes.ordersView);
     } else if (result.isPending) {
-      // Go to orders screen so user can monitor status
-      Get.offAllNamed('/home');
+      // PENDING: same navigation — go to orders so user can monitor
+      Get.offAllNamed(Routes.bottomNav);
+      Get.toNamed(Routes.ordersView);
     } else {
-      // Failed — retry the payment (reuses same placedOrderId, no new order created)
+      // FAILED: retry payment — reuses same placedOrderId, no new order
       controller.retryPayment();
     }
   }
 
   void _onSecondaryTap() {
-    Navigator.of(Get.context!).pop();
-    Get.offAllNamed('/home');
+    if (Get.isBottomSheetOpen ?? false) Get.back();
+    // Go to my orders from secondary button too
+    Get.offAllNamed(Routes.bottomNav);
+    Get.toNamed(Routes.ordersView);
   }
 }

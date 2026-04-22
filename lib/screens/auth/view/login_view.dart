@@ -2,12 +2,12 @@ import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
 import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../controller/auth_controller.dart';
 import 'widget/login_form_widget.dart';
 import 'widget/otp_verification_widget.dart';
-import 'widget/profile_completion_widget.dart';
 
 class AuthView extends StatelessWidget {
   const AuthView({super.key});
@@ -20,107 +20,145 @@ class AuthView extends StatelessWidget {
       resizeToAvoidBottomInset: false,
       body: GetBuilder<AuthController>(
         id: 'auth_screen',
-        builder: (controller) {
-          return Stack(
-            children: [
-              _buildMainContent(context, controller, responsive),
-              if (controller.showProfileBottomSheet) ProfileCompletionWidget(controller: controller),
-            ],
-          );
-        },
+        builder: (controller) => _buildContent(context, controller, responsive),
       ),
     );
   }
 
-  Widget _buildMainContent(BuildContext context, AuthController controller, ResponsiveHelper responsive) {
+  Widget _buildContent(
+    BuildContext context,
+    AuthController controller,
+    ResponsiveHelper responsive,
+  ) {
     return SizedBox(
       height: responsive.screenHeight,
       width: responsive.screenWidth,
       child: Stack(
         children: [
-          // Background image header
+          // ── Background header image ────────────────────────────────────
           Container(
             width: responsive.screenWidth,
             height: responsive.spacing160 * 1.5,
-            decoration: BoxDecoration(
-              image: DecorationImage(image: AssetImage('assets/image/authbg.png'), fit: BoxFit.cover),
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/image/authbg.png'),
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          // Content container
+          ).animate().fade(duration: 500.ms),
+
+          // ── White card ─────────────────────────────────────────────────
           Positioned(
-            top: responsive.spacing160 * 1.4,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(responsive.largeBorderRadius),
-                  topRight: Radius.circular(responsive.largeBorderRadius),
-                ),
-              ),
-              child: Column(
-                children: [
-                  // Header section
-                  Padding(
-                    padding: EdgeInsets.only(top: responsive.spacing20),
-                    child: _buildAuthHeader(controller, responsive),
-                  ),
-                  // Form/OTP content
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
-                      child: _buildAuthContent(controller, responsive),
+                top: responsive.spacing160 * 1.38,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(responsive.largeBorderRadius),
+                      topRight: Radius.circular(responsive.largeBorderRadius),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
                   ),
-                  // Action buttons
-                  _buildAuthActions(context, controller, responsive),
-                ],
+                  child: Column(
+                    children: [
+                      // Header
+                      Padding(
+                        padding: EdgeInsets.only(top: responsive.spacing24),
+                        child: _buildHeader(controller, responsive),
+                      ),
+
+                      // Form / OTP
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: responsive.spacing16,
+                          ),
+                          physics: const BouncingScrollPhysics(),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: responsive.spacing20,
+                            ),
+                            child:
+                                controller.isFormStep
+                                    ? LoginFormWidget(controller: controller)
+                                    : OtpVerificationWidget(
+                                      controller: controller,
+                                    ),
+                          ),
+                        ),
+                      ),
+
+                      // Action buttons
+                      _buildActions(context, controller, responsive),
+                    ],
+                  ),
+                ),
+              )
+              .animate()
+              .fade(duration: 400.ms, delay: 150.ms)
+              .slideY(
+                begin: 0.08,
+                end: 0,
+                duration: 400.ms,
+                delay: 150.ms,
+                curve: Curves.easeOut,
               ),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildAuthHeader(AuthController controller, ResponsiveHelper responsive) {
+  Widget _buildHeader(AuthController controller, ResponsiveHelper responsive) {
     return Column(
       children: [
-        Text(
-          controller.title,
-          style: TextStyle(fontSize: responsive.fontSize26, fontWeight: FontWeight.w700, color: Colors.black),
-          textAlign: TextAlign.center,
-        ),
-        SizedBox(height: responsive.spacing10),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
           child: Text(
-            controller.subtitle,
+            controller.title,
+            key: ValueKey(controller.title),
             style: TextStyle(
-              fontSize: responsive.fontSize16,
-              fontWeight: FontWeight.w400,
-              color: AppColor.black.withOpacity(0.6),
+              fontSize: responsive.fontSize24,
+              fontWeight: FontWeight.w800,
+              color: AppColor.black,
             ),
             textAlign: TextAlign.center,
+          ),
+        ),
+        SizedBox(height: responsive.spacing8),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Padding(
+            key: ValueKey(controller.subtitle),
+            padding: EdgeInsets.symmetric(horizontal: responsive.spacing20),
+            child: Text(
+              controller.subtitle,
+              style: TextStyle(
+                fontSize: responsive.fontSize14,
+                fontWeight: FontWeight.w400,
+                color: AppColor.black.withOpacity(0.55),
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildAuthContent(AuthController controller, ResponsiveHelper responsive) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: responsive.spacing20),
-      child:
-          controller.isFormStep
-              ? LoginFormWidget(controller: controller)
-              : OtpVerificationWidget(controller: controller),
-    );
-  }
-
-  Widget _buildAuthActions(BuildContext context, AuthController controller, ResponsiveHelper responsive) {
+  Widget _buildActions(
+    BuildContext context,
+    AuthController controller,
+    ResponsiveHelper responsive,
+  ) {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.only(
@@ -132,49 +170,55 @@ class AuthView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Primary action button
           button(
             name: controller.buttonText,
             borderRadius: BorderRadius.circular(responsive.spacing40),
             height: responsive.buttonHeight,
             isLoading: controller.isLoading,
-            onTap: controller.isLoading ? () {} : controller.handleAuthAction,
+            onTap: controller.isLoading ? null : controller.handleAuthAction,
           ),
-          SizedBox(height: responsive.spacing10),
-          if (controller.isOtpStep) _buildResendOtpSection(controller, responsive),
+
+          // Resend OTP link
+          if (controller.isOtpStep) ...[
+            SizedBox(height: responsive.spacing12),
+            _buildResendRow(controller, responsive),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildResendOtpSection(AuthController controller, ResponsiveHelper responsive) {
+  Widget _buildResendRow(
+    AuthController controller,
+    ResponsiveHelper responsive,
+  ) {
     final canResend = controller.canResend;
     final isDisabled = !canResend || controller.isLoading;
 
     return GestureDetector(
-      onTap:
-          isDisabled
-              ? null
-              : () {
-                if (canResend) controller.resendOtp();
-              },
+      onTap: isDisabled ? null : controller.resendOtp,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             controller.switchText,
             style: TextStyle(
-              fontSize: responsive.fontSize16,
-              fontWeight: FontWeight.w500,
-              color: AppColor.black.withOpacity(0.6),
+              fontSize: responsive.fontSize14,
+              fontWeight: FontWeight.w400,
+              color: AppColor.black.withOpacity(0.55),
             ),
           ),
           SizedBox(width: responsive.spacing6),
           Text(
             controller.switchActionText,
             style: TextStyle(
-              fontSize: responsive.fontSize16,
+              fontSize: responsive.fontSize14,
               fontWeight: FontWeight.w700,
-              color: isDisabled ? AppColor.black.withOpacity(0.4) : AppColor.appPrimary,
+              color:
+                  isDisabled
+                      ? AppColor.black.withOpacity(0.3)
+                      : AppColor.appPrimary,
             ),
           ),
         ],

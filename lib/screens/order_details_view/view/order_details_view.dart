@@ -1,11 +1,12 @@
-import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
 
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
+import '../../../core/util/responsive_helper.dart';
 import '../../cart/view/widget/price_summary_widget.dart';
 import '../../orders/model/orders_api_model.dart';
 import '../controller/order_details_controller.dart';
@@ -17,6 +18,8 @@ class OrderDetailsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+
     return GetBuilder<OrderDetailsController>(
       init: OrderDetailsController(),
       id: 'order_details',
@@ -25,53 +28,64 @@ class OrderDetailsView extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColor.scaffoldColor,
-          appBar: _buildAppBar(context),
+          appBar: _buildAppBar(context, responsive),
           body:
               order == null
-                  ? _buildNoOrder(controller)
+                  ? emptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'Order details not available',
+                  )
                   : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(responsive.spacing16),
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Tracking steps ─────────────────────────────────
+                        // ── Tracking steps ───────────────────────────────
                         TrackPreparationWidget(
-                          steps: controller.trackingSteps,
-                          vendorName: order.vendor?.name ?? '',
-                          onTrackTap: null, // extend later if needed
-                        ),
+                              steps: controller.trackingSteps,
+                              vendorName: order.vendor?.name ?? '',
+                              onTrackTap: null,
+                            )
+                            .animate()
+                            .fade(duration: 400.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 400.ms),
 
-                        // ── Estimated time banner (delivery only) ──────────
+                        // ── Delivery time banner ─────────────────────────
                         if (order.serviceType == 'delivery' &&
                             order.serviceDetails?.reachTime != null)
-                          _buildTimeEstimateBanner(
+                          _buildTimeBanner(
                             order.serviceDetails!.reachTime!,
-                          ),
+                            responsive,
+                          ).animate().fade(duration: 350.ms, delay: 80.ms),
 
-                        // ── Restaurant & order info ─────────────────────────
-                        RestaurantAndOrderInfoSection(order: order),
+                        // ── Restaurant & order info ──────────────────────
+                        RestaurantAndOrderInfoSection(
+                          order: order,
+                        ).animate().fade(duration: 350.ms, delay: 120.ms),
 
-                        // ── Pickup note for takeaway ────────────────────────
+                        // ── Pickup note ──────────────────────────────────
                         if (order.serviceType == 'takeaway') ...[
-                          text(
-                            text:
-                                'Please show your order ID at the counter to collect your food.',
-                            size: 12,
-                            fontWeight: FontWeight.w400,
-                            color: AppColor.black.withOpacity(0.6),
-                          ),
-                          10.h,
+                          _buildPickupNote(
+                            responsive,
+                          ).animate().fade(duration: 350.ms, delay: 150.ms),
+                          SizedBox(height: responsive.spacing10),
                         ],
 
-                        // ── Cart items ──────────────────────────────────────
-                        _buildCartItemsSection(controller),
+                        // ── Cart items ───────────────────────────────────
+                        _buildItemsCard(
+                          controller,
+                          responsive,
+                        ).animate().fade(duration: 350.ms, delay: 180.ms),
 
-                        // ── Additional notes ────────────────────────────────
-                        if (order.notes != null &&
-                            order.notes.toString().isNotEmpty)
-                          _buildAdditionalNotesCard(order.notes.toString()),
+                        // ── Additional notes ─────────────────────────────
+                        if (order.notes?.toString().isNotEmpty ?? false)
+                          _buildNotesCard(
+                            order.notes.toString(),
+                            responsive,
+                          ).animate().fade(duration: 350.ms, delay: 210.ms),
 
-                        // ── Price summary ───────────────────────────────────
+                        // ── Price summary ────────────────────────────────
                         PriceSummaryWidget(
                           subtotal: controller.subTotal,
                           deliveryFee: null,
@@ -82,36 +96,41 @@ class OrderDetailsView extends StatelessWidget {
                                   ? controller.couponDiscount
                                   : controller.discountTotal,
                           totalAmount: controller.grandTotal,
-                        ),
-
-                        // Bottom nav breathing room
-                        const SizedBox(height: 20),
+                          margin: EdgeInsets.only(bottom: responsive.spacing20),
+                        ).animate().fade(duration: 350.ms, delay: 240.ms),
                       ],
                     ),
                   ),
           bottomNavigationBar:
               order == null
                   ? const SizedBox.shrink()
-                  : _buildBottomBar(context, controller),
+                  : _buildBottomBar(context, controller, responsive),
         );
       },
     );
   }
 
-  // ── App bar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    ResponsiveHelper responsive,
+  ) {
     return AppBar(
       elevation: 0,
       backgroundColor: AppColor.scaffoldColor,
       centerTitle: true,
-      leadingWidth: 80,
-      title: text(text: 'Order Details', size: 18, fontWeight: FontWeight.w600),
+      leadingWidth: responsive.spacing80,
+      title: text(
+        text: 'Order Details',
+        size: responsive.fontSize18,
+        fontWeight: FontWeight.w700,
+      ),
       leading: GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Center(
           child: Container(
-            width: 44,
-            height: 44,
+            width: responsive.spacing40,
+            height: responsive.spacing40,
+            padding: EdgeInsets.all(responsive.spacing10),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: AppColor.white,
@@ -122,12 +141,11 @@ class OrderDetailsView extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
+                  blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(12),
             child: SvgPicture.string(arrowBack2),
           ),
         ),
@@ -135,30 +153,35 @@ class OrderDetailsView extends StatelessWidget {
     );
   }
 
-  // ── Delivery time banner ──────────────────────────────────────────────────
-  Widget _buildTimeEstimateBanner(DateTime reachTime) {
-    final now = DateTime.now();
-    final diff = reachTime.difference(now);
-    final minsLeft = diff.inMinutes;
-    final label = minsLeft > 0 ? 'Arriving in $minsLeft mins' : 'Arriving soon';
+  // ── ETA banner ────────────────────────────────────────────────────────────
+  Widget _buildTimeBanner(DateTime reachTime, ResponsiveHelper responsive) {
+    final diff = reachTime.difference(DateTime.now()).inMinutes;
+    final label = diff > 0 ? 'Arriving in $diff mins' : 'Arriving soon';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.all(responsive.spacing16),
+      margin: EdgeInsets.only(bottom: responsive.spacing12),
       decoration: BoxDecoration(
         color: AppColor.appPrimary,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.appPrimary.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           SvgPicture.string(scooterSvg),
-          14.w,
+          SizedBox(width: responsive.spacing12),
           Expanded(
             child: text(
-              text: 'Estimated Delivery Time: $label',
-              fontWeight: FontWeight.w500,
-              size: 14,
+              text: 'Estimated Delivery: $label',
+              fontWeight: FontWeight.w600,
+              size: responsive.fontSize14,
               color: AppColor.white,
             ),
           ),
@@ -167,67 +190,118 @@ class OrderDetailsView extends StatelessWidget {
     );
   }
 
-  // ── Cart items card ───────────────────────────────────────────────────────
-  Widget _buildCartItemsSection(OrderDetailsController controller) {
-    final items = controller.getCartItems();
-    if (items.isEmpty) return const SizedBox.shrink();
-
+  // ── Pickup note ───────────────────────────────────────────────────────────
+  Widget _buildPickupNote(ResponsiveHelper responsive) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.all(responsive.spacing14),
+      margin: EdgeInsets.only(bottom: responsive.spacing12),
       decoration: BoxDecoration(
-        color: AppColor.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.black.withOpacity(0.03), width: 1),
-        boxShadow: [
-          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24),
-        ],
+        color: AppColor.appPrimary.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+        border: Border.all(color: AppColor.appPrimary.withOpacity(0.15)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          text(text: 'Order Items', size: 18, fontWeight: FontWeight.w600),
-          16.h,
-          ...items.map((item) => _buildItemRow(item)),
+          Icon(
+            Icons.info_outline_rounded,
+            size: responsive.fontSize16,
+            color: AppColor.appPrimary,
+          ),
+          SizedBox(width: responsive.spacing10),
+          Expanded(
+            child: text(
+              text:
+                  'Please show your order ID at the counter to collect your food.',
+              size: responsive.fontSize12,
+              fontWeight: FontWeight.w400,
+              color: AppColor.appPrimary.withOpacity(0.8),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildItemRow(Item item) {
+  // ── Order items card ──────────────────────────────────────────────────────
+  Widget _buildItemsCard(
+    OrderDetailsController controller,
+    ResponsiveHelper responsive,
+  ) {
+    final items = controller.getCartItems();
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(responsive.spacing20),
+      margin: EdgeInsets.only(bottom: responsive.spacing12),
+      decoration: BoxDecoration(
+        color: AppColor.white,
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+        border: Border.all(color: AppColor.black.withOpacity(0.04)),
+        boxShadow: [
+          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 20),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.fastfood_rounded,
+                size: responsive.fontSize16,
+                color: AppColor.appPrimary,
+              ),
+              SizedBox(width: responsive.spacing8),
+              text(
+                text: 'Order Items',
+                size: responsive.fontSize16,
+                fontWeight: FontWeight.w700,
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.spacing16),
+          ...items.map((item) => _buildItemRow(item, responsive)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemRow(Item item, ResponsiveHelper responsive) {
     final addOnCount =
         (item.addOns?.length ?? 0) + (item.customizations?.length ?? 0);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: EdgeInsets.only(bottom: responsive.spacing14),
       child: Row(
         children: [
-          image(
-            url: item.foodImage ?? '',
-            width: 56,
-            height: 56,
-            borderRadius: BorderRadius.circular(10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+            child: image(
+              url: item.foodImage ?? '',
+              width: responsive.spacing55,
+              height: responsive.spacing55,
+            ),
           ),
-          14.w,
+          SizedBox(width: responsive.spacing12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 text(
                   text: item.foodName ?? '—',
-                  size: 14,
+                  size: responsive.fontSize13,
                   fontWeight: FontWeight.w500,
                   maxLines: 2,
                   overFlow: TextOverflow.ellipsis,
                 ),
                 if (addOnCount > 0) ...[
-                  4.h,
+                  SizedBox(height: responsive.spacing3),
                   text(
-                    text: 'Add-ons ($addOnCount)',
-                    size: 12,
+                    text: '$addOnCount add-on${addOnCount > 1 ? 's' : ''}',
+                    size: responsive.fontSize11,
                     fontWeight: FontWeight.w400,
-                    color: AppColor.black.withOpacity(0.5),
+                    color: AppColor.black.withOpacity(0.45),
                   ),
                 ],
               ],
@@ -238,14 +312,14 @@ class OrderDetailsView extends StatelessWidget {
             children: [
               text(
                 text: 'x${item.quantity ?? 1}',
-                size: 13,
+                size: responsive.fontSize12,
                 fontWeight: FontWeight.w500,
-                color: AppColor.black.withOpacity(0.5),
+                color: AppColor.black.withOpacity(0.45),
               ),
-              4.h,
+              SizedBox(height: responsive.spacing3),
               text(
                 text: 'Rs.${item.itemTotal ?? item.effectivePrice ?? 0}',
-                size: 14,
+                size: responsive.fontSize13,
                 fontWeight: FontWeight.w600,
                 color: AppColor.black,
               ),
@@ -256,53 +330,43 @@ class OrderDetailsView extends StatelessWidget {
     );
   }
 
-  // ── Additional notes card ─────────────────────────────────────────────────
-  Widget _buildAdditionalNotesCard(String notes) {
+  // ── Additional notes ──────────────────────────────────────────────────────
+  Widget _buildNotesCard(String notes, ResponsiveHelper responsive) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.all(responsive.spacing16),
+      margin: EdgeInsets.only(bottom: responsive.spacing12),
       decoration: BoxDecoration(
         color: AppColor.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColor.black.withOpacity(0.03), width: 1),
+        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+        border: Border.all(color: AppColor.black.withOpacity(0.04)),
         boxShadow: [
-          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24),
+          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 20),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          text(text: 'Additional Notes', size: 18, fontWeight: FontWeight.w600),
-          10.h,
+          Row(
+            children: [
+              Icon(
+                Icons.sticky_note_2_outlined,
+                size: responsive.fontSize16,
+                color: AppColor.appPrimary,
+              ),
+              SizedBox(width: responsive.spacing8),
+              text(
+                text: 'Additional Notes',
+                size: responsive.fontSize15,
+                fontWeight: FontWeight.w700,
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.spacing10),
           text(
             text: notes,
-            size: 13,
+            size: responsive.fontSize13,
             fontWeight: FontWeight.w300,
-            color: AppColor.black.withOpacity(0.4),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── No order / error state ────────────────────────────────────────────────
-  Widget _buildNoOrder(OrderDetailsController controller) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 64,
-            color: AppColor.black.withOpacity(0.2),
-          ),
-          const SizedBox(height: 16),
-          text(
-            text: 'Order details not available',
-            size: 16,
-            fontWeight: FontWeight.w500,
             color: AppColor.black.withOpacity(0.5),
           ),
         ],
@@ -314,46 +378,51 @@ class OrderDetailsView extends StatelessWidget {
   Widget _buildBottomBar(
     BuildContext context,
     OrderDetailsController controller,
+    ResponsiveHelper responsive,
   ) {
     final canCancel = controller.canCancel;
 
     return Container(
-      width: double.infinity,
       color: AppColor.scaffoldColor,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      padding: EdgeInsets.fromLTRB(
+        responsive.spacing20,
+        responsive.spacing16,
+        responsive.spacing20,
+        responsive.spacing20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           button(
             name: 'Cancel Order',
             width: double.infinity,
-            fontSize: 18,
-            height: 60,
+            fontSize: responsive.fontSize16,
+            height: responsive.buttonHeight,
             fontWeight: FontWeight.w600,
-            borderRadius: BorderRadius.circular(100),
+            borderRadius: BorderRadius.circular(responsive.spacing100),
             onTap: canCancel ? controller.cancelOrder : null,
             color:
                 canCancel
                     ? const Color(0xFFFE6308).withOpacity(0.1)
-                    : AppColor.black.withOpacity(0.1),
+                    : AppColor.black.withOpacity(0.06),
             borderColor:
                 canCancel
                     ? const Color(0xFFFE6308).withOpacity(0.1)
-                    : AppColor.black.withOpacity(0.1),
+                    : AppColor.black.withOpacity(0.06),
             textColor:
                 canCancel
                     ? const Color(0xFFFE6308)
-                    : AppColor.black.withOpacity(0.4),
+                    : AppColor.black.withOpacity(0.35),
           ),
-          10.h,
+          SizedBox(height: responsive.spacing8),
           text(
             text:
                 canCancel
-                    ? 'Cancellation is allowed only before the restaurant accepts your order.'
+                    ? 'Cancellation allowed before restaurant accepts your order.'
                     : 'Order cannot be cancelled at this time.',
-            size: 14,
+            size: responsive.fontSize12,
             fontWeight: FontWeight.w400,
-            color: AppColor.black.withOpacity(0.6),
+            color: AppColor.black.withOpacity(0.5),
             textAlign: TextAlign.center,
           ),
         ],

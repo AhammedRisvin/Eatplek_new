@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
@@ -17,93 +18,122 @@ class BottomCartBar extends StatelessWidget {
 
     return GetBuilder<RestaurantDetailViewController>(
       id: 'bottom_cart_bar',
-      builder: (controller) {
+      builder: (_) {
         final cartService = Get.find<CartService>();
 
         return Obx(() {
           final totalItems = cartService.itemCount.value;
           final totalPrice = cartService.totalPrice.value;
 
-          if (totalItems == 0) {
-            debugPrint('🛒 BottomCartBar: Cart empty, hiding bar');
-            return SizedBox.shrink();
-          }
+          if (totalItems == 0) return const SizedBox.shrink();
 
-          final itemText = totalItems == 1 ? 'item' : 'items';
+          final itemLabel = totalItems == 1 ? 'item' : 'items';
 
-          debugPrint('🛒 BottomCartBar: Showing - $totalItems $itemText, ₹${totalPrice.toStringAsFixed(2)}');
-
-          return AnimatedSlide(
-            duration: Duration(milliseconds: 300),
-            offset: totalItems > 0 ? Offset.zero : Offset(0, 2),
-            child: Container(
-              width: Get.width,
-              decoration: BoxDecoration(
-                color: AppColor.appPrimary,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(responsive.largeBorderRadius)),
-                boxShadow: [
-                  BoxShadow(color: AppColor.appPrimary.withOpacity(0.3), blurRadius: 20, offset: Offset(0, -5)),
-                ],
-              ),
-              padding: EdgeInsets.only(
-                left: responsive.spacing16,
-                right: responsive.spacing16,
-                top: responsive.spacing12,
-                bottom: responsive.spacing16 + MediaQuery.of(context).viewPadding.bottom,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        text(
-                          text: '$totalItems $itemText added',
-                          size: responsive.fontSize14,
-                          fontWeight: FontWeight.w500,
-                          color: AppColor.white,
-                        ),
-                        SizedBox(height: responsive.spacing4),
-                        text(
-                          text: '₹${totalPrice.toStringAsFixed(0)}',
-                          size: responsive.fontSize18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColor.white,
-                        ),
-                      ],
-                    ),
+          return Container(
+                width: Get.width,
+                decoration: BoxDecoration(
+                  color: AppColor.appPrimary,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(responsive.largeBorderRadius),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      debugPrint('🛒 Navigating to cart');
-                      Get.toNamed(Routes.cartView);
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: responsive.spacing16, vertical: responsive.spacing10),
-                      decoration: BoxDecoration(
-                        color: AppColor.white,
-                        borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-                      ),
-                      child: Row(
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColor.appPrimary.withOpacity(0.35),
+                      blurRadius: 24,
+                      offset: const Offset(0, -6),
+                    ),
+                  ],
+                ),
+                padding: EdgeInsets.only(
+                  left: responsive.spacing16,
+                  right: responsive.spacing16,
+                  top: responsive.spacing14,
+                  bottom:
+                      responsive.spacing16 +
+                      MediaQuery.of(context).viewPadding.bottom,
+                ),
+                child: Row(
+                  children: [
+                    // ── Item count + price ─────────────────────────────────
+                    Expanded(
+                      child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           text(
-                            text: 'View Cart',
-                            size: responsive.fontSize14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColor.appPrimary,
+                            text: '$totalItems $itemLabel added',
+                            size: responsive.fontSize13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColor.white.withOpacity(0.85),
                           ),
-                          SizedBox(width: responsive.spacing4),
-                          Icon(Icons.arrow_forward, size: responsive.fontSize14, color: AppColor.appPrimary),
+                          SizedBox(height: responsive.spacing3),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Text(
+                              '₹${totalPrice.toStringAsFixed(0)}',
+                              key: ValueKey(totalPrice),
+                              style: TextStyle(
+                                fontSize: responsive.fontSize18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColor.white,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-          );
+
+                    // ── View Cart button ───────────────────────────────────
+                    GestureDetector(
+                      onTap: () => Get.toNamed(Routes.cartView),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: responsive.spacing16,
+                          vertical: responsive.spacing10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColor.white,
+                          borderRadius: BorderRadius.circular(
+                            responsive.largeBorderRadius,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            text(
+                              text: 'View Cart',
+                              size: responsive.fontSize13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColor.appPrimary,
+                            ),
+                            SizedBox(width: responsive.spacing5),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              size: responsive.fontSize14,
+                              color: AppColor.appPrimary,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+              .animate()
+              .slideY(
+                begin: 1,
+                end: 0,
+                duration: 300.ms,
+                curve: Curves.easeOutCubic,
+              )
+              .fade(duration: 200.ms);
         });
       },
     );

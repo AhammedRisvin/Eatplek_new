@@ -50,7 +50,11 @@ class _OfferViewState extends State<OfferView> {
   }
 
   Widget _buildHeader() {
-    return text(text: 'Today\'s Hot Offers', size: 26, fontWeight: FontWeight.w700);
+    return text(
+      text: 'Today\'s Hot Offers',
+      size: 26,
+      fontWeight: FontWeight.w700,
+    );
   }
 
   Widget _buildSearchField() {
@@ -103,7 +107,10 @@ class _OfferViewState extends State<OfferView> {
           text: _controller.offerCategories[index],
           size: 14,
           fontWeight: FontWeight.w400,
-          color: isSelected ? AppColor.white : const Color(0xff474747).withOpacity(0.6),
+          color:
+              isSelected
+                  ? AppColor.white
+                  : const Color(0xff474747).withOpacity(0.6),
         ),
       ),
     );
@@ -123,7 +130,8 @@ class _OfferViewState extends State<OfferView> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           itemCount: restaurants.length,
-          itemBuilder: (context, index) => _buildRestaurantCard(restaurants[index]),
+          itemBuilder:
+              (context, index) => _buildRestaurantCard(restaurants[index]),
           separatorBuilder: (context, index) => 15.h,
         );
       },
@@ -137,7 +145,11 @@ class _OfferViewState extends State<OfferView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.restaurant_menu, size: 48, color: AppColor.black.withOpacity(0.3)),
+          Icon(
+            Icons.restaurant_menu,
+            size: 48,
+            color: AppColor.black.withOpacity(0.3),
+          ),
           10.h,
           text(
             text: 'No offers available for this category',
@@ -160,7 +172,13 @@ class _OfferViewState extends State<OfferView> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColor.black.withOpacity(0.06)),
-          boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.black.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
@@ -184,7 +202,11 @@ class _OfferViewState extends State<OfferView> {
         errorBuilder: (context, error, stackTrace) {
           return Container(
             color: AppColor.black.withOpacity(0.1),
-            child: const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
+            child: const Icon(
+              Icons.image_not_supported,
+              size: 48,
+              color: Colors.grey,
+            ),
           );
         },
       ),
@@ -198,7 +220,11 @@ class _OfferViewState extends State<OfferView> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.transparent, AppColor.black.withOpacity(0.3), AppColor.black.withOpacity(0.7)],
+            colors: [
+              Colors.transparent,
+              AppColor.black.withOpacity(0.3),
+              AppColor.black.withOpacity(0.7),
+            ],
           ),
         ),
       ),
@@ -211,7 +237,11 @@ class _OfferViewState extends State<OfferView> {
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [_buildCardHeader(restaurant), const Spacer(), _buildRestaurantName(restaurant.name)],
+          children: [
+            _buildCardHeader(restaurant),
+            const Spacer(),
+            _buildRestaurantName(restaurant.name),
+          ],
         ),
       ),
     );
@@ -219,7 +249,11 @@ class _OfferViewState extends State<OfferView> {
 
   Widget _buildCardHeader(RestaurantOffer restaurant) {
     return Row(
-      children: [_buildRatingBadge(restaurant.rating), const Spacer(), _buildLocationInfo(restaurant.location)],
+      children: [
+        _buildRatingBadge(restaurant.rating),
+        const Spacer(),
+        _buildLocationInfo(restaurant.location),
+      ],
     );
   }
 
@@ -235,7 +269,12 @@ class _OfferViewState extends State<OfferView> {
         children: [
           const Icon(Icons.star, color: Color(0XFFFF6E00), size: 16),
           5.w,
-          text(text: rating.toString(), size: 12, fontWeight: FontWeight.w600, color: AppColor.white),
+          text(
+            text: rating.toString(),
+            size: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColor.white,
+          ),
         ],
       ),
     );
@@ -245,14 +284,31 @@ class _OfferViewState extends State<OfferView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Flexible(child: text(text: location, size: 13, fontWeight: FontWeight.w500, color: AppColor.white)),
+        Flexible(
+          child: text(
+            text: location,
+            size: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColor.white,
+          ),
+        ),
         8.w,
-        SvgPicture.string(locationSvg, color: AppColor.white, height: 16, width: 16),
+        SvgPicture.string(
+          locationSvg,
+          color: AppColor.white,
+          height: 16,
+          width: 16,
+        ),
       ],
     );
   }
 
   Widget _buildRestaurantName(String name) {
-    return text(text: name, size: 18, fontWeight: FontWeight.w600, color: AppColor.white);
+    return text(
+      text: name,
+      size: 18,
+      fontWeight: FontWeight.w600,
+      color: AppColor.white,
+    );
   }
 }

@@ -27,12 +27,12 @@ class PriceSummaryWidget extends StatelessWidget {
     super.key,
     required this.subtotal,
     required this.totalAmount,
-    this.deliveryFee, // nullable — show if not null (even if 0)
-    this.taxAmount, // nullable — show if not null (even if 0)
-    this.packingCharge, // nullable — show if not null (even if 0)
+    this.deliveryFee,
+    this.taxAmount,
+    this.packingCharge,
     this.promoDiscount = 0.0,
     this.appliedPromoCode = '',
-    this.currency = 'Rs.',
+    this.currency = '₹',
     this.showDeliveryFee = true,
     this.showTaxes = true,
     this.showPackingCharge = true,
@@ -41,82 +41,98 @@ class PriceSummaryWidget extends StatelessWidget {
     this.customDeliveryTitle,
     this.customTaxTitle,
     this.customPackingTitle,
-    this.discountColor = Colors.green,
+    this.discountColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
+    final effectiveDiscountColor = discountColor ?? const Color(0xFF00b894);
 
     return Container(
-      width: responsive.screenWidth,
-      padding: EdgeInsets.symmetric(
-        vertical: responsive.spacing20,
-        horizontal: responsive.spacing20,
-      ),
+      width: double.infinity,
+      padding: EdgeInsets.all(responsive.spacing20),
       margin: margin ?? EdgeInsets.only(bottom: responsive.spacing100),
       decoration: BoxDecoration(
         color: AppColor.white,
         borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
         border: Border.all(color: AppColor.black.withOpacity(0.03)),
         boxShadow: [
-          BoxShadow(
-            color: AppColor.black.withOpacity(0.05),
-            blurRadius: responsive.spacing24,
-            offset: const Offset(0, 0),
-          ),
+          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24),
         ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Subtotal ──────────────────────────────────────────────────────
-          _priceRow(
-            title: 'Subtotal',
-            value: '$currency${subtotal.toInt()}',
-            padding: EdgeInsets.only(bottom: responsive.spacing20),
+          // Header
+          Row(
+            children: [
+              const Icon(
+                Icons.receipt_long_rounded,
+                size: 16,
+                color: Colors.black54,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Bill Details',
+                style: TextStyle(
+                  fontSize: responsive.fontSize15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColor.black,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: responsive.spacing16),
+
+          // Subtotal
+          _row(
+            'Subtotal',
+            '$currency${subtotal.toInt()}',
             responsive: responsive,
           ),
 
-          // ── Delivery Fee — show if not null (even when value is 0) ────────
+          // Delivery fee
           if (showDeliveryFee && deliveryFee != null)
-            _priceRow(
-              title: customDeliveryTitle ?? 'Delivery Fee',
-              value: '$currency${deliveryFee!.toInt()}',
-              padding: EdgeInsets.only(bottom: responsive.spacing20),
+            _row(
+              customDeliveryTitle ?? 'Delivery Fee',
+              '$currency${deliveryFee!.toInt()}',
               responsive: responsive,
             ),
 
-          // ── Taxes — show if not null (even when value is 0) ───────────────
+          // Tax
           if (showTaxes && taxAmount != null)
-            _priceRow(
-              title: customTaxTitle ?? 'Taxes',
-              value: '$currency${taxAmount!.toInt()}',
-              padding: EdgeInsets.only(bottom: responsive.spacing20),
+            _row(
+              customTaxTitle ?? 'Taxes & Charges',
+              '$currency${taxAmount!.toInt()}',
               responsive: responsive,
             ),
 
-          // ── Packing Charge — show if not null (even when value is 0) ──────
+          // Packing charge
           if (showPackingCharge && packingCharge != null)
-            _priceRow(
-              title: customPackingTitle ?? 'Packing Charge',
-              value: '$currency${packingCharge!.toInt()}',
-              padding: EdgeInsets.only(bottom: responsive.spacing20),
+            _row(
+              customPackingTitle ?? 'Packing Charge',
+              '$currency${packingCharge!.toInt()}',
               responsive: responsive,
             ),
 
-          // ── Promo Discount — only show when actually applied (> 0) ────────
-          if (showPromoDiscount && promoDiscount > 0)
-            _priceRow(
-              title:
-                  'Discount${appliedPromoCode.isNotEmpty ? ' ($appliedPromoCode)' : ''}',
-              value: '-$currency${promoDiscount.toInt()}',
-              padding: EdgeInsets.only(bottom: responsive.spacing16),
-              isDiscount: true,
+          // Promo discount
+          if (showPromoDiscount && promoDiscount > 0) ...[
+            SizedBox(height: responsive.spacing4),
+            _row(
+              appliedPromoCode.isNotEmpty
+                  ? 'Discount ($appliedPromoCode)'
+                  : 'Discount',
+              '-$currency${promoDiscount.toInt()}',
               responsive: responsive,
+              valueColor: effectiveDiscountColor,
+              showSavingsBadge: true,
             ),
+          ],
 
-          // ── Dotted separator ──────────────────────────────────────────────
+          SizedBox(height: responsive.spacing12),
+
+          // Dotted divider
           SizedBox(
             height: 1,
             width: double.infinity,
@@ -126,26 +142,26 @@ class PriceSummaryWidget extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: responsive.spacing16),
+          SizedBox(height: responsive.spacing14),
 
-          // ── Total ─────────────────────────────────────────────────────────
+          // Total row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total',
+                'To Pay',
                 style: TextStyle(
                   fontSize: responsive.fontSize16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  color: AppColor.black,
                 ),
               ),
               Text(
                 '$currency${totalAmount.toInt()}',
                 style: TextStyle(
-                  fontSize: responsive.fontSize16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black,
+                  fontSize: responsive.fontSize18,
+                  fontWeight: FontWeight.w800,
+                  color: AppColor.appPrimary,
                 ),
               ),
             ],
@@ -155,33 +171,60 @@ class PriceSummaryWidget extends StatelessWidget {
     );
   }
 
-  Widget _priceRow({
-    required String title,
-    required String value,
-    required EdgeInsetsGeometry padding,
+  Widget _row(
+    String title,
+    String value, {
     required ResponsiveHelper responsive,
-    bool isDiscount = false,
+    Color? valueColor,
+    bool showSavingsBadge = false,
   }) {
     return Padding(
-      padding: padding,
+      padding: EdgeInsets.only(bottom: responsive.spacing12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
             style: TextStyle(
-              fontSize: responsive.fontSize16,
-              fontWeight: FontWeight.w500,
-              color: AppColor.black.withOpacity(0.6),
+              fontSize: responsive.fontSize13,
+              fontWeight: FontWeight.w400,
+              color: AppColor.black.withOpacity(0.55),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: responsive.fontSize16,
-              fontWeight: FontWeight.w500,
-              color: isDiscount ? discountColor : Colors.black,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showSavingsBadge)
+                Container(
+                  margin: EdgeInsets.only(right: responsive.spacing6),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: responsive.spacing6,
+                    vertical: responsive.spacing2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00b894).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(
+                      responsive.largeBorderRadius,
+                    ),
+                  ),
+                  child: Text(
+                    'Saving!',
+                    style: TextStyle(
+                      fontSize: responsive.fontSize9,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF00b894),
+                    ),
+                  ),
+                ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: responsive.fontSize13,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? AppColor.black,
+                ),
+              ),
+            ],
           ),
         ],
       ),

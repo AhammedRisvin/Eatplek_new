@@ -1,18 +1,20 @@
-import 'package:eatplek_app/core/bindings/orders_bindings.dart';
 import 'package:eatplek_app/screens/bottom_nav/controller/bottom_nav_controller.dart';
+import 'package:eatplek_app/screens/cart/controller/cart_controller.dart';
+import 'package:eatplek_app/screens/cart/controller/cart_extra_controller.dart';
 import 'package:eatplek_app/screens/home/controller/home_controller.dart';
-import 'package:eatplek_app/screens/profile/controller/profile_controller.dart';
+import 'package:eatplek_app/screens/orders/controller/orders_controller.dart';
 import 'package:get/get.dart';
 
-import '../../screens/cart/controller/cart_service.dart';
+import '../../screens/notification/cotroller/notification_controller.dart';
 
 class HomeBindings extends Bindings {
   @override
   void dependencies() {
     Get.lazyPut<HomeController>(() => HomeController());
-    Get.lazyPut<OrdersBindings>(() => OrdersBindings());
     Get.lazyPut<BottomNavController>(() => BottomNavController());
-    Get.lazyPut<ProfileController>(() => ProfileController());
-    Get.lazyPut<CartService>(() => CartService());
+    Get.lazyPut<OrdersController>(() => OrdersController());
+    Get.put<CartController>(CartController());
+    Get.put<CartExtrasController>(CartExtrasController());
+    Get.lazyPut<NotificationController>(() => NotificationController());
   }
 }

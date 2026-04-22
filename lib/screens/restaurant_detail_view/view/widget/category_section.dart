@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
@@ -18,75 +19,109 @@ class CategorySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCategoryHeader(responsive),
-        SizedBox(height: responsive.spacing14),
-        _buildCategoryTabs(responsive),
+        // Section header
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
+          child: text(
+            text: 'What would you like?',
+            fontWeight: FontWeight.w700,
+            size: responsive.fontSize16,
+            color: AppColor.black,
+          ),
+        ),
+        SizedBox(height: responsive.spacing12),
+        _buildTabs(responsive),
       ],
     );
   }
 
-  Widget _buildCategoryHeader(ResponsiveHelper responsive) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
-      child: text(text: 'What would you like?', fontWeight: FontWeight.w600, size: responsive.fontSize18),
-    );
-  }
-
-  Widget _buildCategoryTabs(ResponsiveHelper responsive) {
+  Widget _buildTabs(ResponsiveHelper responsive) {
     return GetBuilder<RestaurantDetailViewController>(
       id: 'category_tabs',
       builder: (controller) {
-        if (controller.categories.isEmpty) {
-          return SizedBox();
-        }
+        if (controller.categories.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: responsive.spacing50,
+          height: responsive.spacing40,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
             padding: EdgeInsets.symmetric(horizontal: responsive.spacing16),
-            itemBuilder: (context, index) {
-              final category = controller.categories[index];
-              final isSelected = controller.selectedCategoryIndex == index;
-
-              return _buildCategoryTab(category, isSelected, () => controller.onCategoryTapped(index), responsive);
-            },
-            separatorBuilder: (context, index) => SizedBox(width: responsive.spacing10),
+            physics: const BouncingScrollPhysics(),
             itemCount: controller.categories.length,
+            separatorBuilder: (_, _) => SizedBox(width: responsive.spacing8),
+            itemBuilder: (context, index) {
+              final isSelected = controller.selectedCategoryIndex == index;
+              return _buildTab(
+                label: controller.categories[index],
+                isSelected: isSelected,
+                index: index,
+                onTap: () => controller.onCategoryTapped(index),
+                responsive: responsive,
+              );
+            },
           ),
         );
       },
     );
   }
 
-  Widget _buildCategoryTab(String title, bool isSelected, VoidCallback onTap, ResponsiveHelper responsive) {
+  Widget _buildTab({
+    required String label,
+    required bool isSelected,
+    required int index,
+    required VoidCallback onTap,
+    required ResponsiveHelper responsive,
+  }) {
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: responsive.spacing11, vertical: responsive.spacing8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColor.appPrimary : Colors.grey[100],
-          borderRadius: BorderRadius.circular(responsive.spacing40),
-          border: Border.all(color: isSelected ? AppColor.appPrimary : Colors.grey[300]!, width: 1),
-        ),
-        child: Row(
-          children: [
-            image(
-              url: 'https://picsum.photos/250?image=20',
-              height: responsive.spacing24,
-              width: responsive.spacing24,
-              borderRadius: BorderRadius.circular(responsive.spacing24),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(
+              left: responsive.spacing14,
+              right: responsive.spacing14,
+              top: responsive.spacing10,
             ),
-            SizedBox(width: responsive.spacing10),
-            text(
-              text: title,
-              size: responsive.fontSize14,
-              fontWeight: FontWeight.w500,
-              color: isSelected ? AppColor.white : Colors.grey[700]!,
+            decoration: BoxDecoration(
+              color: isSelected ? AppColor.appPrimary : AppColor.white,
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+              border: Border.all(
+                color:
+                    isSelected
+                        ? AppColor.appPrimary
+                        : AppColor.black.withOpacity(0.1),
+                width: 1,
+              ),
+              boxShadow:
+                  isSelected
+                      ? [
+                        BoxShadow(
+                          color: AppColor.appPrimary.withOpacity(0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ]
+                      : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                        ),
+                      ],
             ),
-          ],
-        ),
-      ),
-    );
+            child: text(
+              text: label,
+              size: responsive.fontSize13,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+              color:
+                  isSelected
+                      ? AppColor.white
+                      : AppColor.black.withOpacity(0.65),
+            ),
+          ),
+        )
+        .animate(delay: Duration(milliseconds: 40 * index))
+        .fade(duration: 250.ms)
+        .slideX(begin: 0.1, end: 0, duration: 250.ms, curve: Curves.easeOut);
   }
 }

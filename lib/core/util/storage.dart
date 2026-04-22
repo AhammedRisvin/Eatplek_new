@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class Store {
   static const _userToken = "userToken";
+  static const _refreshTokenKey = "refreshToken";
 
   static late SharedPreferences _preference;
 
@@ -20,9 +21,34 @@ class Store {
     await _preference.clear();
   }
 
+  // ── Auth tokens ────────────────────────────────────────────────────────────
+
   static String get userToken => _preference.getString(_userToken) ?? '';
   static set userToken(String value) =>
       _preference.setString(_userToken, value);
+
+  static String get refreshToken =>
+      _preference.getString(_refreshTokenKey) ?? '';
+  static set refreshToken(String value) =>
+      _preference.setString(_refreshTokenKey, value);
+
+  /// Atomically saves both access token and refresh token in a single flush.
+  /// Always await this — it guarantees both values land on disk before
+  /// the caller retries the failed request.
+  static Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await Future.wait([
+      _preference.setString(_userToken, accessToken),
+      _preference.setString(_refreshTokenKey, refreshToken),
+    ]);
+    debugPrint(
+      '💾 Tokens saved — access: ...${accessToken.length > 10 ? accessToken.substring(accessToken.length - 10) : accessToken}',
+    );
+  }
+
+  // ── User profile ───────────────────────────────────────────────────────────
 
   static String get id => _preference.getString("id") ?? '';
   static set id(String value) => _preference.setString("id", value);
@@ -42,6 +68,24 @@ class Store {
   static String get status => _preference.getString("status") ?? '';
   static set status(String value) => _preference.setString("status", value);
 
+  static String get district => _preference.getString("district") ?? '';
+  static set district(String value) => _preference.setString("district", value);
+
+  static String get state => _preference.getString("state") ?? '';
+  static set state(String value) => _preference.setString("state", value);
+
+  static String get place => _preference.getString("place") ?? '';
+  static set place(String value) => _preference.setString("place", value);
+
+  static String get profileImage => _preference.getString("profileImage") ?? '';
+  static set profileImage(String value) =>
+      _preference.setString("profileImage", value);
+
+  static bool get profileComplete =>
+      _preference.getBool("profileComplete") ?? false;
+  static set profileComplete(bool value) =>
+      _preference.setBool("profileComplete", value);
+
   static String get showedOnBoarding =>
       _preference.getString("showedOnBoarding") ?? 'false';
   static set showedOnBoarding(String value) =>
@@ -51,6 +95,8 @@ class Store {
       _preference.getString("deliveryPreference") ?? '';
   static set deliveryPreference(String value) =>
       _preference.setString("deliveryPreference", value);
+
+  // ── Location ───────────────────────────────────────────────────────────────
 
   static double get userLatitude =>
       _preference.getDouble("userLatitude") ?? 0.0;
@@ -71,7 +117,6 @@ class Store {
       _preference.setBool("locationManuallyPicked", value);
 
   /// Atomically saves all manual location fields and sets the picked flag.
-  /// Must be awaited — guarantees everything is flushed to disk before returning.
   static Future<void> saveManualLocation({
     required double latitude,
     required double longitude,

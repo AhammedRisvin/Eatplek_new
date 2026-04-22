@@ -1,7 +1,8 @@
 import 'package:eatplek_app/screens/order_details_view/model/order_details_model.dart';
 import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
@@ -11,19 +12,28 @@ class MiniMapWidget extends StatelessWidget {
   final VoidCallback onMapTap;
   final VoidCallback onTrackTap;
 
-  const MiniMapWidget({super.key, required this.restaurant, required this.onMapTap, required this.onTrackTap});
+  const MiniMapWidget({
+    super.key,
+    required this.restaurant,
+    required this.onMapTap,
+    required this.onTrackTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final latLng = LatLng(restaurant.latitude, restaurant.longitude);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
-      margin: EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColor.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColor.black.withOpacity(0.03), width: 1),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
+        boxShadow: [
+          BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -37,7 +47,11 @@ class MiniMapWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      text(text: 'Track Preparation', size: 18, fontWeight: FontWeight.w600),
+                      text(
+                        text: 'Track Preparation',
+                        size: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
                       6.h,
                       text(
                         text: 'Real-time updates on your order status.',
@@ -66,28 +80,43 @@ class MiniMapWidget extends StatelessWidget {
             child: Container(
               height: 140,
               width: double.infinity,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(restaurant.latitude, restaurant.longitude),
-                    zoom: 15,
-                  ),
-                  markers: {
-                    Marker(
-                      markerId: const MarkerId('restaurant'),
-                      position: LatLng(restaurant.latitude, restaurant.longitude),
-                      infoWindow: InfoWindow(title: restaurant.name, snippet: restaurant.address),
+                child: IgnorePointer(
+                  // blocks scroll/zoom gestures, tap bubbles up to GestureDetector
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: latLng,
+                      initialZoom: 15,
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.none, // disables all gestures
+                      ),
                     ),
-                  },
-                  zoomControlsEnabled: false,
-                  scrollGesturesEnabled: false,
-                  zoomGesturesEnabled: false,
-                  rotateGesturesEnabled: false,
-                  tiltGesturesEnabled: false,
-                  mapToolbarEnabled: false,
-                  onTap: (_) => onMapTap(),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.eatplek.app',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: latLng,
+                            width: 40,
+                            height: 40,
+                            child: const Icon(
+                              Icons.location_pin,
+                              color: Colors.red,
+                              size: 40,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
