@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:eatplek_app/core/network/api_client.dart';
@@ -23,8 +24,6 @@ class ProfileCompletionController extends GetxController {
   bool _isLocationPermissionGranted = false;
 
   // ── Referral server-side validation state ──────────────────────────────────
-  /// True when the API explicitly rejected the referral code (400 response).
-  /// Resets to false the moment the user edits the field.
   bool _referralRejectedByServer = false;
 
   // ── Location ───────────────────────────────────────────────────────────────
@@ -43,18 +42,14 @@ class ProfileCompletionController extends GetxController {
   late FittorConnect _apiClient;
 
   // ── Getters ────────────────────────────────────────────────────────────────
-
   bool get isLoading => _isLoading;
   bool get isLocationLoading => _isLocationLoading;
   bool get isLocationPermissionGranted => _isLocationPermissionGranted;
   double? get latitude => _latitude;
   double? get longitude => _longitude;
   String? get placeName => _placeName;
-
-  /// True when the API rejected the code — drives the red state + clear button.
   bool get referralRejectedByServer => _referralRejectedByServer;
 
-  /// Regex-only check: empty = valid (field is optional).
   bool get isReferralCodeValid {
     final code = referralCodeController.text.trim();
     if (code.isEmpty) return true;
@@ -62,7 +57,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
-
   @override
   void onInit() {
     super.onInit();
@@ -90,9 +84,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Referral field interaction ─────────────────────────────────────────────
-
-  /// Called from the screen's onChanged — resets the server rejection flag
-  /// so the field goes back to neutral/validating state while the user edits.
   void onReferralChanged() {
     if (_referralRejectedByServer) {
       _referralRejectedByServer = false;
@@ -100,7 +91,6 @@ class ProfileCompletionController extends GetxController {
     }
   }
 
-  /// Clears the referral field and resets all referral state.
   void clearReferralCode() {
     referralCodeController.clear();
     _referralRejectedByServer = false;
@@ -108,7 +98,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Device info ────────────────────────────────────────────────────────────
-
   Future<void> _initDeviceInfo() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
@@ -129,7 +118,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Location ───────────────────────────────────────────────────────────────
-
   Future<void> requestLocationPermission() async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -261,7 +249,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Profile completion ─────────────────────────────────────────────────────
-
   Future<void> handleProfileCompletion() async {
     final name = nameController.text.trim();
 
@@ -308,6 +295,15 @@ class ProfileCompletionController extends GetxController {
 
       if (response['success'] == true) {
         await _storeUserData(response);
+
+        // ── Backend bug: returns "pending" even on success ─────────────
+        // Force "registered" so splash routes correctly on next cold start
+        Store.status = 'registered';
+        log('✅ Status forced to registered after profile completion');
+
+        // ── Identify user in OneSignal using fresh response data ────────
+        _identifyUserInOneSignal(response: response);
+
         Get.snackbar(
           'Success',
           response['message'] ?? 'Profile updated successfully!',
@@ -318,12 +314,10 @@ class ProfileCompletionController extends GetxController {
       } else {
         final message = (response['message'] ?? '').toString().toLowerCase();
 
-        // ── Server explicitly rejected the referral code ──────────────────
         if (message.contains('invalid referral code') ||
             message.contains('referral')) {
           _referralRejectedByServer = true;
           update(['profile_completion']);
-          // Don't show a snackbar — the inline field error is enough
         } else {
           _showErrorSnackbar(
             'Error',
@@ -332,7 +326,6 @@ class ProfileCompletionController extends GetxController {
         }
       }
     } catch (e) {
-      // FittorConnect throws the message string on 4xx — check it here too
       final err = e.toString().toLowerCase();
       if (err.contains('invalid referral code') || err.contains('referral')) {
         _referralRejectedByServer = true;
@@ -346,8 +339,34 @@ class ProfileCompletionController extends GetxController {
     }
   }
 
-  // ── Data storage ───────────────────────────────────────────────────────────
+  // ── OneSignal user identification ──────────────────────────────────────────
+  //
+  // Called after successful profile PUT. Uses response directly so there's
+  // no race condition with Store writes — freshest data guaranteed.
+  void _identifyUserInOneSignal({required Map<String, dynamic> response}) {
+    final data = response['data'] as Map<String, dynamic>?;
+    final userId = data?['id'] as String? ?? '';
 
+    if (userId.isEmpty) {
+      log('⚠️ OneSignal setUser skipped — id missing from response');
+      return;
+    }
+
+    final district = data?['district'] as String? ?? '';
+
+    NotificationService.instance.setUser(userId);
+    NotificationService.instance.setTags({
+      'user_type': 'customer',
+      'district': district.isNotEmpty ? district : 'unknown',
+    });
+
+    log('✅ OneSignal user identified: $userId | district: $district');
+  }
+
+  // ── Data storage ───────────────────────────────────────────────────────────
+  //
+  // Status rule: never downgrade. If Store is already "registered",
+  // a "pending" response from backend cannot overwrite it.
   Future<void> _storeUserData(Map<String, dynamic> response) async {
     try {
       final accessToken = response['accessToken'] as String? ?? '';
@@ -359,11 +378,15 @@ class ProfileCompletionController extends GetxController {
           refreshToken: refreshToken,
         );
         _apiClient.setAuthToken();
-        debugPrint('✅ Tokens refreshed after profile completion');
+        log('✅ Tokens saved and auth header updated');
       }
 
-      if (response.containsKey('status')) {
-        Store.status = response['status'] as String? ?? '';
+      // ── Never downgrade status ─────────────────────────────────────────
+      final incomingStatus = response['status'] as String? ?? '';
+      if (incomingStatus == 'registered') {
+        Store.status = 'registered';
+      } else if (Store.status != 'registered') {
+        Store.status = incomingStatus;
       }
 
       final data = response['data'] as Map<String, dynamic>?;
@@ -378,7 +401,8 @@ class ProfileCompletionController extends GetxController {
         Store.profileComplete = data['profileComplete'] as bool? ?? false;
 
         debugPrint(
-          '💾 Profile stored — name: ${Store.name} | complete: ${Store.profileComplete}',
+          '💾 Profile stored — name: ${Store.name} | '
+          'status: ${Store.status} | complete: ${Store.profileComplete}',
         );
       }
     } catch (e) {
@@ -387,7 +411,6 @@ class ProfileCompletionController extends GetxController {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-
   void _showErrorSnackbar(String title, String message) {
     Get.snackbar(
       title,

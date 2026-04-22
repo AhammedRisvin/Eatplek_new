@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
@@ -22,12 +24,18 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _navigate() async {
-    // Allow entrance animation to play before navigating
     await Future.delayed(const Duration(milliseconds: 2400));
 
     final showedOnboarding = Store.showedOnBoarding == 'true';
     final hasToken = Store.userToken.isNotEmpty;
     final isRegistered = Store.status == 'registered';
+
+    // ── Temporary debug — remove after fix ──────────────────
+    log('🔍 showedOnboarding: $showedOnboarding');
+    log('🔍 hasToken: $hasToken');
+    log('🔍 Store.status raw value: "${Store.status}"');
+    log('🔍 isRegistered: $isRegistered');
+    // ────────────────────────────────────────────────────────
 
     if (!showedOnboarding && !hasToken) {
       Get.offAllNamed(Routes.onBoardingView);

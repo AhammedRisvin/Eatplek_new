@@ -9,7 +9,8 @@ plugins {
 
 android {
     namespace = "com.example.eatplek_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
+
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -24,7 +25,7 @@ android {
     defaultConfig {
         applicationId = "com.example.eatplek_app"
         minSdk = flutter.minSdkVersion
-        targetSdk = 33
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -40,3 +41,5 @@ android {
 flutter {
     source = "../.."
 }
+
+

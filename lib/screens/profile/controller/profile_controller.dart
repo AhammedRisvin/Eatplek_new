@@ -5,6 +5,7 @@ import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../core/service/notification_services.dart';
 import '../model/user_profile_model.dart';
 
 class ProfileController extends GetxController {
@@ -102,9 +103,15 @@ class ProfileController extends GetxController {
         headers: {'Authorization': 'Bearer ${Store.refreshToken}'},
       );
 
+      // ── OneSignal: dissociate this device from the user ──────────
+      NotificationService.instance.clearUser();
+
+      await Store.clear();
       debugPrint('✅ ProfileController: Logout API success');
     } catch (e) {
       debugPrint('⚠️ ProfileController: Logout API error (proceeding) — $e');
+      // Still clear OneSignal even if API call fails
+      NotificationService.instance.clearUser();
     } finally {
       await _clearSessionAndRedirect();
     }
@@ -116,9 +123,13 @@ class ProfileController extends GetxController {
 
       await _apiClient.delete(endpoint: Urls.deleteAccount);
 
+      // ── OneSignal: dissociate this device from the deleted user ──
+      NotificationService.instance.clearUser();
+
       debugPrint('✅ ProfileController: Account deleted');
     } catch (e) {
       debugPrint('⚠️ ProfileController: Delete API error (proceeding) — $e');
+      NotificationService.instance.clearUser();
     } finally {
       await _clearSessionAndRedirect();
     }

@@ -15,6 +15,26 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 
+
+        <!-- Flutter Engine -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+        <!-- Google Maps -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyBOHuJ-4CqJBjmSi_RugeonwPU5cBVqbeA" />
+
+        <!-- Firebase Cloud Messaging -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="orders_channel" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
         <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
@@ -47,25 +67,6 @@
                 <data android:scheme="eatplek" />
             </intent-filter>
         </activity>
-
-        <!-- Flutter Engine -->
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2" />
-
-        <!-- Google Maps -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBOHuJ-4CqJBjmSi_RugeonwPU5cBVqbeA" />
-
-        <!-- Firebase Cloud Messaging -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="orders_channel" />
-
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
 
         <!-- Awesome Notifications -->
         <receiver

@@ -5,8 +5,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
@@ -18,28 +16,19 @@ enum AuthStep { form, otp }
 class AuthController extends GetxController {
   // ── Text editing controllers ───────────────────────────────────────────────
   late TextEditingController phoneController;
-  late TextEditingController nameController;
   late TextEditingController otpController;
-  late TextEditingController referralCodeController;
 
-  // ── State variables ────────────────────────────────────────────────────────
+  // ── State ──────────────────────────────────────────────────────────────────
   AuthStep _currentStep = AuthStep.form;
   bool _isLoading = false;
-  bool _isLocationLoading = false;
-  bool _isLocationPermissionGranted = false;
 
-  // ── Location variables ─────────────────────────────────────────────────────
-  double? _latitude;
-  double? _longitude;
-  String? _placeName;
-
-  // ── Timer variables ────────────────────────────────────────────────────────
+  // ── Timer ──────────────────────────────────────────────────────────────────
   Timer? _timer;
   int _remainingTime = 45;
 
   // ── Device info ────────────────────────────────────────────────────────────
-  late String _deviceOs = '';
-  late String _deviceName = '';
+  String _deviceOs = '';
+  String _deviceName = '';
 
   // ── FCM token ──────────────────────────────────────────────────────────────
   String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
@@ -47,36 +36,14 @@ class AuthController extends GetxController {
   // ── API ────────────────────────────────────────────────────────────────────
   late FittorConnect _apiClient;
 
-  // ── Getters — Auth State ───────────────────────────────────────────────────
-
+  // ── Getters ────────────────────────────────────────────────────────────────
   AuthStep get currentStep => _currentStep;
   bool get isFormStep => _currentStep == AuthStep.form;
   bool get isOtpStep => _currentStep == AuthStep.otp;
   bool get isLoading => _isLoading;
 
-  // ── Getters — Timer ────────────────────────────────────────────────────────
-
   int get remainingTime => _remainingTime;
   bool get canResend => _remainingTime == 0;
-
-  // ── Getters — Location ─────────────────────────────────────────────────────
-
-  bool get isLocationLoading => _isLocationLoading;
-  double? get latitude => _latitude;
-  double? get longitude => _longitude;
-  String? get placeName => _placeName;
-  bool get isLocationPermissionGranted => _isLocationPermissionGranted;
-
-  // ── Getters — Referral ─────────────────────────────────────────────────────
-
-  /// Returns true when field is empty (optional) or matches EAT + 9 alphanumeric.
-  bool get isReferralCodeValid {
-    final code = referralCodeController.text.trim();
-    if (code.isEmpty) return true;
-    return RegExp(r'^EAT[A-Z0-9]{9}$', caseSensitive: false).hasMatch(code);
-  }
-
-  // ── Getters — Dynamic Content ──────────────────────────────────────────────
 
   String get title =>
       _currentStep == AuthStep.otp
@@ -112,45 +79,35 @@ class AuthController extends GetxController {
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
-
   @override
   void onInit() {
     super.onInit();
-    _initializeControllers();
-    _apiClient = FittorConnect();
-    _initializeDeviceInfo();
-  }
-
-  void _initializeControllers() {
     phoneController = TextEditingController();
-    nameController = TextEditingController();
     otpController = TextEditingController();
-    referralCodeController = TextEditingController();
+    _apiClient = FittorConnect();
+    _initDeviceInfo();
   }
 
   @override
   void onClose() {
     phoneController.dispose();
-    nameController.dispose();
     otpController.dispose();
-    referralCodeController.dispose();
     _stopTimer();
     super.onClose();
   }
 
   // ── Device Info ────────────────────────────────────────────────────────────
-
-  Future<void> _initializeDeviceInfo() async {
+  Future<void> _initDeviceInfo() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
       if (GetPlatform.isAndroid) {
-        final androidInfo = await deviceInfo.androidInfo;
+        final info = await deviceInfo.androidInfo;
         _deviceOs = 'Android';
-        _deviceName = '${androidInfo.manufacturer} ${androidInfo.model}';
+        _deviceName = '${info.manufacturer} ${info.model}';
       } else if (GetPlatform.isIOS) {
-        final iosInfo = await deviceInfo.iosInfo;
+        final info = await deviceInfo.iosInfo;
         _deviceOs = 'iOS';
-        _deviceName = iosInfo.model;
+        _deviceName = info.model;
       }
     } catch (e) {
       debugPrint('Error getting device info: $e');
@@ -159,33 +116,7 @@ class AuthController extends GetxController {
     }
   }
 
-  // ── Form Navigation ────────────────────────────────────────────────────────
-
-  void _reset() {
-    phoneController.clear();
-    nameController.clear();
-    otpController.clear();
-    referralCodeController.clear();
-    _latitude = null;
-    _longitude = null;
-    _placeName = null;
-  }
-
-  void _goToOtpStep() {
-    _currentStep = AuthStep.otp;
-    otpController.clear();
-    startTimer();
-    update(['auth_screen']);
-  }
-
-  void _goToFormStep() {
-    _currentStep = AuthStep.form;
-    _stopTimer();
-    update(['auth_screen']);
-  }
-
-  // ── Timer Management ───────────────────────────────────────────────────────
-
+  // ── Timer ──────────────────────────────────────────────────────────────────
   void startTimer() {
     _remainingTime = 45;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -209,39 +140,7 @@ class AuthController extends GetxController {
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  // ── OTP Handling ───────────────────────────────────────────────────────────
-
-  Future<void> resendOtp() async {
-    if (!canResend) return;
-
-    try {
-      _setLoading(true);
-
-      final body = {
-        'dialCode': '+91',
-        'phone': phoneController.text.trim(),
-        'firebaseToken': _firebaseToken,
-        'deviceOs': _deviceOs,
-        'deviceName': _deviceName,
-      };
-
-      await _apiClient.post<Map<String, dynamic>>(
-        endpoint: Urls.login,
-        data: body,
-      );
-
-      Get.snackbar('Success', 'OTP sent successfully!');
-      startTimer();
-      update(['auth_screen']);
-    } catch (e) {
-      _showErrorSnackbar('Error', e.toString());
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // ── Authentication Flow ────────────────────────────────────────────────────
-
+  // ── Auth flow ──────────────────────────────────────────────────────────────
   void handleAuthAction() {
     if (_currentStep == AuthStep.otp) {
       handleOtpVerification();
@@ -255,7 +154,6 @@ class AuthController extends GetxController {
       _showErrorSnackbar('Error', 'Please enter your mobile number');
       return;
     }
-
     if (phoneController.text.length != 10) {
       _showErrorSnackbar(
         'Error',
@@ -263,7 +161,6 @@ class AuthController extends GetxController {
       );
       return;
     }
-
     _sendOtp();
   }
 
@@ -271,27 +168,56 @@ class AuthController extends GetxController {
     try {
       _setLoading(true);
 
-      final body = {
-        'dialCode': '+91',
-        'phone': phoneController.text.trim(),
-        'firebaseToken': _firebaseToken,
-        'deviceOs': _deviceOs,
-        'deviceName': _deviceName,
-      };
-
       final response = await _apiClient.post<Map<String, dynamic>>(
         endpoint: Urls.login,
-        data: body,
+        data: {
+          'dialCode': '+91',
+          'phone': phoneController.text.trim(),
+          'firebaseToken': _firebaseToken,
+          'deviceOs': _deviceOs,
+          'deviceName': _deviceName,
+        },
       );
 
       if (response['success'] == true) {
-        _goToOtpStep();
+        _currentStep = AuthStep.otp;
+        otpController.clear();
+        startTimer();
+        update(['auth_screen']);
       } else {
-        log('error 11');
-        _showErrorSnackbar('Error', response['message'] ?? 'OTP sent failed');
+        _showErrorSnackbar(
+          'Error',
+          response['message'] ?? 'Failed to send OTP',
+        );
       }
     } catch (e) {
-      log('error 22');
+      _showErrorSnackbar('Error', e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> resendOtp() async {
+    if (!canResend) return;
+
+    try {
+      _setLoading(true);
+
+      await _apiClient.post<Map<String, dynamic>>(
+        endpoint: Urls.login,
+        data: {
+          'dialCode': '+91',
+          'phone': phoneController.text.trim(),
+          'firebaseToken': _firebaseToken,
+          'deviceOs': _deviceOs,
+          'deviceName': _deviceName,
+        },
+      );
+
+      Get.snackbar('Success', 'OTP sent successfully!');
+      startTimer();
+      update(['auth_screen']);
+    } catch (e) {
       _showErrorSnackbar('Error', e.toString());
     } finally {
       _setLoading(false);
@@ -303,7 +229,6 @@ class AuthController extends GetxController {
       _showErrorSnackbar('Error', 'Please enter the OTP');
       return;
     }
-
     if (otpController.text.length != 6) {
       _showErrorSnackbar('Error', 'Please enter a valid 6-digit OTP');
       return;
@@ -312,31 +237,30 @@ class AuthController extends GetxController {
     try {
       _setLoading(true);
 
-      final body = {
-        'dialCode': '+91',
-        'phone': phoneController.text.trim(),
-        'otp': otpController.text.trim(),
-        'deviceOs': _deviceOs,
-        'deviceName': _deviceName,
-        'firebaseToken': _firebaseToken,
-      };
-
       final response = await _apiClient.post<Map<String, dynamic>>(
         endpoint: Urls.verifyOtp,
-        data: body,
+        data: {
+          'dialCode': '+91',
+          'phone': phoneController.text.trim(),
+          'otp': otpController.text.trim(),
+          'deviceOs': _deviceOs,
+          'deviceName': _deviceName,
+          'firebaseToken': _firebaseToken,
+        },
       );
 
       if (response['success'] == true) {
         final status = response['status'] as String?;
-        debugPrint('OTP Verification Response: $response');
 
         if (status == 'pending') {
+          // ── New user — store data and go to profile completion ──────────
           await _storeUserData(response);
           Get.put<AuthController>(this, permanent: true);
           Get.offAllNamed(Routes.profileCompletion);
         } else if (status == 'registered') {
-          // Existing user — persist everything and go to home.
+          // ── Existing user — store data, identify in OneSignal, go home ──
           await _storeUserData(response);
+          _identifyUserInOneSignal(response: response);
           Get.snackbar('Success', response['message'] ?? 'Login successful!');
           Get.offAllNamed(Routes.bottomNav);
         }
@@ -353,253 +277,36 @@ class AuthController extends GetxController {
     }
   }
 
-  // ── Location Management ────────────────────────────────────────────────────
+  // ── OneSignal — existing user login path ───────────────────────────────────
+  void _identifyUserInOneSignal({required Map<String, dynamic> response}) {
+    final data = response['data'] as Map<String, dynamic>?;
+    final userId = data?['id'] as String? ?? '';
 
-  /// Public entry point — called from ProfileCompletionScreen.initState()
-  /// so location permission fires as soon as the screen mounts.
-  Future<void> requestLocationPermissionPublic() =>
-      _requestLocationPermission();
-
-  Future<void> _requestLocationPermission() async {
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _showPermissionDialog();
-        return;
-      }
-
-      if (permission == LocationPermission.whileInUse ||
-          permission == LocationPermission.always) {
-        _isLocationPermissionGranted = true;
-        update(['auth_screen']);
-        await _fetchCurrentLocation();
-      }
-    } catch (e) {
-      debugPrint('Error requesting location permission: $e');
-      _showErrorSnackbar('Error', 'Failed to request location permission');
-    }
-  }
-
-  void _showPermissionDialog() {
-    Get.dialog(
-      WillPopScope(
-        onWillPop: () async => false,
-        child: AlertDialog(
-          title: const Text('Location Permission Required'),
-          content: const Text(
-            'This app needs access to your location to complete your profile. '
-            'Please enable location permission in settings.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Get.back();
-                Geolocator.openLocationSettings();
-              },
-              child: const Text('Open Settings'),
-            ),
-            TextButton(
-              onPressed: () {
-                Get.back();
-                _requestLocationPermission();
-              },
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-      barrierDismissible: false,
-    );
-  }
-
-  Future<void> _fetchCurrentLocation() async {
-    try {
-      _setLocationLoading(true);
-
-      debugPrint('🌍 Fetching location...');
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
-      );
-
-      _latitude = position.latitude;
-      _longitude = position.longitude;
-
-      debugPrint('✓ Location fetched: $_latitude, $_longitude');
-
-      _getPlaceNameFromCoordinates(position.latitude, position.longitude)
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              debugPrint('⏱️ Place name fetch timed out, using fallback');
-              _setFallbackPlaceName(position.latitude, position.longitude);
-            },
-          )
-          .catchError((e) {
-            debugPrint('Error in place name fetch: $e');
-            _setFallbackPlaceName(position.latitude, position.longitude);
-          });
-
-      update(['auth_screen']);
-    } catch (e) {
-      debugPrint('❌ Error fetching location: $e');
-      _showErrorSnackbar(
-        'Error',
-        'Failed to fetch location. Please try again.',
-      );
-    } finally {
-      _setLocationLoading(false);
-    }
-  }
-
-  Future<void> _getPlaceNameFromCoordinates(
-    double latitude,
-    double longitude,
-  ) async {
-    try {
-      debugPrint('Starting reverse geocoding for: $latitude, $longitude');
-
-      final placemarks = await placemarkFromCoordinates(
-        latitude,
-        longitude,
-      ).timeout(
-        const Duration(seconds: 8),
-        onTimeout: () {
-          debugPrint('Reverse geocoding timeout - using coordinates');
-          throw TimeoutException('Reverse geocoding timed out');
-        },
-      );
-
-      if (placemarks.isNotEmpty) {
-        final place = placemarks.first;
-        _placeName = _buildPlaceNameString(place);
-        debugPrint('✓ Place name resolved: $_placeName');
-        update(['auth_screen']);
-      } else {
-        _setFallbackPlaceName(latitude, longitude);
-      }
-    } on TimeoutException catch (e) {
-      debugPrint('⏱️ Timeout error: $e');
-      _setFallbackPlaceName(latitude, longitude);
-    } catch (e) {
-      debugPrint('❌ Error getting place name: $e');
-      _setFallbackPlaceName(latitude, longitude);
-    }
-  }
-
-  void _setFallbackPlaceName(double latitude, double longitude) {
-    _placeName =
-        'Lat: ${latitude.toStringAsFixed(4)}, Long: ${longitude.toStringAsFixed(4)}';
-    debugPrint('Using fallback place name: $_placeName');
-    update(['auth_screen']);
-  }
-
-  String _buildPlaceNameString(Placemark placemark) {
-    final List<String> addressParts = [];
-
-    if (placemark.locality?.isNotEmpty == true) {
-      addressParts.add(placemark.locality!);
-    }
-    if (placemark.administrativeArea?.isNotEmpty == true) {
-      addressParts.add(placemark.administrativeArea!);
-    }
-    if (placemark.country?.isNotEmpty == true) {
-      addressParts.add(placemark.country!);
-    }
-
-    return addressParts.isNotEmpty
-        ? addressParts.join(', ')
-        : 'Current Location';
-  }
-
-  // ── Profile Completion ─────────────────────────────────────────────────────
-
-  Future<void> handleProfileCompletion() async {
-    if (nameController.text.trim().isEmpty) {
-      _showErrorSnackbar('Error', 'Please enter your name');
+    if (userId.isEmpty) {
+      log('⚠️ OneSignal setUser skipped — id missing from response');
       return;
     }
 
-    if (nameController.text.trim().length < 2) {
-      _showErrorSnackbar('Error', 'Name must be at least 2 characters');
-      return;
-    }
+    final district = data?['district'] as String? ?? '';
 
-    if (_latitude == null || _longitude == null) {
-      _showErrorSnackbar('Error', 'Location is required. Please try again.');
-      return;
-    }
+    NotificationService.instance.setUser(userId);
+    NotificationService.instance.setTags({
+      'user_type': 'customer',
+      'district': district.isNotEmpty ? district : 'unknown',
+    });
 
-    // Defensive guard — UI should already block this via isReferralCodeValid
-    if (!isReferralCodeValid) {
-      _showErrorSnackbar(
-        'Invalid Referral Code',
-        'Please enter a valid referral code or leave the field empty.',
-      );
-      return;
-    }
-
-    try {
-      _setLoading(true);
-
-      final referral = referralCodeController.text.trim();
-
-      final body = <String, dynamic>{
-        'name': nameController.text.trim(),
-        'latitude': _latitude,
-        'longitude': _longitude,
-        'firebaseToken': _firebaseToken,
-        'deviceOs': _deviceOs,
-        'deviceName': _deviceName,
-        // Only include referralCode key when the user actually typed one
-        if (referral.isNotEmpty) 'referralCode': referral.toUpperCase(),
-      };
-
-      // Token is already saved and set on _apiClient from the OTP step,
-      // so no need to pass Authorization header manually here.
-      final response = await _apiClient.put<Map<String, dynamic>>(
-        endpoint: Urls.addUserDetails,
-        data: body,
-      );
-
-      if (response['success'] == true) {
-        await _storeUserData(response);
-        Get.snackbar(
-          'Success',
-          response['message'] ?? 'Profile updated successfully!',
-        );
-
-        _reset();
-        Get.offAllNamed(Routes.bottomNav);
-      } else {
-        _showErrorSnackbar(
-          'Error',
-          response['message'] ?? 'Failed to update profile',
-        );
-      }
-    } catch (e) {
-      _showErrorSnackbar('Error', e.toString());
-    } finally {
-      _setLoading(false);
-    }
+    log('✅ OneSignal user identified: $userId | district: $district');
   }
 
-  // ── Data Storage ───────────────────────────────────────────────────────────
-
-  /// Persists all user data from any auth response (OTP verify or profile PUT).
-  ///
-  /// Token priority: `accessToken` is used as the bearer token going forward.
-  /// Both access + refresh tokens are saved atomically via [Store.saveTokens].
-  /// After saving, [_apiClient.setAuthToken] is called so the in-memory header
-  /// is updated immediately — no restart needed.
+  // ── Data storage ───────────────────────────────────────────────────────────
+  //
+  // Only used for the OTP verify response (both pending + registered).
+  // Profile completion data is stored by ProfileCompletionController.
+  //
+  // Status rule: never downgrade — if Store is already "registered",
+  // a "pending" response cannot overwrite it.
   Future<void> _storeUserData(Map<String, dynamic> response) async {
     try {
-      // ── Tokens ────────────────────────────────────────────────────────────
       final accessToken = response['accessToken'] as String? ?? '';
       final refreshToken = response['refreshToken'] as String? ?? '';
 
@@ -608,17 +315,18 @@ class AuthController extends GetxController {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
-        // Sync the live Authorization header on the existing client instance.
         _apiClient.setAuthToken();
         log('✅ Tokens saved and auth header updated');
       }
 
-      // ── Top-level fields ───────────────────────────────────────────────────
-      if (response.containsKey('status')) {
-        Store.status = response['status'] as String? ?? '';
+      // ── Never downgrade status ─────────────────────────────────────────
+      final incomingStatus = response['status'] as String? ?? '';
+      if (incomingStatus == 'registered') {
+        Store.status = 'registered';
+      } else if (Store.status != 'registered') {
+        Store.status = incomingStatus;
       }
 
-      // ── User data object ───────────────────────────────────────────────────
       final data = response['data'] as Map<String, dynamic>?;
       if (data != null) {
         Store.id = data['id'] as String? ?? '';
@@ -632,7 +340,7 @@ class AuthController extends GetxController {
 
         debugPrint(
           '💾 User stored — id: ${Store.id} | name: ${Store.name} | '
-          'place: ${Store.place} | profileComplete: ${Store.profileComplete}',
+          'status: ${Store.status} | district: ${Store.district}',
         );
       }
     } catch (e) {
@@ -640,15 +348,9 @@ class AuthController extends GetxController {
     }
   }
 
-  // ── UI State Management ────────────────────────────────────────────────────
-
+  // ── UI helpers ─────────────────────────────────────────────────────────────
   void _setLoading(bool value) {
     _isLoading = value;
-    update(['auth_screen']);
-  }
-
-  void _setLocationLoading(bool value) {
-    _isLocationLoading = value;
     update(['auth_screen']);
   }
 

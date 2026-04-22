@@ -62,6 +62,7 @@ dependencies:
 
   # ── SVG (legacy — svg_flutter kept for any existing svg_flutter imports) ────
   svg_flutter: ^0.0.1
+  onesignal_flutter: ^5.5.1
 
 dev_dependencies:
   flutter_test:
