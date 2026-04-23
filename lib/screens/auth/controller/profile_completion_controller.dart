@@ -36,7 +36,7 @@ class ProfileCompletionController extends GetxController {
   String _deviceName = '';
 
   // ── FCM ────────────────────────────────────────────────────────────────────
-  String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
+  String get _firebaseToken => 'noti using one signal';
 
   // ── API ────────────────────────────────────────────────────────────────────
   late FittorConnect _apiClient;

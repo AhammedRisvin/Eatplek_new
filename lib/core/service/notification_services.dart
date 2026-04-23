@@ -1,14 +1,15 @@
 // lib/core/service/notification_services.dart
 
-import 'dart:async';
 import 'dart:developer';
 
-import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:onesignal_flutter/onesignal_flutter.dart'; // ← ADD THIS
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 
+// ─────────────────────────────────────────────────────────────
+// Notification type enum
+// ─────────────────────────────────────────────────────────────
 enum EatPlekNotificationType {
   orderAccepted,
   orderRejected,
@@ -22,7 +23,6 @@ enum EatPlekNotificationType {
   unknown,
 }
 
-/// Parses the raw 'type' string from FCM payload into an enum
 EatPlekNotificationType _parseNotificationType(String? raw) {
   switch (raw?.toLowerCase().trim()) {
     case 'order_accepted':
@@ -49,205 +49,122 @@ EatPlekNotificationType _parseNotificationType(String? raw) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Top-level background handler — must be outside any class
-// ─────────────────────────────────────────────────────────────
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  log('[BG] message received: ${message.messageId} | data: ${message.data}');
-
-  if (message.notification != null) {
-    log(
-      '[BG] notification payload present — FCM handles display, skipping duplicate',
-    );
-    return;
-  }
-
-  final type = _parseNotificationType(message.data['type']);
-  await _showBackgroundNotification(message, type);
-}
-
-Future<void> _showBackgroundNotification(
-  RemoteMessage message,
-  EatPlekNotificationType type,
-) async {
-  await AwesomeNotifications().initialize(null, [
-    _buildOrderChannel(),
-    _buildPromoChannel(),
-  ], debug: kDebugMode);
-
-  final title = message.data['title']?.toString() ?? _defaultTitle(type);
-  final body = message.data['body']?.toString() ?? '';
-  final channelKey = _channelKeyForType(type);
-  final id =
-      message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
-
-  await AwesomeNotifications().createNotification(
-    content: NotificationContent(
-      id: id,
-      channelKey: channelKey,
-      title: title,
-      body: body,
-      notificationLayout: NotificationLayout.Default,
-      payload: message.data.map((k, v) => MapEntry(k, v.toString())),
-      category: _categoryForType(type),
-      autoDismissible: true,
-    ),
-    actionButtons: _actionButtonsForType(type),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
 // NotificationService singleton
 // ─────────────────────────────────────────────────────────────
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
 
-  // ── ADD: OneSignal App ID ─────────────────────────────────
   static const String _oneSignalAppId = '84f1ab18-029d-4b73-afa1-8030e50ed0dc';
 
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  String? fcmToken;
+  static const String _orderChannelId = 'orders_channel';
+  static const String _orderChannelName = 'Order Updates';
+  static const String _promoChannelId = 'promo_channel';
+  static const String _promoChannelName = 'Promotions & Offers';
+
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
   GlobalKey<NavigatorState>? navigatorKey;
 
-  // ── Public API ──────────────────────────────────────────────
-
+  // ─────────────────────────────────────────────────────────────
+  // Initialize
+  // ─────────────────────────────────────────────────────────────
   Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,
   }) async {
     this.navigatorKey = navigatorKey;
 
-    await _initAwesomeNotifications();
-    await _requestFcmPermissions();
-    await _fetchFcmToken();
-    _listenForeground();
-    _listenTapFromBackground();
-    await _handleTerminatedStateTap();
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    // ── ADD: OneSignal init after everything else ──────────
+    await _initLocalNotifications();
     await _initOneSignal();
 
     log('[NotificationService] initialised ✓');
   }
 
-  // ── Existing methods — UNCHANGED ────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // Local Notifications setup
+  // ─────────────────────────────────────────────────────────────
+  Future<void> _initLocalNotifications() async {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-  Future<void> _initAwesomeNotifications() async {
-    await AwesomeNotifications().initialize(
-      null,
-      [_buildOrderChannel(), _buildPromoChannel()],
-      channelGroups: [
-        NotificationChannelGroup(
-          channelGroupKey: 'orders_group',
-          channelGroupName: 'Order Updates',
-        ),
-        NotificationChannelGroup(
-          channelGroupKey: 'promo_group',
-          channelGroupName: 'Promotions',
-        ),
-      ],
-      debug: kDebugMode,
+    const InitializationSettings settings = InitializationSettings(
+      android: androidSettings,
     );
 
-    await AwesomeNotifications().setListeners(
-      onActionReceivedMethod: _onActionReceived,
-      onNotificationCreatedMethod: _onNotificationCreated,
-      onNotificationDisplayedMethod: _onNotificationDisplayed,
-      onDismissActionReceivedMethod: _onDismissActionReceived,
+    await _localNotifications.initialize(
+      settings: settings,
+      onDidReceiveNotificationResponse: _onNotificationTap,
     );
 
-    final allowed = await AwesomeNotifications().isNotificationAllowed();
-    if (!allowed) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        await Future.delayed(const Duration(milliseconds: 500));
-        await AwesomeNotifications().requestPermissionToSendNotifications(
-          permissions: [
-            NotificationPermission.Alert,
-            NotificationPermission.Sound,
-            NotificationPermission.Badge,
-            NotificationPermission.Vibration,
-          ],
-        );
-      });
-    }
-  }
+    // Create notification channels
+    final AndroidFlutterLocalNotificationsPlugin? androidPlugin =
+        _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
 
-  Future<void> _requestFcmPermissions() async {
-    final settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _orderChannelId,
+        _orderChannelName,
+        description: 'Updates about your food orders',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+        ledColor: Colors.orange,
+      ),
     );
-    log('[FCM] auth status: ${settings.authorizationStatus}');
+
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _promoChannelId,
+        _promoChannelName,
+        description: 'Deals, discounts, and new restaurants near you',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      ),
+    );
+
+    log('[LocalNotifications] initialised ✓');
   }
 
-  Future<void> _fetchFcmToken() async {
-    const maxRetries = 3;
-    const retryDelay = Duration(seconds: 3);
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        fcmToken = await _fcm.getToken();
-        log('[FCM] token: $fcmToken');
-
-        // final connect = Get.find<FittorConnect>();
-        // await connect.post('/user/fcm-token', body: {'fcmToken': fcmToken});
-
-        _fcm.onTokenRefresh.listen((token) {
-          fcmToken = token;
-          log('[FCM] token refreshed: $token');
-        });
-
-        return;
-      } catch (e) {
-        log('[FCM] Token fetch attempt $attempt/$maxRetries failed: $e');
-        if (attempt < maxRetries) {
-          await Future.delayed(retryDelay);
-        } else {
-          log('[FCM] All retries exhausted. App will run without FCM token.');
-        }
-      }
-    }
-  }
-
-  // ── ADD: OneSignal initialisation ───────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // OneSignal setup
+  // ─────────────────────────────────────────────────────────────
   Future<void> _initOneSignal() async {
     OneSignal.Debug.setLogLevel(
       kDebugMode ? OSLogLevel.verbose : OSLogLevel.none,
     );
 
-    OneSignal.initialize(_oneSignalAppId);
-
+    // Register foreground listener BEFORE initialize
     OneSignal.Notifications.addForegroundWillDisplayListener((event) async {
-      log('[OneSignal] foreground received — showing via AwesomeNotifications');
+      log(
+        '[OneSignal] foreground — displaying via flutter_local_notifications',
+      );
+
+      // Prevent OneSignal from showing its own notification
+      event.preventDefault();
 
       final notification = event.notification;
-      final title = notification.title ?? 'EatPlek';
-      final body = notification.body ?? '';
       final data = notification.additionalData ?? {};
       final type = _parseNotificationType(data['type']?.toString());
-      final id =
-          notification.notificationId.hashCode ??
-          DateTime.now().millisecondsSinceEpoch;
 
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          id: id,
-          channelKey: _channelKeyForType(type),
-          title: title,
-          body: body,
-          notificationLayout: NotificationLayout.Default,
-          payload: data.map((k, v) => MapEntry(k, v.toString())),
-          category: _categoryForType(type),
-          autoDismissible: true,
-        ),
-        actionButtons: _actionButtonsForType(type),
+      await _showNotification(
+        id: notification.notificationId.hashCode,
+        title: notification.title ?? _defaultTitle(type),
+        body: notification.body ?? '',
+        type: type,
+        payload: data.map((k, v) => MapEntry(k, v.toString())),
       );
     });
 
+    OneSignal.initialize(_oneSignalAppId);
     await OneSignal.Notifications.requestPermission(true);
 
+    // Handle notification tap from background/killed
     OneSignal.Notifications.addClickListener((event) {
       log('[OneSignal] tapped: ${event.notification.additionalData}');
       _navigateFromPayload(event.notification.additionalData ?? {});
@@ -256,96 +173,70 @@ class NotificationService {
     log('[OneSignal] initialised ✓ | AppId: $_oneSignalAppId');
   }
 
-  // ── ADD: Identify user to OneSignal after login ─────────────
+  // ─────────────────────────────────────────────────────────────
+  // Show notification via flutter_local_notifications
+  // ─────────────────────────────────────────────────────────────
+  Future<void> _showNotification({
+    required int id,
+    required String title,
+    required String body,
+    required EatPlekNotificationType type,
+    Map<String, String>? payload,
+  }) async {
+    final channelId = _channelIdForType(type);
+    final channelName = _channelNameForType(type);
 
-  /// Call this in your LoginController after successful login.
-  /// OneSignal will associate this device's push token with the user ID
-  /// so your backend can send targeted pushes.
-  ///
-  /// ```dart
-  /// // In LoginController, after saving user:
-  /// NotificationService.instance.setUser(user.id.toString());
-  /// ```
-  void setUser(String userId) {
-    OneSignal.login(userId);
-    log('[OneSignal] user set: $userId');
-  }
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          channelId,
+          channelName,
+          importance:
+              type == EatPlekNotificationType.promo
+                  ? Importance.high
+                  : Importance.max,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+          color: const Color(0xFFFF6B35),
+          icon: '@mipmap/ic_launcher',
+        );
 
-  /// Call this in your logout flow.
-  void clearUser() {
-    OneSignal.logout();
-    log('[OneSignal] user cleared');
-  }
+    final NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+    );
 
-  /// Tag this device for segmented campaigns (city, plan type, etc.)
-  ///
-  /// ```dart
-  /// NotificationService.instance.setTags({
-  ///   'city': 'Malappuram',
-  ///   'user_type': 'customer',
-  /// });
-  /// ```
-  void setTags(Map<String, dynamic> tags) {
-    OneSignal.User.addTags(tags);
-    log('[OneSignal] tags set: $tags');
-  }
-
-  // ── Existing methods — UNCHANGED ────────────────────────────
-  void _listenForeground() {
-    FirebaseMessaging.onMessage.listen((message) async {
-      log('[FCM Foreground] ${message.messageId} | ${message.data}');
-      // OneSignal handles background/killed — FCM handles foreground display
-      final type = _parseNotificationType(message.data['type']);
-      await _showForegroundNotification(message, type);
-    });
-  }
-
-  void _listenTapFromBackground() {
-    FirebaseMessaging.onMessageOpenedApp.listen((message) {
-      log('[FCM] opened from background tap: ${message.data}');
-      _navigateFromPayload(message.data);
-    });
-  }
-
-  Future<void> _handleTerminatedStateTap() async {
-    final initial = await _fcm.getInitialMessage();
-    if (initial != null) {
-      log('[FCM] launched from terminated state: ${initial.data}');
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _navigateFromPayload(initial.data);
-      });
-    }
-  }
-
-  Future<void> _showForegroundNotification(
-    RemoteMessage message,
-    EatPlekNotificationType type,
-  ) async {
-    final title =
-        message.data['title']?.toString() ??
-        message.notification?.title ??
-        _defaultTitle(type);
-    final body =
-        message.data['body']?.toString() ?? message.notification?.body ?? '';
-    final channelKey = _channelKeyForType(type);
-    final id =
-        message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch;
-
-    await AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: id,
-        channelKey: channelKey,
-        title: title,
-        body: body,
-        notificationLayout: NotificationLayout.Default,
-        payload: message.data.map((k, v) => MapEntry(k, v.toString())),
-        category: _categoryForType(type),
-        autoDismissible: true,
-      ),
-      actionButtons: _actionButtonsForType(type),
+    await _localNotifications.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload?.entries.map((e) => '${e.key}=${e.value}').join('&'),
     );
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Handle notification tap
+  // ─────────────────────────────────────────────────────────────
+  void _onNotificationTap(NotificationResponse response) {
+    log('[LocalNotifications] tapped — payload: ${response.payload}');
+
+    if (response.payload == null || response.payload!.isEmpty) return;
+
+    // Parse payload back from query string format
+    final Map<String, dynamic> data = {};
+    for (final part in response.payload!.split('&')) {
+      final kv = part.split('=');
+      if (kv.length == 2) {
+        data[kv[0]] = kv[1];
+      }
+    }
+
+    _navigateFromPayload(data);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Navigation
+  // ─────────────────────────────────────────────────────────────
   void _navigateFromPayload(Map<String, dynamic> payload) {
     final navigator = navigatorKey?.currentState;
     if (navigator == null) {
@@ -371,124 +262,78 @@ class NotificationService {
       case EatPlekNotificationType.orderCancelled:
       case EatPlekNotificationType.timeSuggestion:
         if (orderId != null) {
+          // TODO: Get.toNamed(Routes.orderDetails, arguments: orderId);
           log('[Nav] → Order Details: $orderId');
         }
         break;
-
       case EatPlekNotificationType.promo:
         if (productId != null && vendorId != null) {
+          // TODO: Get.toNamed(Routes.productDetail, arguments: {...});
           log('[Nav] → Product Detail: product=$productId vendor=$vendorId');
         } else {
+          // TODO: Get.toNamed(Routes.promos);
           log('[Nav] → Promos screen');
         }
         break;
-
       case EatPlekNotificationType.general:
       case EatPlekNotificationType.unknown:
         break;
     }
   }
 
-  @pragma('vm:entry-point')
-  static Future<void> _onActionReceived(ReceivedAction action) async {
-    log(
-      '[AwesomeNotif] action: ${action.buttonKeyPressed} | payload: ${action.payload}',
-    );
+  // ─────────────────────────────────────────────────────────────
+  // User identification
+  // ─────────────────────────────────────────────────────────────
 
-    final payload = action.payload ?? {};
-    final buttonKey = action.buttonKeyPressed;
-
-    if (buttonKey == 'view_order' || buttonKey == '') {
-      NotificationService.instance._navigateFromPayload(
-        payload.map((k, v) => MapEntry(k, v as dynamic)),
-      );
-    }
+  /// Call after successful login
+  void setUser(String userId) {
+    OneSignal.login(userId);
+    log('[OneSignal] user set: $userId');
   }
 
-  @pragma('vm:entry-point')
-  static Future<void> _onNotificationCreated(
-    ReceivedNotification notification,
-  ) async {
-    log('[AwesomeNotif] created: ${notification.id}');
+  /// Call on logout
+  void clearUser() {
+    OneSignal.logout();
+    log('[OneSignal] user cleared');
   }
 
-  @pragma('vm:entry-point')
-  static Future<void> _onNotificationDisplayed(
-    ReceivedNotification notification,
-  ) async {
-    log('[AwesomeNotif] displayed: ${notification.id}');
+  /// Tag device for segmented campaigns
+  void setTags(Map<String, dynamic> tags) {
+    OneSignal.User.addTags(tags);
+    log('[OneSignal] tags set: $tags');
   }
 
-  @pragma('vm:entry-point')
-  static Future<void> _onDismissActionReceived(ReceivedAction action) async {
-    log('[AwesomeNotif] dismissed: ${action.id}');
-  }
-
-  // ── Utility ──────────────────────────────────────────────────
-
+  // ─────────────────────────────────────────────────────────────
+  // Utility
+  // ─────────────────────────────────────────────────────────────
   Future<void> cancelNotification(int id) async {
-    await AwesomeNotifications().cancel(id);
+    await _localNotifications.cancel(id: id);
   }
 
   Future<void> cancelAllNotifications() async {
-    await AwesomeNotifications().cancelAll();
-  }
-
-  Future<void> subscribeToTopic(String topic) async {
-    await _fcm.subscribeToTopic(topic);
-    log('[FCM] subscribed to: $topic');
-  }
-
-  Future<void> unsubscribeFromTopic(String topic) async {
-    await _fcm.unsubscribeFromTopic(topic);
-    log('[FCM] unsubscribed from: $topic');
+    await _localNotifications.cancelAll();
   }
 }
 
 // ─────────────────────────────────────────────────────────────
-// Channel builders — UNCHANGED
+// Helpers
 // ─────────────────────────────────────────────────────────────
 
-NotificationChannel _buildOrderChannel() => NotificationChannel(
-  channelGroupKey: 'orders_group',
-  channelKey: 'orders_channel',
-  channelName: 'Order Updates',
-  channelDescription: 'Updates about your food orders',
-  defaultColor: const Color(0xFFFF6B35),
-  ledColor: Colors.orange,
-  importance: NotificationImportance.Max,
-  channelShowBadge: true,
-  playSound: true,
-  enableVibration: true,
-  enableLights: true,
-  defaultRingtoneType: DefaultRingtoneType.Notification,
-);
-
-NotificationChannel _buildPromoChannel() => NotificationChannel(
-  channelGroupKey: 'promo_group',
-  channelKey: 'promo_channel',
-  channelName: 'Promotions & Offers',
-  channelDescription: 'Deals, discounts, and new restaurants near you',
-  defaultColor: const Color(0xFFFF6B35),
-  ledColor: Colors.orange,
-  importance: NotificationImportance.High,
-  channelShowBadge: true,
-  playSound: true,
-  enableVibration: true,
-  enableLights: true,
-  defaultRingtoneType: DefaultRingtoneType.Notification,
-);
-
-// ─────────────────────────────────────────────────────────────
-// Helpers — UNCHANGED
-// ─────────────────────────────────────────────────────────────
-
-String _channelKeyForType(EatPlekNotificationType type) {
+String _channelIdForType(EatPlekNotificationType type) {
   switch (type) {
     case EatPlekNotificationType.promo:
       return 'promo_channel';
     default:
       return 'orders_channel';
+  }
+}
+
+String _channelNameForType(EatPlekNotificationType type) {
+  switch (type) {
+    case EatPlekNotificationType.promo:
+      return 'Promotions & Offers';
+    default:
+      return 'Order Updates';
   }
 }
 
@@ -512,45 +357,5 @@ String _defaultTitle(EatPlekNotificationType type) {
       return 'Special Offer 🔥';
     default:
       return 'EatPlek';
-  }
-}
-
-NotificationCategory? _categoryForType(EatPlekNotificationType type) {
-  switch (type) {
-    case EatPlekNotificationType.promo:
-      return NotificationCategory.Promo;
-    case EatPlekNotificationType.orderDelivered:
-      return NotificationCategory.Status;
-    default:
-      return null;
-  }
-}
-
-List<NotificationActionButton>? _actionButtonsForType(
-  EatPlekNotificationType type,
-) {
-  switch (type) {
-    case EatPlekNotificationType.orderAccepted:
-    case EatPlekNotificationType.orderReady:
-    case EatPlekNotificationType.orderPickedUp:
-    case EatPlekNotificationType.orderDelivered:
-    case EatPlekNotificationType.timeSuggestion:
-      return [
-        NotificationActionButton(
-          key: 'view_order',
-          label: 'View Order',
-          actionType: ActionType.Default,
-        ),
-      ];
-    case EatPlekNotificationType.promo:
-      return [
-        NotificationActionButton(
-          key: 'view_order',
-          label: 'View Offer',
-          actionType: ActionType.Default,
-        ),
-      ];
-    default:
-      return null;
   }
 }

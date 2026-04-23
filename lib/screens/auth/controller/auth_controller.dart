@@ -31,7 +31,7 @@ class AuthController extends GetxController {
   String _deviceName = '';
 
   // ── FCM token ──────────────────────────────────────────────────────────────
-  String get _firebaseToken => NotificationService.instance.fcmToken ?? '';
+  String get _firebaseToken => 'noti using one signal';
 
   // ── API ────────────────────────────────────────────────────────────────────
   late FittorConnect _apiClient;
