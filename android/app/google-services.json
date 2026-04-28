@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:729633800126:android:6c1e801ac09e81b13703ef",
+        "android_client_info": {
+          "package_name": "com.eatplek.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHy5Uuf6HEX0BH1DgGmvHkQxnkDkRMzgg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:729633800126:android:299edbb2c6ed7bc83703ef",
         "android_client_info": {
           "package_name": "com.example.eatplek_app"

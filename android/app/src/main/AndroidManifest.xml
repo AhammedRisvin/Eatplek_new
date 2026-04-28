@@ -1,40 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ── Permissions ─────────────────────────────────────────────────────── -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- USE_FULL_SCREEN_INTENT requires special Play Store declaration from API 34+.
+         Only keep if you show full-screen notification overlays (e.g. incoming call UI).
+         EatPlek does not need this — removed. -->
 
     <application
         android:label="EatPlek"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:enableOnBackInvokedCallback="true">
 
-        <!-- Flutter Engine -->
+        <!-- Flutter embedding version -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- Google Maps -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBOHuJ-4CqJBjmSi_RugeonwPU5cBVqbeA" />
-
-        <!-- Firebase Cloud Messaging -->
+        <!-- Firebase Cloud Messaging — default channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="orders_channel" />
 
+        <!-- Notification icon: use a white-silhouette drawable for Android 5+ -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@mipmap/ic_notification" />
 
-        <!-- Main Activity -->
+        <!-- NOTE: Google Maps API key removed from manifest.
+             Store it in local.properties + read via manifestPlaceholders in build.gradle.
+             Never commit an API key to source control. See build.gradle notes below. -->
+
+        <!-- ── Main Activity ──────────────────────────────────────────────── -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -53,9 +57,17 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep link for OneSignal notification tap (open app) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eatplek" android:host="open" />
+            </intent-filter>
         </activity>
 
-        <!-- PhonePe Payment SDK -->
+        <!-- ── PhonePe Payment SDK ─────────────────────────────────────────── -->
         <activity
             android:name="com.phonepe.intent.sdk.api.B2BPGActivity"
             android:exported="true">
@@ -67,26 +79,27 @@
             </intent-filter>
         </activity>
 
-        <!-- flutter_local_notifications -->
+        <!-- ── flutter_local_notifications receivers ──────────────────────── -->
         <receiver
             android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"/>
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver" />
         <receiver
             android:exported="false"
-            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver
             android:exported="false"
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
             <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
-                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 
     </application>
 
+    <!-- ── Package visibility queries ─────────────────────────────────────── -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />
@@ -108,6 +121,8 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
         </intent>
+        <!-- PhonePe app query -->
+        <package android:name="com.phonepe.app" />
     </queries>
 
 </manifest>

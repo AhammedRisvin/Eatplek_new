@@ -1,5 +1,5 @@
-package com.example.eatplek_app
+package com.eatplek.user
 
-import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity : FlutterFragmentActivity()
+class MainActivity: FlutterActivity()
