@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/network/api_client.dart';
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -270,15 +271,6 @@ class CartExtrasController extends GetxController {
   }
 
   String _getCleanServiceType(String pref) {
-    final s = pref.toLowerCase().trim();
-    if (s.contains('delivery') || s.contains('🛵')) return 'delivery';
-    if (s.contains('dine-in') || s.contains('dine in') || s.contains('🍽')) {
-      return 'dine-in';
-    }
-    if (s.contains('takeaway') || s.contains('🎁')) return 'takeaway';
-    if (s.contains('car-dine') || s.contains('car dine') || s.contains('🚗')) {
-      return 'car-dine-in';
-    }
-    return 'delivery';
+    return ServiceType.normalize(pref);
   }
 }

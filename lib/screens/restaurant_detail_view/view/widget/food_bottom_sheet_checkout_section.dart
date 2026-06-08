@@ -20,6 +20,7 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
         final totalPrice = controller.getTotalBottomSheetPrice();
         final hasCustomizations = controller.hasCustomizations;
         final isEditMode = controller.isEditMode;
+        final isSubmitting = controller.isCartSubmitting;
         final buttonText = controller.getBottomSheetButtonText();
 
         final scenarioAQuantity = controller.getBottomSheetItemQuantity();
@@ -40,6 +41,8 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
             isButtonEnabled = scenarioAQuantity >= 1;
           }
         }
+
+        final canSubmit = isButtonEnabled && !isSubmitting;
 
         debugPrint(
           '🟢 Checkout section rebuild - price: $totalPrice, enabled: $isButtonEnabled, mode: ${isEditMode ? "EDIT" : "ADD"}, customizations: $totalCustomizationQty, qty: $scenarioAQuantity',
@@ -107,7 +110,7 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
               // Add/Edit button
               GestureDetector(
                 onTap:
-                    isButtonEnabled
+                    canSubmit
                         ? () {
                           debugPrint('🟢 $buttonText button tapped');
                           controller.addOrUpdateItemToCart();
@@ -117,25 +120,42 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                   height: responsive.spacing50,
                   constraints: BoxConstraints(maxWidth: responsive.spacing160),
                   decoration: BoxDecoration(
-                    color: isButtonEnabled ? AppColor.appPrimary : AppColor.black.withOpacity(0.2),
+                    color:
+                        isSubmitting
+                            ? AppColor.appPrimary.withOpacity(0.75)
+                            : canSubmit
+                                ? AppColor.appPrimary
+                                : AppColor.black.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
                   ),
                   child: Center(
-                    child: Column(
+                    child:
+                        isSubmitting
+                            ? SizedBox(
+                              width: responsive.spacing20,
+                              height: responsive.spacing20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColor.white,
+                                ),
+                              ),
+                            )
+                            : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         text(
                           text: buttonText,
                           size: responsive.fontSize12,
                           fontWeight: FontWeight.w600,
-                          color: isButtonEnabled ? AppColor.white : AppColor.black.withOpacity(0.5),
+                          color: canSubmit ? AppColor.white : AppColor.black.withOpacity(0.5),
                         ),
                         SizedBox(height: responsive.spacing2),
                         text(
                           text: '₹${totalPrice.toStringAsFixed(0)}',
                           size: responsive.fontSize16,
                           fontWeight: FontWeight.w700,
-                          color: isButtonEnabled ? AppColor.white : AppColor.black.withOpacity(0.5),
+                          color: canSubmit ? AppColor.white : AppColor.black.withOpacity(0.5),
                         ),
                       ],
                     ),

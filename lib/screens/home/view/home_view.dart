@@ -1,4 +1,7 @@
+import 'dart:developer';
+
 import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -21,6 +24,7 @@ class HomeView extends StatelessWidget {
 
     return GetBuilder<HomeController>(
       builder: (controller) {
+        log('token ${Store.userToken}');
         return Scaffold(
           body: Stack(
             children: [

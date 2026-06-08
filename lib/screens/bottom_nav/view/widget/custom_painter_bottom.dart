@@ -10,36 +10,85 @@ class BNBCustomPainter extends CustomPainter {
           ..color = Colors.white
           ..style = PaintingStyle.fill;
 
-    // Flat bar — no bump (marketplace FAB coming soon)
-    // ── Previous bump painter code kept below for future use ──
-    // double bumpWidth = size.width * 0.25;
-    // double bumpHeight = size.height * 0.5;
-    // double cornerRadius = size.width * 0.04;
-    // double left = (size.width / 2) - (bumpWidth / 2);
-    // double right = (size.width / 2) + (bumpWidth / 2);
-    // Path path = Path();
-    // path.moveTo(0, cornerRadius);
-    // path.quadraticBezierTo(0, 0, cornerRadius, 0);
-    // path.lineTo(left, 0);
-    // path.quadraticBezierTo(left + (bumpWidth * 0.16), 0, left + (bumpWidth * 0.24), -bumpHeight * 0.4);
-    // path.quadraticBezierTo(size.width / 2, -bumpHeight, right - (bumpWidth * 0.24), -bumpHeight * 0.4);
-    // path.quadraticBezierTo(right - (bumpWidth * 0.16), 0, right, 0);
-    // path.lineTo(size.width - cornerRadius, 0);
-    // path.quadraticBezierTo(size.width, 0, size.width, cornerRadius);
-    // path.lineTo(size.width, size.height);
-    // path.lineTo(0, size.height);
-    // path.close();
-    // canvas.drawShadow(path, shadowColor, 8, false);
-    // canvas.drawPath(path, paint);
+    final barTop = size.height * 0.03;
+    final bumpWidth = size.width * 0.34;
+    final bumpHeight = size.height * 0.55;
+    final cornerRadius = size.width * 0.04;
+    final left = (size.width / 2) - (bumpWidth / 2);
+    final right = (size.width / 2) + (bumpWidth / 2);
+    final center = size.width / 2;
+    final bumpPeak = -bumpHeight;
 
-    final Path path =
+    final topEdgePath =
         Path()
-          ..moveTo(0, 0)
-          ..lineTo(size.width, 0)
+          ..moveTo(0, barTop + cornerRadius)
+          ..quadraticBezierTo(0, barTop, cornerRadius, barTop)
+          ..lineTo(left, barTop)
+          ..cubicTo(
+            left + (bumpWidth * 0.24),
+            barTop,
+            center - (bumpWidth * 0.28),
+            bumpPeak,
+            center,
+            bumpPeak,
+          )
+          ..cubicTo(
+            center + (bumpWidth * 0.28),
+            bumpPeak,
+            right - (bumpWidth * 0.24),
+            barTop,
+            right,
+            barTop,
+          )
+          ..lineTo(size.width - cornerRadius, barTop)
+          ..quadraticBezierTo(
+            size.width,
+            barTop,
+            size.width,
+            barTop + cornerRadius,
+          );
+
+    final path =
+        Path()
+          ..moveTo(0, barTop + cornerRadius)
+          ..quadraticBezierTo(0, barTop, cornerRadius, barTop)
+          ..lineTo(left, barTop)
+          ..cubicTo(
+            left + (bumpWidth * 0.24),
+            barTop,
+            center - (bumpWidth * 0.28),
+            bumpPeak,
+            center,
+            bumpPeak,
+          )
+          ..cubicTo(
+            center + (bumpWidth * 0.28),
+            bumpPeak,
+            right - (bumpWidth * 0.24),
+            barTop,
+            right,
+            barTop,
+          )
+          ..lineTo(size.width - cornerRadius, barTop)
+          ..quadraticBezierTo(
+            size.width,
+            barTop,
+            size.width,
+            barTop + cornerRadius,
+          )
           ..lineTo(size.width, size.height)
           ..lineTo(0, size.height)
           ..close();
 
+    canvas.drawPath(
+      topEdgePath,
+      Paint()
+        ..color = Colors.black.withOpacity(0.14)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+    );
+    canvas.drawShadow(path, Colors.black.withOpacity(0.16), 18, false);
     canvas.drawPath(path, paint);
   }
 

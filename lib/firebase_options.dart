@@ -63,7 +63,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '729633800126',
     projectId: 'eatplek-6263a',
     storageBucket: 'eatplek-6263a.firebasestorage.app',
-    iosBundleId: 'com.example.eatplekApp',
+    iosBundleId: 'com.eatplek',
   );
-
 }

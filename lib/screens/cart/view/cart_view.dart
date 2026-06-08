@@ -39,7 +39,7 @@ class _CartViewState extends State<CartView> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         try {
           final navCtrl = Get.find<BottomNavController>();
-          if (navCtrl.currentIndex == 2) {
+          if (navCtrl.currentIndex == 3) {
             Get.find<CartService>().onCartViewEntered();
             if (Get.isRegistered<CartController>()) {
               Get.find<CartController>().fetchCartData();

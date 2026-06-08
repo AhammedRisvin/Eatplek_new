@@ -32,7 +32,7 @@ class _ProfileViewState extends State<ProfileView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final navCtrl = Get.find<BottomNavController>();
-        if (navCtrl.currentIndex == 3) {
+        if (navCtrl.currentIndex == 4) {
           _controller.fetchProfile();
         }
       } catch (_) {

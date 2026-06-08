@@ -8,8 +8,8 @@ class BottomNavController extends GetxController {
   int currentIndex = 0;
 
   static const int _ordersTabIndex = 1;
-  static const int _cartTabIndex = 2;
-  static const int _profileTabIndex = 3;
+  static const int _cartTabIndex = 3;
+  static const int _profileTabIndex = 4;
 
   void setBottomBarIndex(int index) {
     final previousIndex = currentIndex;

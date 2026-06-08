@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -576,35 +577,30 @@ class OrderConfirmationController extends GetxController {
 
   bool isDelivery() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
-    return cleanedType.toLowerCase() == 'delivery';
+    return cleanedType == ServiceType.delivery;
   }
 
   bool isTakeaway() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
-    final type = cleanedType.toLowerCase();
-    return type == 'takeaway' || type == 'take away';
+    return cleanedType == ServiceType.takeaway;
   }
 
   bool isDineIn() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
-    final type = cleanedType.toLowerCase();
-    return type.contains('dine') &&
-        type.contains('in') &&
-        !type.contains('car');
+    return cleanedType == ServiceType.dineIn;
   }
 
   bool isCarDineIn() {
     final cleanedType = _cleanServiceType(Store.deliveryPreference);
-    final type = cleanedType.toLowerCase();
-    return type.contains('car') && type.contains('dine');
+    return cleanedType == ServiceType.carDineIn;
   }
 
   Map<String, dynamic> _buildOrderRequestBody() {
     final cleanedServiceType = _cleanServiceType(Store.deliveryPreference);
     final baseOrderData = <String, dynamic>{};
 
-    switch (cleanedServiceType.toLowerCase()) {
-      case 'delivery':
+    switch (cleanedServiceType) {
+      case ServiceType.delivery:
         baseOrderData.addAll({
           "serviceType": "Delivery",
           "address": addressController.text.trim(),
@@ -617,15 +613,14 @@ class OrderConfirmationController extends GetxController {
           baseOrderData['notes'] = instructions.trim();
         }
         break;
-      case 'dine-in':
-      case 'dine_in':
+      case ServiceType.dineIn:
         baseOrderData.addAll({
           "serviceType": "Dine in",
           "personCount": guestCount,
           "reachTime": _convertTimeToISO8601(),
         });
         break;
-      case 'takeaway':
+      case ServiceType.takeaway:
         baseOrderData.addAll({
           "serviceType": "Takeaway",
           "reachTime": _convertTimeToISO8601(),
@@ -634,8 +629,7 @@ class OrderConfirmationController extends GetxController {
           baseOrderData['notes'] = instructions.trim();
         }
         break;
-      case 'car-dine-in':
-      case 'car_dine_in':
+      case ServiceType.carDineIn:
         baseOrderData.addAll({
           "serviceType": "Car Dine in",
           "reachTime": _convertTimeToISO8601(),
@@ -650,17 +644,7 @@ class OrderConfirmationController extends GetxController {
   }
 
   String _cleanServiceType(String serviceType) {
-    String cleaned = serviceType.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
-
-    if (cleaned.isEmpty) return 'delivery';
-    if (cleaned.contains('takeaway') || cleaned.contains('take away'))
-      return 'takeaway';
-    if (cleaned.contains('car') && cleaned.contains('dine'))
-      return 'car-dine-in';
-    if (cleaned.contains('dine') && cleaned.contains('in')) return 'dine-in';
-    if (cleaned.contains('delivery')) return 'delivery';
-    return cleaned.length > 50 ? 'delivery' : cleaned;
+    return ServiceType.normalize(serviceType);
   }
 
   // ========== PLACE ORDER ==========

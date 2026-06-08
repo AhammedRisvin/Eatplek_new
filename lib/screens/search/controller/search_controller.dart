@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:eatplek_app/screens/home/controller/home_controller.dart';
 import 'package:eatplek_app/screens/home/model/new_home_model.dart';
@@ -180,7 +181,7 @@ class SearchVendorController extends GetxController {
       final params = StringBuffer();
       params.write('latitude=$userLatitude');
       params.write('&longitude=$userLongitude');
-      params.write('&serviceType=$serviceType');
+      params.write('&serviceType=${Uri.encodeQueryComponent(serviceType)}');
       params.write('&dateTime=$formattedDateTime');
       params.write('&page=$currentPage');
       params.write('&limit=$pageLimit');
@@ -270,15 +271,7 @@ class SearchVendorController extends GetxController {
   }
 
   String _extractServiceType(String preference) {
-    if (preference.contains('Delivery')) return 'delivery';
-    if (preference.contains('Takeaway')) return 'takeaway';
-    if (preference.contains('Dine-in')) return 'dine-in';
-    if (preference.contains('SpecialBooking') ||
-        preference.contains('Special Booking'))
-      // ignore: curly_braces_in_flow_control_structures
-      return 'car-dine-in';
-    if (preference.contains('Pickup')) return 'pickup';
-    return 'delivery';
+    return ServiceType.normalize(preference);
   }
 
   void _handleError(String message) {

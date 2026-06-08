@@ -1,6 +1,7 @@
 import 'package:eatplek_app/screens/cart/controller/cart_service.dart';
 import 'package:eatplek_app/screens/cart/view/cart_view.dart';
 import 'package:eatplek_app/screens/home/view/home_view.dart';
+import 'package:eatplek_app/screens/offer_view/view/offer_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -12,6 +13,7 @@ import '../../../core/util/assets.dart';
 import '../../orders/view/orders_view.dart';
 import '../../profile/view/profile_view.dart';
 import '../controller/bottom_nav_controller.dart';
+import 'widget/custom_painter_bottom.dart';
 
 class BottomNavView extends StatefulWidget {
   const BottomNavView({super.key});
@@ -28,6 +30,7 @@ class _BottomNavViewState extends State<BottomNavView>
   final List<Widget> _pages = const [
     HomeView(),
     OrdersView(),
+    OfferView(),
     CartView(isFromBottomNav: true),
     ProfileView(),
   ];
@@ -45,7 +48,7 @@ class _BottomNavViewState extends State<BottomNavView>
       colorFilter:
           isActive
               ? const ColorFilter.mode(AppColor.appPrimary, BlendMode.srcIn)
-              : const ColorFilter.mode(Color(0xFFAAAAAA), BlendMode.srcIn),
+              : const ColorFilter.mode(Color(0xFF9DB2CE), BlendMode.srcIn),
     );
   }
 
@@ -82,61 +85,173 @@ class _BottomNavViewState extends State<BottomNavView>
     double navHeight,
     double bottomPadding,
   ) {
-    return Container(
-      height: navHeight + bottomPadding,
-      decoration: BoxDecoration(
-        color: AppColor.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, -4),
+    final bumpHeight = navHeight * 0.42;
+    final totalHeight = navHeight + bottomPadding;
+
+    return SizedBox(
+      height: totalHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.topCenter,
+        children: [
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: CustomPaint(painter: BNBCustomPainter()),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: navHeight,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _navItem(
+                        iconActive: activeHomeSvg,
+                        iconInactive: inActiveHomeSvg,
+                        label: 'Home',
+                        index: 0,
+                        isActive: ctrl.currentIndex == 0,
+                        size: size,
+                        navHeight: navHeight,
+                        ctrl: ctrl,
+                      ),
+                    ),
+                    Expanded(
+                      child: _navItem(
+                        iconActive: activeOrdersSvg,
+                        iconInactive: ordersInactiveSvg,
+                        label: 'Orders',
+                        index: 1,
+                        isActive: ctrl.currentIndex == 1,
+                        size: size,
+                        navHeight: navHeight,
+                        ctrl: ctrl,
+                      ),
+                    ),
+                    Expanded(
+                      child: _offerNavItem(
+                        isActive: ctrl.currentIndex == 2,
+                        size: size,
+                        navHeight: navHeight,
+                        ctrl: ctrl,
+                      ),
+                    ),
+                    Expanded(
+                      child: _cartNavItem(
+                        isActive: ctrl.currentIndex == 3,
+                        size: size,
+                        navHeight: navHeight,
+                        ctrl: ctrl,
+                      ),
+                    ),
+                    Expanded(
+                      child: _navItem(
+                        iconActive: activeProfileSvg,
+                        iconInactive: inActiveProfileSvg,
+                        label: 'Profile',
+                        index: 4,
+                        isActive: ctrl.currentIndex == 4,
+                        size: size,
+                        navHeight: navHeight,
+                        ctrl: ctrl,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: -bumpHeight * 0.9,
+            child: _offerFab(
+              isActive: ctrl.currentIndex == 2,
+              size: size,
+              ctrl: ctrl,
+            ),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _navItem(
-              iconActive: activeHomeSvg,
-              iconInactive: inActiveHomeSvg,
-              label: 'Home',
-              index: 0,
-              isActive: ctrl.currentIndex == 0,
-              size: size,
-              navHeight: navHeight,
-              ctrl: ctrl,
+    );
+  }
+
+  Widget _offerFab({
+    required bool isActive,
+    required Size size,
+    required BottomNavController ctrl,
+  }) {
+    final fabSize = size.width * 0.14;
+    final iconSize = size.width * 0.058;
+
+    return GestureDetector(
+      onTap: () => ctrl.setBottomBarIndex(2),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutBack,
+        width: fabSize,
+        height: fabSize,
+        decoration: BoxDecoration(
+          color: AppColor.appPrimary,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.appPrimary.withOpacity(0.32),
+              blurRadius: 22,
+              spreadRadius: 1,
+              offset: const Offset(0, 8),
             ),
-            _navItem(
-              iconActive: activeOrdersSvg,
-              iconInactive: ordersInactiveSvg,
-              label: 'Orders',
-              index: 1,
-              isActive: ctrl.currentIndex == 1,
-              size: size,
-              navHeight: navHeight,
-              ctrl: ctrl,
-            ),
-            _cartNavItem(
-              isActive: ctrl.currentIndex == 2,
-              size: size,
-              navHeight: navHeight,
-              ctrl: ctrl,
-            ),
-            _navItem(
-              iconActive: activeProfileSvg,
-              iconInactive: inActiveProfileSvg,
-              label: 'Profile',
-              index: 3,
-              isActive: ctrl.currentIndex == 3,
-              size: size,
-              navHeight: navHeight,
-              ctrl: ctrl,
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
           ],
+        ),
+        child: Icon(
+          Icons.percent_rounded,
+          color: AppColor.white,
+          size: iconSize,
+        ),
+      ),
+    );
+  }
+
+  Widget _offerNavItem({
+    required bool isActive,
+    required Size size,
+    required double navHeight,
+    required BottomNavController ctrl,
+  }) {
+    final double labelSize = size.width * 0.028;
+
+    return GestureDetector(
+      onTap: () => ctrl.setBottomBarIndex(2),
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: double.infinity,
+        height: navHeight,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: navHeight * 0.16),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              style: TextStyle(
+                fontSize: labelSize,
+                fontFamily: GoogleFonts.urbanist().fontFamily,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                color: isActive ? AppColor.appPrimary : const Color(0xFF9DB2CE),
+              ),
+              child: const Text('Offers'),
+            ),
+          ),
         ),
       ),
     );
@@ -160,7 +275,7 @@ class _BottomNavViewState extends State<BottomNavView>
       onTap: () => ctrl.setBottomBarIndex(index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: size.width * 0.22,
+        width: double.infinity,
         height: navHeight,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -199,7 +314,7 @@ class _BottomNavViewState extends State<BottomNavView>
                 fontSize: labelSize,
                 fontFamily: GoogleFonts.urbanist().fontFamily,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                color: isActive ? AppColor.appPrimary : const Color(0xFFAAAAAA),
+                color: isActive ? AppColor.appPrimary : const Color(0xFF9DB2CE),
               ),
               child: Text(label),
             ),
@@ -220,10 +335,10 @@ class _BottomNavViewState extends State<BottomNavView>
     final double labelSize = size.width * 0.028;
 
     return GestureDetector(
-      onTap: () => ctrl.setBottomBarIndex(2),
+      onTap: () => ctrl.setBottomBarIndex(3),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: size.width * 0.22,
+        width: double.infinity,
         height: navHeight,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -273,7 +388,7 @@ class _BottomNavViewState extends State<BottomNavView>
                 fontSize: labelSize,
                 fontFamily: GoogleFonts.urbanist().fontFamily,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                color: isActive ? AppColor.appPrimary : const Color(0xFFAAAAAA),
+                color: isActive ? AppColor.appPrimary : const Color(0xFF9DB2CE),
               ),
               child: const Text('Cart'),
             ),

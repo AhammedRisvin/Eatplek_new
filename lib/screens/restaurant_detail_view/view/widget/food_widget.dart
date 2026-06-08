@@ -62,8 +62,8 @@ class FoodWidget extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildVegIndicator(responsive),
-                        SizedBox(width: responsive.spacing5),
+                        // _buildVegIndicator(responsive),
+                        // SizedBox(width: responsive.spacing5),
                         Expanded(
                           child: text(
                             text: foodName,

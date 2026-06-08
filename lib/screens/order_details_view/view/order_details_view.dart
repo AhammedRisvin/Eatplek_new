@@ -7,6 +7,7 @@ import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
 import '../../../core/util/responsive_helper.dart';
+import '../../../core/util/service_type.dart';
 import '../../cart/view/widget/price_summary_widget.dart';
 import '../../orders/model/orders_api_model.dart';
 import '../controller/order_details_controller.dart';
@@ -52,7 +53,10 @@ class OrderDetailsView extends StatelessWidget {
                             .slideY(begin: 0.05, end: 0, duration: 400.ms),
 
                         // ── Delivery time banner ─────────────────────────
-                        if (order.serviceType == 'delivery' &&
+                        if (ServiceType.same(
+                              order.serviceType ?? '',
+                              ServiceType.delivery,
+                            ) &&
                             order.serviceDetails?.reachTime != null)
                           _buildTimeBanner(
                             order.serviceDetails!.reachTime!,
@@ -65,7 +69,10 @@ class OrderDetailsView extends StatelessWidget {
                         ).animate().fade(duration: 350.ms, delay: 120.ms),
 
                         // ── Pickup note ──────────────────────────────────
-                        if (order.serviceType == 'takeaway') ...[
+                        if (ServiceType.same(
+                          order.serviceType ?? '',
+                          ServiceType.takeaway,
+                        )) ...[
                           _buildPickupNote(
                             responsive,
                           ).animate().fade(duration: 350.ms, delay: 150.ms),

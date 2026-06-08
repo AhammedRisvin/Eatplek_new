@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -40,6 +41,7 @@ class RestaurantDetailViewController extends GetxController {
   bool isEditMode = false;
   String? editingFoodId;
   String? restaurantId;
+  bool isCartSubmitting = false;
 
   Timer? _quantityDebounceTimer;
   Timer? _autoRemoveCheckTimer;
@@ -159,7 +161,7 @@ class RestaurantDetailViewController extends GetxController {
 
       final response = await _apiClient.get(
         endpoint:
-            "${Urls.getRestaurantDetailsUrl}$restaurantId/foods?service=$serviceType",
+            "${Urls.getRestaurantDetailsUrl}$restaurantId/foods?service=${Uri.encodeQueryComponent(serviceType)}",
       );
 
       if (response != null && response is Map<String, dynamic>) {
@@ -332,23 +334,7 @@ class RestaurantDetailViewController extends GetxController {
   }
 
   String _getCleanServiceType(String servicePreference) {
-    String cleaned = servicePreference.toLowerCase().trim();
-
-    if (cleaned.contains('delivery') || cleaned.contains('🛵')) {
-      return 'delivery';
-    } else if (cleaned.contains('dine-in') ||
-        cleaned.contains('dine in') ||
-        cleaned.contains('🍽')) {
-      return 'dine-in';
-    } else if (cleaned.contains('takeaway') || cleaned.contains('🎁')) {
-      return 'takeaway';
-    } else if (cleaned.contains('car-dine') ||
-        cleaned.contains('car dine') ||
-        cleaned.contains('🚗')) {
-      return 'car-dine-in';
-    }
-
-    return 'delivery';
+    return ServiceType.normalize(servicePreference);
   }
 
   void _extractCategories() {
@@ -679,8 +665,6 @@ class RestaurantDetailViewController extends GetxController {
       debugPrint('🟣 Clearing add-ons for foodId: $foodId');
       bsAddOnQuantity.clear();
       update(['addons_list', 'bottom_sheet_content', 'total_price']);
-
-      _removeItemFromCartDirectly(foodId);
     }
   }
 
@@ -970,13 +954,23 @@ class RestaurantDetailViewController extends GetxController {
 
   Future<void> addOrUpdateItemToCart() async {
     if (selectedFoodItem?.foodId == null) return;
+    if (isCartSubmitting) return;
 
     try {
+      isCartSubmitting = true;
+      update(['total_price']);
+
+      _autoRemoveCheckTimer?.cancel();
+
       final foodId = selectedFoodItem!.foodId!;
       final hasCustomizations = _isScenario3And4(selectedFoodItem!);
       final hasAddOns =
           selectedFoodItem?.addOns != null &&
           selectedFoodItem!.addOns!.isNotEmpty;
+
+      if (hasCustomizations && getTotalCustomizationQuantity() == 0) {
+        bsAddOnQuantity.clear();
+      }
 
       final requestBody = _buildAddToCartRequestBody();
 
@@ -1018,6 +1012,9 @@ class RestaurantDetailViewController extends GetxController {
     } catch (e) {
       debugPrint('❌ addOrUpdateItemToCart error: $e');
       _showErrorSnackbar('Something went wrong. Please try again.');
+    } finally {
+      isCartSubmitting = false;
+      update(['total_price']);
     }
   }
 

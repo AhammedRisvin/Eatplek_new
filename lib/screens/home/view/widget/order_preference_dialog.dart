@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/screens/home/model/new_home_model.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -202,12 +203,7 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
     final filteredPreferences =
         allPreferences.where((pref) {
           return widget.availableServices.any(
-            (service) =>
-                service.toLowerCase().replaceAll('-', '').replaceAll(' ', '') ==
-                pref.value
-                    .toLowerCase()
-                    .replaceAll('-', '')
-                    .replaceAll(' ', ''),
+            (service) => ServiceType.same(service, pref.value),
           );
         }).toList();
 
@@ -221,7 +217,8 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
         children: [
           SizedBox(height: responsive.spacing16),
           ...filteredPreferences.map((preference) {
-            final bool isSelected = widget.currentPreference.contains(
+            final bool isSelected = ServiceType.same(
+              widget.currentPreference,
               preference.value,
             );
             return Padding(
@@ -350,27 +347,27 @@ class _OrderPreferenceDialogState extends State<OrderPreferenceDialog> {
     return [
       OrderPreferenceModel(
         id: 'dine-in',
-        title: 'Dine-in',
+        title: ServiceType.dineIn,
         emoji: '🍽️',
-        value: 'Dine-in',
+        value: ServiceType.dineIn,
       ),
       OrderPreferenceModel(
         id: 'takeaway',
-        title: 'Takeaway',
+        title: ServiceType.takeaway,
         emoji: '🥡',
-        value: 'Takeaway',
+        value: ServiceType.takeaway,
       ),
       OrderPreferenceModel(
         id: 'delivery',
-        title: 'Delivery',
+        title: ServiceType.delivery,
         emoji: '🛵',
-        value: 'Delivery',
+        value: ServiceType.delivery,
       ),
       OrderPreferenceModel(
         id: 'car-dine-in',
-        title: 'Car Dine-in',
+        title: ServiceType.carDineIn,
         emoji: '🚗',
-        value: 'SpecialBooking',
+        value: ServiceType.carDineIn,
       ),
     ];
   }

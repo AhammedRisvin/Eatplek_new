@@ -3,6 +3,7 @@ import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/routes/routes.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
@@ -202,7 +203,7 @@ class CartController extends GetxController {
               return AddOn(
                 customizationId: c['customizationId'],
                 name: c['name'],
-                price: c['price'],
+                price: (c['price'] ?? 0).toDouble(),
                 quantity: c['quantity'],
                 addOnId: c['customizationId'],
               );
@@ -212,7 +213,7 @@ class CartController extends GetxController {
               return AddOn(
                 addOnId: a['addOnId'],
                 name: a['name'],
-                price: a['price'],
+                price: (a['price'] ?? 0).toDouble(),
                 quantity: a['quantity'],
               );
             }).toList(),
@@ -664,7 +665,8 @@ class CartController extends GetxController {
   double get subtotal => cartModel?.data?.totals?.subTotal ?? 0;
   double get deliveryFee => 0.0;
   double get taxAmount => cartModel?.data?.totals?.taxAmount ?? 0;
-  int get taxPercentageValue => cartModel?.data?.totals?.taxPercentage ?? 0;
+  double get taxPercentageValue =>
+      cartModel?.data?.totals?.taxPercentage ?? 0;
   double get packingCharge =>
       (cartModel?.data?.totals?.packingChargeTotal ?? 0).toDouble();
   double get discountAmount =>
@@ -893,20 +895,7 @@ class CartController extends GetxController {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   String _getCleanServiceType(String servicePreference) {
-    String cleaned = servicePreference.toLowerCase().trim();
-    if (cleaned.contains('delivery') || cleaned.contains('🛵'))
-      return 'delivery';
-    if (cleaned.contains('dine-in') ||
-        cleaned.contains('dine in') ||
-        cleaned.contains('🍽'))
-      return 'dine-in';
-    if (cleaned.contains('takeaway') || cleaned.contains('🎁'))
-      return 'takeaway';
-    if (cleaned.contains('car-dine') ||
-        cleaned.contains('car dine') ||
-        cleaned.contains('🚗'))
-      return 'car-dine-in';
-    return 'delivery';
+    return ServiceType.normalize(servicePreference);
   }
 
   void placeOrder() {

@@ -415,7 +415,7 @@ class CartFoodListWidget extends StatelessWidget {
                 ),
                 SizedBox(height: responsive.spacing4),
                 Text(
-                  'Rs.${addOn.price ?? 0}',
+                  'Rs.${_formatPrice(addOn.price)}',
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
                     fontSize: responsive.fontSize12,
@@ -536,7 +536,7 @@ class CartFoodListWidget extends StatelessWidget {
                 ),
                 SizedBox(height: responsive.spacing4),
                 Text(
-                  'Rs.${customization.price ?? 0}',
+                  'Rs.${_formatPrice(customization.price)}',
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
                     fontSize: responsive.fontSize12,
@@ -584,5 +584,10 @@ class CartFoodListWidget extends StatelessWidget {
         painter: DottedLinePainter(color: AppColor.black.withOpacity(0.1)),
       ),
     );
+  }
+
+  String _formatPrice(num? value) {
+    final price = value ?? 0;
+    return price % 1 == 0 ? price.toInt().toString() : price.toStringAsFixed(2);
   }
 }

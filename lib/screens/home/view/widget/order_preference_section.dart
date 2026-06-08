@@ -20,8 +20,11 @@ class OrderPreferenceSection extends StatelessWidget {
       id: HomeController.orderPreferenceId,
       builder: (controller) {
         final hasPreference = controller.orderPreference.isNotEmpty;
+        final glowing = controller.shouldGlowOrderPreference;
 
-        return Container(
+        return AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOut,
               width: responsive.screenWidth,
               margin: EdgeInsets.only(top: responsive.spacing20),
               padding: EdgeInsets.symmetric(
@@ -42,9 +45,22 @@ class OrderPreferenceSection extends StatelessWidget {
                   ],
                 ),
                 border: Border.all(
-                  color: AppColor.appPrimary.withOpacity(0.12),
-                  width: 1,
+                  color:
+                      glowing
+                          ? AppColor.appPrimary
+                          : AppColor.appPrimary.withOpacity(0.12),
+                  width: glowing ? 1.8 : 1,
                 ),
+                boxShadow:
+                    glowing
+                        ? [
+                          BoxShadow(
+                            color: AppColor.appPrimary.withOpacity(0.28),
+                            blurRadius: 22,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                        : null,
               ),
               child: Row(
                 children: [
@@ -144,8 +160,8 @@ class OrderPreferenceSection extends StatelessWidget {
   IconData _serviceIcon(String preference) {
     if (preference.contains('Delivery')) return Icons.delivery_dining_rounded;
     if (preference.contains('Takeaway')) return Icons.shopping_bag_rounded;
-    if (preference.contains('Dine')) return Icons.restaurant_rounded;
     if (preference.contains('Car')) return Icons.directions_car_rounded;
+    if (preference.contains('Dine')) return Icons.restaurant_rounded;
     if (preference.contains('Book')) return Icons.calendar_today_rounded;
     return Icons.fastfood_rounded;
   }

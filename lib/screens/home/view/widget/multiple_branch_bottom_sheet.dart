@@ -52,7 +52,9 @@ class MultipleBranchBottomSheet extends StatelessWidget {
                 margin: EdgeInsets.only(bottom: responsive.spacing10),
                 decoration: BoxDecoration(
                   color: const Color(0XFFD9D9D9),
-                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                  borderRadius: BorderRadius.circular(
+                    responsive.largeBorderRadius,
+                  ),
                 ),
               ),
             ),
@@ -105,9 +107,10 @@ class MultipleBranchBottomSheet extends StatelessWidget {
       itemCount: branches.length,
       itemBuilder: (context, index) {
         final branch = branches[index];
-        return GestureDetector(
+        return VendorCardWidget(
+          vendor: branch,
           onTap: () => onBranchSelected(branch),
-          child: VendorCardWidget(vendor: branch, onTap: () => onBranchSelected(branch), showFullOverlay: true),
+          showFullOverlay: true,
         );
       },
     );

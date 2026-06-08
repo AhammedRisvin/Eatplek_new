@@ -14,6 +14,9 @@ mixin Urls {
   // Vendors (Search + View All)
   static const String getVendorsUrl = 'api/users/app/vendors';
 
+  // Offers
+  static const String getTodayOffersUrl = 'api/users/app/offers/today';
+
   //Cart
   static const String getCartUrl = 'api/cart';
   static const String addOrUpdateCartUrl = 'api/cart/items';

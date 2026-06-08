@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -33,10 +34,10 @@ class OrdersController extends GetxController
 
   // ── Tab definitions (display order as requested) ──────────────────────────
   final List<Map<String, String>> tabs = const [
-    {'label': 'Dine In', 'serviceType': 'dine_in'},
-    {'label': 'Takeaway', 'serviceType': 'takeaway'},
-    {'label': 'Delivery', 'serviceType': 'delivery'},
-    {'label': 'Car Dine In', 'serviceType': 'car_dine_in'},
+    {'label': ServiceType.dineIn, 'serviceType': ServiceType.dineIn},
+    {'label': ServiceType.takeaway, 'serviceType': ServiceType.takeaway},
+    {'label': ServiceType.delivery, 'serviceType': ServiceType.delivery},
+    {'label': ServiceType.carDineIn, 'serviceType': ServiceType.carDineIn},
     {'label': 'Prebook', 'serviceType': 'prebook'},
   ];
 
@@ -155,7 +156,7 @@ class OrdersController extends GetxController
 
     try {
       final endpoint =
-          '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=$serviceType';
+          '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=${Uri.encodeQueryComponent(serviceType)}';
 
       debugPrint('📦 Fetching orders: $endpoint');
       final response = await _apiClient.get(endpoint: endpoint);

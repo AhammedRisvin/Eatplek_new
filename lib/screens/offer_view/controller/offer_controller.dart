@@ -1,67 +1,339 @@
+import 'dart:async';
+
+import 'package:eatplek_app/core/network/api_endpoints.dart';
+import 'package:eatplek_app/core/util/service_type.dart';
+import 'package:eatplek_app/core/util/storage.dart';
+import 'package:eatplek_app/screens/home/controller/home_controller.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../core/network/api_client.dart';
+import '../model/today_offers_model.dart';
+
 class OfferController extends GetxController {
-  // Offer categories
-  final List<String> offerCategories = ['Dining', 'Take Away', 'Delivery'];
-  int selectedCategoryIndex = 0; // Default selected index
+  static const String preferencesId = 'offerPreferences';
+  static const String foodsId = 'offerFoods';
+  static const int pageLimit = 20;
 
-  // Mock restaurant data
+  final FittorConnect _apiClient = FittorConnect();
+  final ScrollController scrollController = ScrollController();
 
-  final List<RestaurantOffer> restaurants = [
-    RestaurantOffer(
-      id: 1,
-      name: 'Nibraz Restaurant Poonoor',
-      location: 'Calicut, Kannur, Kerala',
-      rating: 4.5,
-      imageUrl: 'https://picsum.photos/400/200?random=30',
-      offerType: 'Delivery',
-    ),
-    RestaurantOffer(
-      id: 2,
-      name: 'Spice Garden Restaurant',
-      location: 'Kozhikode, Kerala',
-      rating: 4.2,
-      imageUrl: 'https://picsum.photos/400/200?random=31',
-      offerType: 'Dining',
-    ),
-    RestaurantOffer(
-      id: 3,
-      name: 'Ocean View Cafe',
-      location: 'Malappuram, Kerala',
-      rating: 4.7,
-      imageUrl: 'https://picsum.photos/400/200?random=32',
-      offerType: 'Take Away',
-    ),
-  ];
+  List<String> availableServices = [];
+  List<OfferFood> offers = [];
 
-  // Filter restaurants based on selected category
-  List<RestaurantOffer> get filteredRestaurants {
-    final selectedCategory = offerCategories[selectedCategoryIndex];
-    return restaurants.where((restaurant) => restaurant.offerType == selectedCategory).toList();
+  String selectedPreference = '';
+  double userLatitude = 0.0;
+  double userLongitude = 0.0;
+
+  bool isLoading = false;
+  bool isLoadingMore = false;
+  bool hasError = false;
+  String errorMessage = '';
+
+  int currentPage = 1;
+  int totalPages = 0;
+  bool hasNextPage = false;
+
+  bool _isFetching = false;
+  Timer? _homeSyncRetryTimer;
+
+  @override
+  void onInit() {
+    super.onInit();
+    scrollController.addListener(_onScroll);
+    _syncFromHome(fetchAfterSync: true);
   }
 
-  // Update selected category
-  void updateSelectedCategory(int index) {
-    selectedCategoryIndex = index;
-    update(['category_list', 'restaurant_list']);
+  @override
+  void onClose() {
+    _homeSyncRetryTimer?.cancel();
+    scrollController.removeListener(_onScroll);
+    scrollController.dispose();
+    super.onClose();
   }
-}
 
-// Model class for restaurant offers
-class RestaurantOffer {
-  final int id;
-  final String name;
-  final String location;
-  final double rating;
-  final String imageUrl;
-  final String offerType;
+  void refreshFromHome() {
+    _syncFromHome(fetchAfterSync: true, forceRefresh: true);
+  }
 
-  RestaurantOffer({
-    required this.id,
-    required this.name,
-    required this.location,
-    required this.rating,
-    required this.imageUrl,
-    required this.offerType,
-  });
+  Future<void> retryFetch() async {
+    currentPage = 1;
+    offers.clear();
+    await _fetchOffers(isRefresh: true);
+  }
+
+  Future<void> refreshOffers() async {
+    _syncFromHome(fetchAfterSync: false);
+    currentPage = 1;
+    offers.clear();
+    await _fetchOffers(isRefresh: true);
+  }
+
+  void onPreferenceSelected(String preference) {
+    final normalized = ServiceType.normalize(preference);
+    if (ServiceType.same(selectedPreference, normalized)) return;
+
+    selectedPreference = normalized;
+    Store.deliveryPreference = normalized;
+    _syncHomePreference(normalized);
+
+    currentPage = 1;
+    offers.clear();
+    update([preferencesId, foodsId]);
+    _fetchOffers(isRefresh: true);
+  }
+
+  void _syncFromHome({
+    required bool fetchAfterSync,
+    bool forceRefresh = false,
+  }) {
+    final previousPreference = selectedPreference;
+    final previousLatitude = userLatitude;
+    final previousLongitude = userLongitude;
+
+    if (Get.isRegistered<HomeController>()) {
+      final homeController = Get.find<HomeController>();
+      availableServices = _normalizeAvailableServices(
+        homeController.availableServices,
+      );
+      userLatitude = homeController.userLatitude;
+      userLongitude = homeController.userLongitude;
+
+      final homePreference = homeController.orderPreference;
+      selectedPreference =
+          _resolveSelectedPreference(homePreference: homePreference);
+    } else {
+      userLatitude = Store.userLatitude;
+      userLongitude = Store.userLongitude;
+      selectedPreference = _resolveSelectedPreference();
+    }
+
+    if (userLatitude == 0.0 && Store.userLatitude != 0.0) {
+      userLatitude = Store.userLatitude;
+    }
+    if (userLongitude == 0.0 && Store.userLongitude != 0.0) {
+      userLongitude = Store.userLongitude;
+    }
+
+    update([preferencesId]);
+
+    final shouldRefetch =
+        forceRefresh ||
+        offers.isEmpty ||
+        !ServiceType.same(previousPreference, selectedPreference) ||
+        previousLatitude != userLatitude ||
+        previousLongitude != userLongitude;
+
+    if (fetchAfterSync &&
+        selectedPreference.isNotEmpty &&
+        _hasUsableLocation &&
+        shouldRefetch) {
+      currentPage = 1;
+      offers.clear();
+      _fetchOffers(isRefresh: true);
+    }
+
+    _scheduleHomeSyncRetryIfNeeded();
+  }
+
+  String _resolveSelectedPreference({String homePreference = ''}) {
+    final savedPreference = Store.deliveryPreference;
+
+    if (_isAvailable(homePreference)) {
+      return ServiceType.normalize(homePreference);
+    }
+    if (_isAvailable(savedPreference)) {
+      return ServiceType.normalize(savedPreference);
+    }
+    if (availableServices.isNotEmpty) {
+      return ServiceType.normalize(availableServices.first);
+    }
+    if (homePreference.trim().isNotEmpty) {
+      return ServiceType.normalize(homePreference);
+    }
+    if (savedPreference.trim().isNotEmpty) {
+      return ServiceType.normalize(savedPreference);
+    }
+
+    return ServiceType.delivery;
+  }
+
+  List<String> _normalizeAvailableServices(List<String> services) {
+    final normalized = <String>[];
+
+    for (final service in services) {
+      final cleanService = _normalizeServiceAlias(service);
+      if (cleanService.isEmpty) continue;
+      if (normalized.any((item) => ServiceType.same(item, cleanService))) {
+        continue;
+      }
+      normalized.add(cleanService);
+    }
+
+    return normalized;
+  }
+
+  String _normalizeServiceAlias(String service) {
+    final cleaned = service.trim().toLowerCase();
+    if (cleaned == 'pickup' || cleaned == 'pick up') {
+      return ServiceType.takeaway;
+    }
+    return ServiceType.normalize(service);
+  }
+
+  bool _isAvailable(String preference) {
+    if (preference.trim().isEmpty || availableServices.isEmpty) return false;
+    return availableServices.any((item) => ServiceType.same(item, preference));
+  }
+
+  void _syncHomePreference(String preference) {
+    if (!Get.isRegistered<HomeController>()) return;
+
+    final homeController = Get.find<HomeController>();
+    homeController.orderPreference = preference;
+    homeController.update([HomeController.orderPreferenceId]);
+  }
+
+  void _scheduleHomeSyncRetryIfNeeded() {
+    if (availableServices.isNotEmpty && _hasUsableLocation) return;
+    if (!Get.isRegistered<HomeController>()) return;
+
+    _homeSyncRetryTimer?.cancel();
+    _homeSyncRetryTimer = Timer(const Duration(seconds: 1), () {
+      if (isClosed) return;
+      final homeServices = Get.find<HomeController>().availableServices;
+      final homeHasLocation =
+          Get.find<HomeController>().userLatitude != 0.0 ||
+          Get.find<HomeController>().userLongitude != 0.0;
+      _syncFromHome(fetchAfterSync: homeServices.isNotEmpty && homeHasLocation);
+    });
+  }
+
+  Future<void> _fetchOffers({required bool isRefresh}) async {
+    if (_isFetching) return;
+    if (!_hasUsableLocation) {
+      _handleError('Location is not available yet. Please try again.');
+      _scheduleHomeSyncRetryIfNeeded();
+      return;
+    }
+
+    try {
+      _isFetching = true;
+
+      if (isRefresh) {
+        isLoading = true;
+        hasError = false;
+        errorMessage = '';
+      } else {
+        isLoadingMore = true;
+      }
+      update([foodsId]);
+
+      final endpoint = _buildOffersEndpoint();
+      debugPrint('Offers endpoint: $endpoint');
+
+      final response = await _apiClient
+          .get(endpoint: endpoint)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw TimeoutException('Request timed out'),
+          );
+
+      if (response is! Map<String, dynamic>) {
+        _handleError('Invalid response from server');
+        return;
+      }
+
+      final parsed = TodayOffersModel.fromJson(response);
+      if (!parsed.success) {
+        _handleError(
+          parsed.message.isNotEmpty ? parsed.message : 'Failed to load offers',
+        );
+        return;
+      }
+
+      final newOffers = parsed.data?.offers ?? [];
+      final pagination = parsed.data?.pagination;
+
+      if (isRefresh) {
+        offers = newOffers;
+      } else {
+        offers.addAll(newOffers);
+      }
+
+      currentPage = pagination?.currentPage ?? currentPage;
+      totalPages = pagination?.totalPages ?? totalPages;
+      hasNextPage = pagination?.hasNextPage ?? newOffers.length >= pageLimit;
+
+      isLoading = false;
+      isLoadingMore = false;
+      hasError = false;
+      update([foodsId]);
+    } on TimeoutException {
+      _handleError('Request timed out. Please try again.');
+    } catch (e) {
+      _handleError(_parseError(e.toString()));
+      debugPrint('Offer fetch error: $e');
+    } finally {
+      _isFetching = false;
+    }
+  }
+
+  String _buildOffersEndpoint() {
+    final params = StringBuffer();
+    params.write('latitude=$userLatitude');
+    params.write('&longitude=$userLongitude');
+    params.write(
+      '&serviceType=${Uri.encodeQueryComponent(ServiceType.normalize(selectedPreference))}',
+    );
+    params.write('&dateTime=${Uri.encodeQueryComponent(_formattedNow())}');
+    params.write('&page=$currentPage');
+    params.write('&limit=$pageLimit');
+
+    return '${Urls.getTodayOffersUrl}?${params.toString()}';
+  }
+
+  bool get _hasUsableLocation => userLatitude != 0.0 || userLongitude != 0.0;
+
+  String _formattedNow() {
+    final iso = DateTime.now().toUtc().toIso8601String();
+    final dotIndex = iso.indexOf('.');
+    if (dotIndex == -1) return iso;
+    return '${iso.substring(0, dotIndex)}Z';
+  }
+
+  void _onScroll() {
+    if (!scrollController.hasClients) return;
+    if (scrollController.position.pixels <
+        scrollController.position.maxScrollExtent * 0.85) {
+      return;
+    }
+
+    if (hasNextPage && !isLoading && !isLoadingMore && !_isFetching) {
+      currentPage++;
+      _fetchOffers(isRefresh: false);
+    }
+  }
+
+  void _handleError(String message) {
+    hasError = true;
+    errorMessage = message;
+    isLoading = false;
+    isLoadingMore = false;
+    update([foodsId]);
+  }
+
+  String _parseError(String error) {
+    if (error.contains('SocketException') ||
+        error.contains('Failed host lookup')) {
+      return 'Network error. Please check your connection.';
+    }
+    if (error.toLowerCase().contains('timeout')) {
+      return 'Request timed out. Please try again.';
+    }
+    if (error.contains('Connection refused')) {
+      return 'Could not connect to server.';
+    }
+    return 'Unable to load offers. Please try again.';
+  }
 }

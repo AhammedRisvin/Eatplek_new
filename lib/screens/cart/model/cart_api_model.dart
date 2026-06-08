@@ -85,7 +85,7 @@ class CartItem {
   List<AddOn>? customizations;
   List<AddOn>? addOns;
   bool? isPrebook;
-  int? packingCharge;
+  double? packingCharge;
   double? itemTotal;
   dynamic notes;
 
@@ -128,7 +128,7 @@ class CartItem {
             ? []
             : List<AddOn>.from(json["addOns"]!.map((x) => AddOn.fromJson(x))),
     isPrebook: json["isPrebook"],
-    packingCharge: json["packingCharge"],
+    packingCharge: json["packingCharge"]?.toDouble(),
     itemTotal: json["itemTotal"]?.toDouble(),
     notes: json["notes"],
   );
@@ -137,7 +137,7 @@ class CartItem {
 class AddOn {
   String? addOnId;
   String? name;
-  int? price;
+  double? price;
   int? quantity;
   String? customizationId;
 
@@ -152,7 +152,7 @@ class AddOn {
   factory AddOn.fromJson(Map<String, dynamic> json) => AddOn(
     addOnId: json["addOnId"],
     name: json["name"],
-    price: json["price"],
+    price: json["price"]?.toDouble(),
     quantity: json["quantity"],
     customizationId: json["customizationId"],
   );
@@ -160,13 +160,13 @@ class AddOn {
 
 class Totals {
   double? subTotal;
-  int? addOnTotal;
-  int? customizationTotal;
-  int? packingChargeTotal;
-  int? discountTotal;
-  int? couponDiscount;
+  double? addOnTotal;
+  double? customizationTotal;
+  double? packingChargeTotal;
+  double? discountTotal;
+  double? couponDiscount;
   double? taxAmount;
-  int? taxPercentage;
+  double? taxPercentage;
   double? grandTotal;
   int? itemCount;
 
@@ -185,13 +185,13 @@ class Totals {
 
   factory Totals.fromJson(Map<String, dynamic> json) => Totals(
     subTotal: json["subTotal"]?.toDouble(),
-    addOnTotal: json["addOnTotal"],
-    customizationTotal: json["customizationTotal"],
-    packingChargeTotal: json["packingChargeTotal"],
-    discountTotal: json["discountTotal"],
-    couponDiscount: json["couponDiscount"],
+    addOnTotal: json["addOnTotal"]?.toDouble(),
+    customizationTotal: json["customizationTotal"]?.toDouble(),
+    packingChargeTotal: json["packingChargeTotal"]?.toDouble(),
+    discountTotal: json["discountTotal"]?.toDouble(),
+    couponDiscount: json["couponDiscount"]?.toDouble(),
     taxAmount: json["taxAmount"]?.toDouble(),
-    taxPercentage: json["taxPercentage"],
+    taxPercentage: json["taxPercentage"]?.toDouble(),
     grandTotal: json["grandTotal"]?.toDouble(),
     itemCount: json["itemCount"],
   );
@@ -202,7 +202,7 @@ class Vendor {
   String? name;
   String? profileImage;
   String? place;
-  int? gstPercentage;
+  double? gstPercentage;
 
   Vendor({
     this.id,
@@ -217,7 +217,7 @@ class Vendor {
     name: json["name"],
     profileImage: json["profileImage"],
     place: json["place"],
-    gstPercentage: json["gstPercentage"],
+    gstPercentage: json["gstPercentage"]?.toDouble(),
   );
 }
 

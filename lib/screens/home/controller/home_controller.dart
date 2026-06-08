@@ -11,10 +11,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/util/service_type.dart';
 import '../../../core/util/storage.dart';
 import '../../notification/cotroller/notification_controller.dart';
 import '../model/new_home_model.dart';
 import '../view/widget/multiple_branch_bottom_sheet.dart';
+import '../view/widget/order_preference_confirm_bottom_sheet.dart';
 import '../view/widget/order_preference_dialog.dart';
 
 class HomeController extends GetxController {
@@ -45,6 +47,7 @@ class HomeController extends GetxController {
   bool isLoadingMore = false;
   bool hasError = false;
   String errorMessage = '';
+  bool shouldGlowOrderPreference = false;
 
   // ─── Pagination ───────────────────────────────────────────────────────────
   int currentPage = 1;
@@ -263,7 +266,7 @@ class HomeController extends GetxController {
           '${Urls.getHomeUrl}?latitude=$userLatitude&longitude=$userLongitude&dateTime=$cleanDateTime';
 
       if (serviceType != null && serviceType.isNotEmpty) {
-        endpoint += '&serviceType=$serviceType';
+        endpoint += '&serviceType=${Uri.encodeQueryComponent(serviceType)}';
         debugPrint('🔗 Fetching with serviceType: $serviceType');
       } else {
         debugPrint('🔗 Fetching without serviceType — services discovery only');
@@ -726,6 +729,7 @@ class HomeController extends GetxController {
   Future<void> _applyPreference(String selectedPreference) async {
     orderPreference = selectedPreference;
     Store.deliveryPreference = selectedPreference;
+    shouldGlowOrderPreference = false;
     update([orderPreferenceId]);
 
     debugPrint('💾 Preference applied: $selectedPreference');
@@ -906,11 +910,16 @@ class HomeController extends GetxController {
   }
 
   void onRestaurantTapped(Vendor restaurant) {
+    if (_isVendorClosed(restaurant)) {
+      _showRestaurantClosedMessage(restaurant);
+      return;
+    }
+
     final branches = restaurant.branchList ?? [];
     if (branches.length > 1) {
       _showMultipleBranchesBottomSheet(restaurant, branches);
     } else {
-      Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
+      _showOrderPreferenceConfirmSheet(restaurant);
     }
   }
 
@@ -923,7 +932,15 @@ class HomeController extends GetxController {
         vendorName: mainVendor.hotelName ?? 'Restaurant',
         branches: branches,
         onBranchSelected: (Vendor selected) {
-          Get.toNamed(Routes.restaurantDetail, arguments: selected);
+          if (_isVendorClosed(selected)) {
+            _showRestaurantClosedMessage(selected);
+            return;
+          }
+
+          _showOrderPreferenceConfirmSheet(
+            selected,
+            closeBranchSheetToo: true,
+          );
         },
       ),
       isScrollControlled: true,
@@ -937,6 +954,86 @@ class HomeController extends GetxController {
   }
 
   // ─── Retry / Refresh ──────────────────────────────────────────────────────
+
+  void _showOrderPreferenceConfirmSheet(
+    Vendor restaurant, {
+    bool closeBranchSheetToo = false,
+  }) {
+    final preference =
+        orderPreference.isNotEmpty ? orderPreference : Store.deliveryPreference;
+
+    if (preference.isEmpty) {
+      _highlightOrderPreferenceChange();
+      _showOrderPreferenceDialog(canDismiss: false);
+      return;
+    }
+
+    Get.bottomSheet(
+      OrderPreferenceConfirmBottomSheet(
+        restaurantName: restaurant.hotelName ?? 'this restaurant',
+        preference: preference,
+        onContinue: () {
+          _closePreferencePrompt(closeBranchSheetToo: closeBranchSheetToo);
+          Future.delayed(const Duration(milliseconds: 120), () {
+            Get.toNamed(Routes.restaurantDetail, arguments: restaurant);
+          });
+        },
+        onCancel: () {
+          _closePreferencePrompt(closeBranchSheetToo: closeBranchSheetToo);
+          _highlightOrderPreferenceChange();
+        },
+      ),
+      isScrollControlled: true,
+      barrierColor: Colors.black.withOpacity(0.28),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+    );
+  }
+
+  void _closePreferencePrompt({required bool closeBranchSheetToo}) {
+    if (Get.isBottomSheetOpen ?? false) {
+      Get.back();
+    }
+
+    if (!closeBranchSheetToo) return;
+
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (Get.isBottomSheetOpen ?? false) {
+        Get.back();
+      }
+    });
+  }
+
+  void _highlightOrderPreferenceChange() {
+    shouldGlowOrderPreference = true;
+    update([orderPreferenceId]);
+
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (isClosed) return;
+      shouldGlowOrderPreference = false;
+      update([orderPreferenceId]);
+    });
+  }
+
+  bool _isVendorClosed(Vendor vendor) {
+    return vendor.schedule?.isClosed ?? true;
+  }
+
+  void _showRestaurantClosedMessage(Vendor vendor) {
+    Get.snackbar(
+      'Restaurant Closed',
+      '${vendor.hotelName ?? 'This restaurant'} is closed right now.',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.black.withOpacity(0.85),
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 2),
+    );
+  }
 
   Future<void> retryFetchingVendors() async {
     debugPrint('🔄 RETRY triggered');
@@ -969,23 +1066,14 @@ class HomeController extends GetxController {
 
   /// Returns null when preference is empty — never silently defaults to delivery
   String? _extractServiceType(String preference) {
-    if (preference.isEmpty) return null;
-    if (preference.contains('Delivery')) return 'delivery';
-    if (preference.contains('Takeaway')) return 'takeaway';
-    if (preference.contains('Dine-in')) return 'dine-in';
-    if (preference.contains('Special Booking')) return 'car-dine-in';
-    return null;
+    return ServiceType.normalizeOrNull(preference);
   }
 
   /// Checks if the current preference is in the list of available services
   bool _isPreferenceAvailable(String preference) {
     final String? serviceType = _extractServiceType(preference);
     if (serviceType == null) return false;
-    return availableServices.any(
-      (s) =>
-          s.toLowerCase().replaceAll('-', '').replaceAll(' ', '') ==
-          serviceType.toLowerCase().replaceAll('-', '').replaceAll(' ', ''),
-    );
+    return availableServices.any((s) => ServiceType.same(s, serviceType));
   }
 
   String _parseError(String error) {
