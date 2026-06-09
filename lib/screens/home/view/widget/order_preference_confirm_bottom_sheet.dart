@@ -8,6 +8,7 @@ class OrderPreferenceConfirmBottomSheet extends StatelessWidget {
   final String preference;
   final VoidCallback onContinue;
   final VoidCallback onCancel;
+  final VoidCallback onChangePreference;
 
   const OrderPreferenceConfirmBottomSheet({
     super.key,
@@ -15,6 +16,7 @@ class OrderPreferenceConfirmBottomSheet extends StatelessWidget {
     required this.preference,
     required this.onContinue,
     required this.onCancel,
+    required this.onChangePreference,
   });
 
   @override
@@ -125,6 +127,31 @@ class OrderPreferenceConfirmBottomSheet extends StatelessWidget {
                         color: AppColor.appPrimary,
                         fontSize: responsive.fontSize15,
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: responsive.spacing10),
+                  TextButton(
+                    onPressed: onChangePreference,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColor.appPrimary,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: responsive.spacing10,
+                        vertical: responsive.spacing6,
+                      ),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          responsive.largeBorderRadius,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: responsive.fontSize12,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),

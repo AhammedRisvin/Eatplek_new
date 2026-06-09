@@ -23,7 +23,7 @@ class BottomCartBar extends StatelessWidget {
 
         return Obx(() {
           final totalItems = cartService.itemCount.value;
-          final totalPrice = cartService.totalPrice.value;
+          final totalPrice = cartService.subtotalPrice.value;
 
           if (totalItems == 0) return const SizedBox.shrink();
 
@@ -70,7 +70,7 @@ class BottomCartBar extends StatelessWidget {
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
                             child: Text(
-                              '₹${totalPrice.toStringAsFixed(0)}',
+                              '₹${totalPrice.toStringAsFixed(2)}',
                               key: ValueKey(totalPrice),
                               style: TextStyle(
                                 fontSize: responsive.fontSize18,

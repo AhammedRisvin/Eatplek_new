@@ -186,6 +186,11 @@ class ResponsiveHelper {
     return screenHeight / screenWidth * 0.325;
   }
 
+  double get gridChildAspectRatioForOfferFood {
+    // Responsive aspect ratio calculation
+    return screenHeight / screenWidth * 0.285;
+  }
+
   double get gridMainAxisSpacing => spacing16;
   double get gridCrossAxisSpacing => spacing12;
 

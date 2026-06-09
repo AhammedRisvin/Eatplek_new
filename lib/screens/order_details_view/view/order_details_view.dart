@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../../../core/util/app_color.dart';
 import '../../../core/util/assets.dart';
 import '../../../core/util/common_widgets.dart';
+import '../../../core/util/price_formatter.dart';
 import '../../../core/util/responsive_helper.dart';
 import '../../../core/util/service_type.dart';
 import '../../cart/view/widget/price_summary_widget.dart';
@@ -325,7 +326,8 @@ class OrderDetailsView extends StatelessWidget {
               ),
               SizedBox(height: responsive.spacing3),
               text(
-                text: 'Rs.${item.itemTotal ?? item.effectivePrice ?? 0}',
+                text:
+                    'Rs.${formatPrice(item.itemTotal ?? item.effectivePrice)}',
                 size: responsive.fontSize13,
                 fontWeight: FontWeight.w600,
                 color: AppColor.black,

@@ -17,6 +17,8 @@ class OrderPreferenceSection extends StatelessWidget {
     final responsive = ResponsiveHelper();
 
     return GetBuilder<HomeController>(
+      init: controller,
+      global: false,
       id: HomeController.orderPreferenceId,
       builder: (controller) {
         final hasPreference = controller.orderPreference.isNotEmpty;

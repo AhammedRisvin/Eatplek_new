@@ -3,6 +3,7 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart' hide ShimmerEffect;
 import 'package:get/get.dart';
@@ -13,7 +14,7 @@ import '../../../cart/view/widget/dotted_line_painter.dart';
 import '../../controller/orders_controller.dart';
 import '../../model/orders_api_model.dart';
 
-class OrdersList extends StatelessWidget {
+class OrdersList extends StatefulWidget {
   final OrdersController controller;
   final int tabIndex;
 
@@ -24,7 +25,41 @@ class OrdersList extends StatelessWidget {
   });
 
   @override
+  State<OrdersList> createState() => _OrdersListState();
+}
+
+class _OrdersListState extends State<OrdersList> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final nearBottom =
+        _scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 250;
+    if (nearBottom) {
+      widget.controller.loadMoreForTab(widget.tabIndex);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final tabIndex = widget.tabIndex;
+
     if (controller.isInitialLoadingForTab(tabIndex)) {
       return _buildSkeletonList();
     }
@@ -45,7 +80,7 @@ class OrdersList extends StatelessWidget {
     final orders = controller.ordersForTab(tabIndex);
 
     return ListView.builder(
-      controller: controller.scrollControllers[tabIndex],
+      controller: _scrollController,
       padding: EdgeInsets.zero,
       physics: const BouncingScrollPhysics(),
       itemCount:
@@ -150,7 +185,7 @@ class OrdersList extends StatelessWidget {
                         Row(
                           children: [
                             text(
-                              text: '₹${totals?.grandTotal ?? 0}',
+                              text: formatCurrency(totals?.grandTotal),
                               size: 16,
                               fontWeight: FontWeight.w700,
                               color: AppColor.black,
@@ -225,7 +260,7 @@ class OrdersList extends StatelessWidget {
               : AppColor.appPrimary,
       textColor: isPending ? AppColor.appPrimary : AppColor.white,
       onTap: () {
-        if (!isPending) controller.viewOrderDetails(order);
+        if (!isPending) widget.controller.viewOrderDetails(order);
       },
     );
   }

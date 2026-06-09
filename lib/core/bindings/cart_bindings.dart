@@ -6,7 +6,9 @@ import '../../screens/cart/controller/cart_controller.dart';
 class CartBindings extends Bindings {
   @override
   void dependencies() {
-    Get.put<CartController>(CartController());
+    if (!Get.isRegistered<CartController>()) {
+      Get.put<CartController>(CartController(), permanent: true);
+    }
     Get.put<CartExtrasController>(CartExtrasController());
   }
 }

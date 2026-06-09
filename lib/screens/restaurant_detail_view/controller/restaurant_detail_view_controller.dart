@@ -11,6 +11,10 @@ import '../../cart/controller/cart_service.dart';
 import '../model/restaurent_details_model.dart';
 
 class RestaurantDetailViewController extends GetxController {
+  final bool skipInitialFetch;
+
+  RestaurantDetailViewController({this.skipInitialFetch = false});
+
   final FittorConnect _apiClient = FittorConnect();
 
   bool isLoading = false;
@@ -53,7 +57,9 @@ class RestaurantDetailViewController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _extractRestaurantIdAndFetch();
+    if (!skipInitialFetch) {
+      _extractRestaurantIdAndFetch();
+    }
     _setupExternalCartSyncListener();
   }
 
@@ -102,22 +108,29 @@ class RestaurantDetailViewController extends GetxController {
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
-              cartAddOnQuantity[foodId]![addOn['addOnId']] =
-                  addOn['quantity'] ?? 0;
+              final addOnId = _addOnIdFromMap(addOn);
+              if (addOnId.isNotEmpty) {
+                cartAddOnQuantity[foodId]![addOnId] = addOn['quantity'] ?? 0;
+              }
             }
           }
         } else {
           cartCustomizationQuantity[foodId] = {};
           for (var custom in item['customizations'] as List) {
-            cartCustomizationQuantity[foodId]![custom['customizationId']] =
-                custom['quantity'] ?? 0;
+            final customizationId = _customizationIdFromMap(custom);
+            if (customizationId.isNotEmpty) {
+              cartCustomizationQuantity[foodId]![customizationId] =
+                  custom['quantity'] ?? 0;
+            }
           }
 
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
-              cartAddOnQuantity[foodId]![addOn['addOnId']] =
-                  addOn['quantity'] ?? 0;
+              final addOnId = _addOnIdFromMap(addOn);
+              if (addOnId.isNotEmpty) {
+                cartAddOnQuantity[foodId]![addOnId] = addOn['quantity'] ?? 0;
+              }
             }
           }
         }
@@ -222,8 +235,7 @@ class RestaurantDetailViewController extends GetxController {
             if (foodId == null) continue;
 
             if (food.cartCount != null && food.cartCount! > 0) {
-              final basePrice =
-                  (food.discountPrice ?? food.foodPrice ?? 0).toDouble();
+              final basePrice = _effectiveFoodPrice(food);
               final hasCustomizations =
                   food.customizations != null &&
                   food.customizations!.isNotEmpty;
@@ -464,7 +476,7 @@ class RestaurantDetailViewController extends GetxController {
       if (currentCartItem['addOns'] != null) {
         final addOns = currentCartItem['addOns'] as List;
         for (var addOn in addOns) {
-          final addOnId = addOn['addOnId'] ?? '';
+          final addOnId = _addOnIdFromMap(addOn);
           final addOnQty = addOn['quantity'] ?? 0;
           if (addOnId.isNotEmpty) {
             bsAddOnQuantity[addOnId] = addOnQty;
@@ -475,7 +487,7 @@ class RestaurantDetailViewController extends GetxController {
       if (currentCartItem['customizations'] != null) {
         final customizations = currentCartItem['customizations'] as List;
         for (var customization in customizations) {
-          final customId = customization['customizationId'] ?? '';
+          final customId = _customizationIdFromMap(customization);
           final customQty = customization['quantity'] ?? 0;
           if (customId.isNotEmpty) {
             bsCustomizationQuantity[customId] = customQty;
@@ -486,7 +498,7 @@ class RestaurantDetailViewController extends GetxController {
       if (currentCartItem['addOns'] != null) {
         final addOns = currentCartItem['addOns'] as List;
         for (var addOn in addOns) {
-          final addOnId = addOn['addOnId'] ?? '';
+          final addOnId = _addOnIdFromMap(addOn);
           final addOnQty = addOn['quantity'] ?? 0;
           if (addOnId.isNotEmpty) {
             bsAddOnQuantity[addOnId] = addOnQty;
@@ -772,8 +784,7 @@ class RestaurantDetailViewController extends GetxController {
 
         // Resolve base price from existing cart entry or restaurant data
         final food = _getFoodById(foodId);
-        final basePrice =
-            (food?.discountPrice ?? food?.foodPrice ?? 0).toDouble();
+        final basePrice = _effectiveFoodPrice(food);
 
         if (existingIndex != -1) {
           // Update quantity + itemTotal on existing entry
@@ -900,8 +911,11 @@ class RestaurantDetailViewController extends GetxController {
             (itemInResponse['addOns'] as List).isNotEmpty) {
           cartAddOnQuantity[updatingFoodId] = {};
           for (var addOn in itemInResponse['addOns'] as List) {
-            cartAddOnQuantity[updatingFoodId]![addOn['addOnId']] =
-                addOn['quantity'] ?? 0;
+            final addOnId = _addOnIdFromMap(addOn);
+            if (addOnId.isNotEmpty) {
+              cartAddOnQuantity[updatingFoodId]![addOnId] =
+                  addOn['quantity'] ?? 0;
+            }
           }
         } else {
           cartAddOnQuantity.remove(updatingFoodId);
@@ -932,7 +946,10 @@ class RestaurantDetailViewController extends GetxController {
         if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
           cartAddOnQuantity[id] = {};
           for (var addOn in item['addOns'] as List) {
-            cartAddOnQuantity[id]![addOn['addOnId']] = addOn['quantity'] ?? 0;
+            final addOnId = _addOnIdFromMap(addOn);
+            if (addOnId.isNotEmpty) {
+              cartAddOnQuantity[id]![addOnId] = addOn['quantity'] ?? 0;
+            }
           }
         }
       }
@@ -985,7 +1002,8 @@ class RestaurantDetailViewController extends GetxController {
 
       if (response != null && response is Map<String, dynamic>) {
         if (response['success'] == true && response['data'] != null) {
-          final cartData = response['data'];
+          final cartData = Map<String, dynamic>.from(response['data']);
+          _applySubmittedSelectionToCartData(cartData, requestBody);
 
           if (!hasCustomizations && !hasAddOns) {
             _mergeScenario1Update(
@@ -998,7 +1016,13 @@ class RestaurantDetailViewController extends GetxController {
           }
 
           final cartService = Get.find<CartService>();
+          cartService.recordSubmittedOptionState(
+            foodId: foodId,
+            addOns: requestBody['addOns'],
+            customizations: requestBody['customizations'],
+          );
           cartService.updateCartFromApi(cartData);
+          update(['food_grid', 'bottom_cart_bar']);
 
           resetBottomSheetState();
           Navigator.pop(Get.context!);
@@ -1108,6 +1132,7 @@ class RestaurantDetailViewController extends GetxController {
 
           final cartService = Get.find<CartService>();
           cartService.updateCartFromApi(cartData);
+          update(['food_grid', 'bottom_cart_bar']);
 
           resetBottomSheetState();
           Navigator.pop(Get.context!);
@@ -1212,22 +1237,29 @@ class RestaurantDetailViewController extends GetxController {
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
-              cartAddOnQuantity[foodId]![addOn['addOnId']] =
-                  addOn['quantity'] ?? 0;
+              final addOnId = _addOnIdFromMap(addOn);
+              if (addOnId.isNotEmpty) {
+                cartAddOnQuantity[foodId]![addOnId] = addOn['quantity'] ?? 0;
+              }
             }
           }
         } else {
           cartCustomizationQuantity[foodId] = {};
           for (var custom in item['customizations'] as List) {
-            cartCustomizationQuantity[foodId]![custom['customizationId']] =
-                custom['quantity'] ?? 0;
+            final customizationId = _customizationIdFromMap(custom);
+            if (customizationId.isNotEmpty) {
+              cartCustomizationQuantity[foodId]![customizationId] =
+                  custom['quantity'] ?? 0;
+            }
           }
 
           if (item['addOns'] != null && (item['addOns'] as List).isNotEmpty) {
             cartAddOnQuantity[foodId] = {};
             for (var addOn in item['addOns'] as List) {
-              cartAddOnQuantity[foodId]![addOn['addOnId']] =
-                  addOn['quantity'] ?? 0;
+              final addOnId = _addOnIdFromMap(addOn);
+              if (addOnId.isNotEmpty) {
+                cartAddOnQuantity[foodId]![addOnId] = addOn['quantity'] ?? 0;
+              }
             }
           }
         }
@@ -1312,10 +1344,158 @@ class RestaurantDetailViewController extends GetxController {
     }
   }
 
+  void _applySubmittedSelectionToCartData(
+    Map<String, dynamic> cartData,
+    Map<String, dynamic> requestBody,
+  ) {
+    final items = cartData['items'];
+    final foodId = requestBody['foodId']?.toString() ?? '';
+    if (foodId.isEmpty || items is! List) return;
+
+    final itemIndex = items.indexWhere((item) {
+      return item is Map && item['foodId']?.toString() == foodId;
+    });
+    if (itemIndex == -1) return;
+
+    final item = Map<String, dynamic>.from(items[itemIndex] as Map);
+    final addOns = _submittedAddOns(requestBody['addOns']);
+    final customizations = _submittedCustomizations(
+      requestBody['customizations'],
+    );
+
+    if (requestBody.containsKey('addOns')) {
+      item['addOns'] = addOns;
+    }
+    if (requestBody.containsKey('customizations')) {
+      item['customizations'] = customizations;
+    }
+
+    item['itemTotal'] = _submittedItemTotal(item);
+    items[itemIndex] = item;
+    cartData['items'] = items;
+  }
+
+  List<Map<String, dynamic>> _submittedAddOns(dynamic submitted) {
+    if (submitted is! List) return [];
+
+    return submitted
+        .whereType<Map>()
+        .where((addOn) => (_asDouble(addOn['quantity']) ?? 0) > 0)
+        .map((addOn) {
+          final addOnId = addOn['addOnId']?.toString() ?? '';
+          final source = selectedFoodItem?.addOns?.firstWhere(
+            (item) => item.addOnId == addOnId || item.id == addOnId,
+            orElse: () => AddOn(),
+          );
+          return {
+            'addOnId': addOnId,
+            'name': source?.name ?? '',
+            'price': source?.price ?? 0,
+            'quantity': addOn['quantity'] ?? 0,
+          };
+        })
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _submittedCustomizations(dynamic submitted) {
+    if (submitted is! List) return [];
+
+    return submitted
+        .whereType<Map>()
+        .where(
+          (customization) => (_asDouble(customization['quantity']) ?? 0) > 0,
+        )
+        .map((customization) {
+          final customizationId =
+              customization['customizationId']?.toString() ?? '';
+          final source = selectedFoodItem?.customizations?.firstWhere(
+            (item) =>
+                item.customizationId == customizationId ||
+                item.id == customizationId,
+            orElse: () => Customization(),
+          );
+          return {
+            'customizationId': customizationId,
+            'name': source?.name ?? '',
+            'price': source?.price ?? 0,
+            'quantity': customization['quantity'] ?? 0,
+          };
+        })
+        .toList();
+  }
+
+  double _submittedItemTotal(Map<String, dynamic> item) {
+    final quantity = _asDouble(item['quantity']) ?? 1;
+    final basePrice =
+        _asDouble(item['effectivePrice']) ??
+        _asDouble(item['basePrice']) ??
+        _effectiveFoodPrice(selectedFoodItem);
+    final addOnsTotal = _optionTotal(item['addOns']);
+    final customizationsTotal = _optionTotal(item['customizations']);
+
+    if (customizationsTotal > 0) {
+      return customizationsTotal + addOnsTotal;
+    }
+    return (basePrice * quantity) + addOnsTotal;
+  }
+
   double getBasePrice() {
     if (selectedFoodItem == null) return 0;
-    return (selectedFoodItem!.discountPrice ?? selectedFoodItem!.foodPrice ?? 0)
-        .toDouble();
+    return _effectiveFoodPrice(selectedFoodItem);
+  }
+
+  double _effectiveFoodPrice(Food? food) {
+    if (food == null) return 0;
+    return _asDouble(food.specialOfferPrice) ??
+        food.discountPrice ??
+        food.foodPrice ??
+        0;
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  double _optionTotal(dynamic options) {
+    if (options is! List) return 0;
+
+    double total = 0;
+    for (final option in options) {
+      if (option is Map) {
+        total +=
+            (_asDouble(option['price']) ?? 0) *
+            (_asDouble(option['quantity']) ?? 0);
+      }
+    }
+    return total;
+  }
+
+  String _addOnIdFromMap(dynamic addOn) {
+    if (addOn is! Map) return '';
+    final nested = addOn['addOn'];
+    return (addOn['addOnId'] ??
+            addOn['id'] ??
+            addOn['_id'] ??
+            (nested is Map
+                ? nested['addOnId'] ?? nested['id'] ?? nested['_id']
+                : null) ??
+            '')
+        .toString();
+  }
+
+  String _customizationIdFromMap(dynamic customization) {
+    if (customization is! Map) return '';
+    final nested = customization['customization'];
+    return (customization['customizationId'] ??
+            customization['id'] ??
+            customization['_id'] ??
+            (nested is Map
+                ? nested['customizationId'] ?? nested['id'] ?? nested['_id']
+                : null) ??
+            '')
+        .toString();
   }
 
   double getAddOnsPrice() {

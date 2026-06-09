@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer';
 
 import 'package:eatplek_app/core/network/api_endpoints.dart';
@@ -26,8 +27,7 @@ class TabOrderState {
       !isInitialLoading && !hasError && orders.isEmpty && isFetched;
 }
 
-class OrdersController extends GetxController
-    with GetSingleTickerProviderStateMixin {
+class OrdersController extends GetxController {
   final FittorConnect _apiClient = FittorConnect();
 
   static const int _pageLimit = 10;
@@ -41,9 +41,11 @@ class OrdersController extends GetxController
     {'label': 'Prebook', 'serviceType': 'prebook'},
   ];
 
-  late TabController tabController;
   late List<TabOrderState> tabStates;
-  late List<ScrollController> scrollControllers;
+  int currentTabIndex = 0;
+  Timer? _pollingTimer;
+  bool _isPolling = false;
+  bool _isPollingActive = false;
 
   // ── Per-tab accessors ─────────────────────────────────────────────────────
   TabOrderState stateForTab(int index) => tabStates[index];
@@ -58,26 +60,7 @@ class OrdersController extends GetxController
   void onInit() {
     super.onInit();
 
-    tabController = TabController(length: tabs.length, vsync: this);
     tabStates = List.generate(tabs.length, (_) => TabOrderState());
-
-    // One ScrollController per tab with its own load-more listener
-    scrollControllers = List.generate(tabs.length, (index) {
-      final sc = ScrollController();
-      sc.addListener(() => _onScroll(index));
-      return sc;
-    });
-
-    // Lazy-fetch on tab switch (only if not yet cached)
-    tabController.addListener(() {
-      if (!tabController.indexIsChanging) {
-        final idx = tabController.index;
-        if (!tabStates[idx].isFetched && !tabStates[idx].isInitialLoading) {
-          _fetchOrders(idx);
-        }
-        update(['tab_bar']);
-      }
-    });
 
     // ✅ Do NOT call _fetchOrders(0) here.
     // OrdersView is mounted inside IndexedStack at app start even when the
@@ -95,24 +78,39 @@ class OrdersController extends GetxController
     }
   }
 
+  void startPolling() {
+    if (isClosed) return;
+    _isPollingActive = true;
+    fetchFirstTabIfNeeded();
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _pollSelectedTab();
+    });
+  }
+
+  void stopPolling() {
+    _isPollingActive = false;
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  void selectTab(int index) {
+    if (index < 0 || index >= tabs.length) return;
+    currentTabIndex = index;
+    if (!tabStates[index].isInitialLoading) {
+      _fetchOrders(index);
+    }
+    update(['tab_bar']);
+  }
+
   @override
   void onClose() {
-    tabController.dispose();
-    for (final sc in scrollControllers) {
-      sc.dispose();
-    }
+    stopPolling();
     super.onClose();
   }
 
   // ── Scroll → load more ────────────────────────────────────────────────────
-  void _onScroll(int index) {
-    final sc = scrollControllers[index];
-    if (!sc.hasClients) return;
-    final nearBottom = sc.position.pixels >= sc.position.maxScrollExtent - 250;
-    if (nearBottom) {
-      _loadMore(index);
-    }
-  }
+  void loadMoreForTab(int index) => _loadMore(index);
 
   // ── Initial fetch (resets state, shows skeleton) ──────────────────────────
   Future<void> _fetchOrders(int index) async {
@@ -192,6 +190,72 @@ class OrdersController extends GetxController
   }
 
   // ── Retry on error ────────────────────────────────────────────────────────
+  Future<OrdersApiModel> _requestOrdersPage(
+    int index, {
+    required int page,
+  }) async {
+    final serviceType = tabs[index]['serviceType']!;
+    final endpoint =
+        '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=${Uri.encodeQueryComponent(serviceType)}';
+
+    debugPrint('📦 Polling orders: $endpoint');
+    final response = await _apiClient.get(endpoint: endpoint);
+    log('Orders poll [$serviceType] page $page: $response');
+
+    if (response is Map<String, dynamic>) {
+      return OrdersApiModel.fromJson(response);
+    }
+
+    return OrdersApiModel(
+      success: false,
+      message: 'Invalid response from server',
+    );
+  }
+
+  Future<void> _pollSelectedTab() async {
+    if (!_isPollingActive) return;
+    if (_isPolling || isClosed) return;
+    final index = currentTabIndex;
+    if (index < 0 || index >= tabStates.length) return;
+
+    final state = tabStates[index];
+    if (state.isInitialLoading || state.isLoadingMore) return;
+
+    if (!state.isFetched) {
+      await _fetchOrders(index);
+      return;
+    }
+
+    _isPolling = true;
+    try {
+      final pagesToRefresh = state.currentPage <= 0 ? 1 : state.currentPage;
+      final refreshedOrders = <SingleOrder>[];
+      int refreshedCurrentPage = state.currentPage;
+      int refreshedTotalPages = state.totalPages;
+
+      for (var page = 1; page <= pagesToRefresh; page++) {
+        final parsed = await _requestOrdersPage(index, page: page);
+        if (parsed.success != true || parsed.data == null) return;
+
+        refreshedOrders.addAll(parsed.data!.orders ?? []);
+        refreshedCurrentPage = parsed.data!.pagination?.page ?? page;
+        refreshedTotalPages = parsed.data!.pagination?.totalPages ?? 1;
+      }
+
+      state
+        ..orders = refreshedOrders
+        ..currentPage = refreshedCurrentPage
+        ..totalPages = refreshedTotalPages
+        ..hasError = false
+        ..errorMessage = '';
+      update(['orders_tab_$index']);
+    } catch (e) {
+      debugPrint('⚠️ Orders polling skipped: $e');
+    } finally {
+      _isPolling = false;
+    }
+  }
+
   void retryFetch(int index) => _fetchOrders(index);
 
   // ── Navigate to details — passes full SingleOrder so details screen

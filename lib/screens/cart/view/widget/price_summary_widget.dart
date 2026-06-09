@@ -1,4 +1,5 @@
 import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 
@@ -86,17 +87,13 @@ class PriceSummaryWidget extends StatelessWidget {
           SizedBox(height: responsive.spacing16),
 
           // Subtotal
-          _row(
-            'Subtotal',
-            '$currency${subtotal.toInt()}',
-            responsive: responsive,
-          ),
+          _row('Subtotal', _money(subtotal), responsive: responsive),
 
           // Delivery fee
           if (showDeliveryFee && deliveryFee != null)
             _row(
               customDeliveryTitle ?? 'Delivery Fee',
-              '$currency${deliveryFee!.toInt()}',
+              _money(deliveryFee),
               responsive: responsive,
             ),
 
@@ -104,7 +101,7 @@ class PriceSummaryWidget extends StatelessWidget {
           if (showTaxes && taxAmount != null)
             _row(
               customTaxTitle ?? 'Taxes & Charges',
-              '$currency${taxAmount!.toInt()}',
+              _money(taxAmount),
               responsive: responsive,
             ),
 
@@ -112,7 +109,7 @@ class PriceSummaryWidget extends StatelessWidget {
           if (showPackingCharge && packingCharge != null)
             _row(
               customPackingTitle ?? 'Packing Charge',
-              '$currency${packingCharge!.toInt()}',
+              _money(packingCharge),
               responsive: responsive,
             ),
 
@@ -123,7 +120,7 @@ class PriceSummaryWidget extends StatelessWidget {
               appliedPromoCode.isNotEmpty
                   ? 'Discount ($appliedPromoCode)'
                   : 'Discount',
-              '-$currency${promoDiscount.toInt()}',
+              '-${_money(promoDiscount)}',
               responsive: responsive,
               valueColor: effectiveDiscountColor,
               showSavingsBadge: true,
@@ -157,7 +154,7 @@ class PriceSummaryWidget extends StatelessWidget {
                 ),
               ),
               Text(
-                '$currency${totalAmount.toInt()}',
+                _money(totalAmount),
                 style: TextStyle(
                   fontSize: responsive.fontSize18,
                   fontWeight: FontWeight.w800,
@@ -230,4 +227,6 @@ class PriceSummaryWidget extends StatelessWidget {
       ),
     );
   }
+
+  String _money(num? value) => formatCurrency(value, symbol: currency);
 }

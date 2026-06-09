@@ -13,7 +13,7 @@ class HomeBindings extends Bindings {
     Get.lazyPut<HomeController>(() => HomeController());
     Get.lazyPut<BottomNavController>(() => BottomNavController());
     Get.lazyPut<OrdersController>(() => OrdersController());
-    Get.put<CartController>(CartController());
+    Get.put<CartController>(CartController(), permanent: true);
     Get.put<CartExtrasController>(CartExtrasController());
     Get.lazyPut<NotificationController>(() => NotificationController());
   }

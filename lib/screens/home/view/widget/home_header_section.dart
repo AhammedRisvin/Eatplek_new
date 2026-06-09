@@ -64,6 +64,8 @@ class HomeHeaderSection extends StatelessWidget {
 
   Widget _buildUserGreeting(ResponsiveHelper responsive) {
     return GetBuilder<HomeController>(
+      init: controller,
+      global: false,
       id: HomeController.userGreetingId,
       builder: (controller) {
         return Column(

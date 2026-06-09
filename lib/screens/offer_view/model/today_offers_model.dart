@@ -5,11 +5,7 @@ class TodayOffersModel {
   final String message;
   final TodayOffersData? data;
 
-  TodayOffersModel({
-    required this.success,
-    required this.message,
-    this.data,
-  });
+  TodayOffersModel({required this.success, required this.message, this.data});
 
   factory TodayOffersModel.fromJson(Map<String, dynamic> json) {
     return TodayOffersModel(
@@ -24,18 +20,26 @@ class TodayOffersModel {
 }
 
 class TodayOffersData {
+  final List<String> availableServices;
   final List<OfferFood> offers;
   final OfferPagination pagination;
 
   TodayOffersData({
+    required this.availableServices,
     required this.offers,
     required this.pagination,
   });
 
   factory TodayOffersData.fromJson(Map<String, dynamic> json) {
     final rawOffers = json['offers'] ?? json['foods'] ?? json['items'];
+    final rawServices =
+        json['availableServices'] ?? json['services'] ?? json['serviceTypes'];
 
     return TodayOffersData(
+      availableServices:
+          rawServices is List
+              ? rawServices.map((item) => item.toString()).toList()
+              : [],
       offers:
           rawOffers is List
               ? rawOffers

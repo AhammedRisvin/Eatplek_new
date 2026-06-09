@@ -18,6 +18,8 @@ class BannerCarouselSection extends StatelessWidget {
     final responsive = ResponsiveHelper();
 
     return GetBuilder<HomeController>(
+      init: controller,
+      global: false,
       id: HomeController.carouselId,
       builder: (controller) {
         if (controller.isLoadingServices && controller.banners.isEmpty) {
@@ -62,6 +64,8 @@ class BannerCarouselSection extends StatelessWidget {
             SizedBox(height: responsive.spacing12),
             // Dot indicators
             GetBuilder<HomeController>(
+              init: ctrl,
+              global: false,
               id: HomeController.carouselId,
               builder:
                   (ctrl) => Row(

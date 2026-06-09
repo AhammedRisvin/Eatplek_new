@@ -105,7 +105,6 @@ class HomeController extends GetxController {
   @override
   void onClose() {
     scrollController.removeListener(_onScroll);
-    scrollController.dispose();
     super.onClose();
   }
 
@@ -290,6 +289,7 @@ class HomeController extends GetxController {
 
         if (newHomeModel.success == true && newHomeModel.data != null) {
           availableServices = newHomeModel.data!.availableServices ?? [];
+          Store.availableServices = availableServices;
           banners = newHomeModel.data!.banners ?? [];
 
           debugPrint(
@@ -581,8 +581,7 @@ class HomeController extends GetxController {
       canDismiss: canDismiss,
       onPreferenceSelected: (String selected) {
         debugPrint('✅ Preference selected: $selected');
-        // Pass canDismiss so _onPreferenceSelected knows whether to reopen
-        // the dialog on cancel (mandatory flow) or not (optional change flow).
+
         _onPreferenceSelected(selected, canDismiss: canDismiss);
       },
       onDialogDismissed:
@@ -937,10 +936,7 @@ class HomeController extends GetxController {
             return;
           }
 
-          _showOrderPreferenceConfirmSheet(
-            selected,
-            closeBranchSheetToo: true,
-          );
+          _showOrderPreferenceConfirmSheet(selected, closeBranchSheetToo: true);
         },
       ),
       isScrollControlled: true,
@@ -981,6 +977,13 @@ class HomeController extends GetxController {
         onCancel: () {
           _closePreferencePrompt(closeBranchSheetToo: closeBranchSheetToo);
           _highlightOrderPreferenceChange();
+        },
+        onChangePreference: () {
+          _closePreferencePrompt(closeBranchSheetToo: closeBranchSheetToo);
+          Future.delayed(const Duration(milliseconds: 180), () {
+            if (isClosed) return;
+            onOrderPreferenceChanged();
+          });
         },
       ),
       isScrollControlled: true,

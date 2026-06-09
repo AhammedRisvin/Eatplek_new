@@ -96,6 +96,11 @@ class Store {
   static set deliveryPreference(String value) =>
       _preference.setString("deliveryPreference", value);
 
+  static List<String> get availableServices =>
+      _preference.getStringList("availableServices") ?? [];
+  static set availableServices(List<String> value) =>
+      _preference.setStringList("availableServices", value);
+
   // ── Location ───────────────────────────────────────────────────────────────
 
   static double get userLatitude =>

@@ -203,14 +203,18 @@ class FoodWidget extends StatelessWidget {
   }
 
   Widget _buildPrice(ResponsiveHelper responsive) {
-    final discounted = (foodItem.discountPrice ?? foodItem.foodPrice ?? 0);
-    final actual = (foodItem.actualPrice ?? foodItem.foodPrice ?? 0);
+    final discounted =
+        _asDouble(foodItem.specialOfferPrice) ??
+        foodItem.discountPrice ??
+        foodItem.foodPrice ??
+        0;
+    final actual = foodItem.actualPrice ?? foodItem.foodPrice ?? discounted;
     final hasDiscount = actual > discounted;
 
     return Row(
       children: [
         text(
-          text: '₹${discounted.toInt()}',
+          text: '₹${_formatPrice(discounted)}',
           size: responsive.fontSize13,
           fontWeight: FontWeight.w700,
           color: AppColor.appPrimary,
@@ -218,7 +222,7 @@ class FoodWidget extends StatelessWidget {
         if (hasDiscount) ...[
           SizedBox(width: responsive.spacing6),
           text(
-            text: '₹${actual.toInt()}',
+            text: '₹${_formatPrice(actual)}',
             size: responsive.fontSize10,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.35),
@@ -371,5 +375,13 @@ class FoodWidget extends StatelessWidget {
   double _calcDiscount(double actual, double discounted) {
     if (actual == 0) return 0;
     return ((actual - discounted) / actual) * 100;
+  }
+
+  String _formatPrice(num price) => price.toDouble().toStringAsFixed(2);
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 }

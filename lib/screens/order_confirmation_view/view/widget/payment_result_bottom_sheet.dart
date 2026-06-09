@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../../../core/routes/routes.dart';
 import '../../../../core/util/responsive_helper.dart';
+import '../../../bottom_nav/controller/bottom_nav_controller.dart';
 import '../../controller/order_confirmation_controller.dart';
 import '../../service/phonepay_service.dart';
 
@@ -135,7 +136,7 @@ class PaymentResultBottomSheet extends StatelessWidget {
                 responsive.extraLargeBorderRadius,
               ),
               color: result.isSuccess ? AppColor.appPrimary : _statusColor,
-              onTap: () => _onPrimaryTap(),
+              onTap: () async => _onPrimaryTap(),
             ),
 
             SizedBox(height: responsive.spacing12),
@@ -233,24 +234,18 @@ class PaymentResultBottomSheet extends StatelessWidget {
     return 'Retry Payment';
   }
 
-  void _onPrimaryTap() {
+  Future<void> _onPrimaryTap() async {
     // Dismiss the bottom sheet first
     if (Get.isBottomSheetOpen ?? false) Get.back();
 
     if (result.isSuccess) {
-      // Clear cart first (non-blocking)
-      controller.clearCartAfterPayment();
+      // Clear cart via API only after payment success.
+      await controller.clearCartAfterPayment();
 
-      // ✅ SUCCESS NAVIGATION:
-      // 1. offAllNamed to bottomNav — clears entire stack, starts fresh
-      // 2. Then immediately push ordersView on top
-      // Result: back button from ordersView → bottomNav (home tab) → device back exits app
-      Get.offAllNamed(Routes.bottomNav);
-      Get.toNamed(Routes.ordersView);
+      _goToOrdersTab();
     } else if (result.isPending) {
-      // PENDING: same navigation — go to orders so user can monitor
-      Get.offAllNamed(Routes.bottomNav);
-      Get.toNamed(Routes.ordersView);
+      // PENDING: go to orders so user can monitor, without clearing cart.
+      _goToOrdersTab();
     } else {
       // FAILED: retry payment — reuses same placedOrderId, no new order
       controller.retryPayment();
@@ -259,8 +254,16 @@ class PaymentResultBottomSheet extends StatelessWidget {
 
   void _onSecondaryTap() {
     if (Get.isBottomSheetOpen ?? false) Get.back();
-    // Go to my orders from secondary button too
+    // Go to my orders from secondary button too.
+    _goToOrdersTab();
+  }
+
+  void _goToOrdersTab() {
     Get.offAllNamed(Routes.bottomNav);
-    Get.toNamed(Routes.ordersView);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.isRegistered<BottomNavController>()) {
+        Get.find<BottomNavController>().setBottomBarIndex(1);
+      }
+    });
   }
 }

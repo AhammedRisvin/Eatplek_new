@@ -72,7 +72,7 @@ class _CartViewState extends State<CartView> {
       },
       child: Scaffold(
         backgroundColor: AppColor.scaffoldColor,
-        appBar: _buildAppBar(),
+        appBar: _buildAppBar(context),
         body: GetBuilder<CartController>(
           id: 'empty_cart',
           builder: (controller) {
@@ -148,7 +148,7 @@ class _CartViewState extends State<CartView> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       leadingWidth: responsive.spacing80,
       centerTitle: widget.isFromBottomNav,
@@ -188,6 +188,112 @@ class _CartViewState extends State<CartView> {
                   ),
                 ),
               ),
+      actions: [
+        GetBuilder<CartController>(
+          id: 'clear_cart_button',
+          builder: (controller) {
+            final shouldShow =
+                !controller.isCartEmpty &&
+                !controller.isLoading &&
+                !controller.hasError;
+            if (!shouldShow) return const SizedBox.shrink();
+
+            return TextButton.icon(
+              onPressed:
+                  controller.isClearingCart
+                      ? null
+                      : () => _showClearCartSheet(context, controller),
+              icon:
+                  controller.isClearingCart
+                      ? SizedBox(
+                        width: responsive.spacing18,
+                        height: responsive.spacing18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.red.shade600,
+                        ),
+                      )
+                      : Icon(Icons.delete_sweep_rounded, size: 22),
+              label: Text(
+                'Clear',
+                style: TextStyle(
+                  fontSize: responsive.fontSize15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red.shade600,
+                disabledForegroundColor: Colors.red.shade600.withOpacity(0.45),
+              ),
+            );
+          },
+        ),
+        SizedBox(width: responsive.spacing8),
+      ],
+    );
+  }
+
+  Future<void> _showClearCartSheet(
+    BuildContext context,
+    CartController controller,
+  ) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        var isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return _ClearCartSheetContent(
+              isSubmitting: isSubmitting,
+              onCancel: () => Navigator.of(sheetContext).pop(false),
+              onConfirm: () async {
+                setSheetState(() => isSubmitting = true);
+
+                final success = await controller.clearCartApi(
+                  onError: (error) {
+                    if (!sheetContext.mounted) return;
+                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                      SnackBar(
+                        content: Text(error),
+                        backgroundColor: Colors.red.withOpacity(0.85),
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            responsive.cardBorderRadius,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+
+                if (!sheetContext.mounted) return;
+                if (success) {
+                  Navigator.of(sheetContext).pop(true);
+                  return;
+                }
+
+                setSheetState(() => isSubmitting = false);
+              },
+            );
+          },
+        );
+      },
+    );
+
+    if (!context.mounted || result != true) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Cart cleared'),
+        backgroundColor: AppColor.appPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(responsive.cardBorderRadius),
+        ),
+      ),
     );
   }
 
@@ -347,6 +453,148 @@ class _CartViewState extends State<CartView> {
     return errorState(
       message: controller.errorMessage,
       onRetry: controller.retryFetchCart,
+    );
+  }
+}
+
+class _ClearCartSheetContent extends StatelessWidget {
+  final bool isSubmitting;
+  final VoidCallback onCancel;
+  final Future<void> Function() onConfirm;
+
+  const _ClearCartSheetContent({
+    required this.isSubmitting,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+    final bottomPad = MediaQuery.of(context).viewInsets.bottom;
+    final accentColor = Colors.red.shade600;
+
+    return AnimatedPadding(
+      padding: EdgeInsets.only(bottom: bottomPad),
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          responsive.spacing24,
+          responsive.spacing16,
+          responsive.spacing24,
+          responsive.spacing32,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColor.black.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            SizedBox(height: responsive.spacing24),
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.delete_sweep_rounded,
+                color: accentColor,
+                size: 32,
+              ),
+            ),
+            SizedBox(height: responsive.spacing16),
+            text(
+              text: 'Clear Cart',
+              size: responsive.fontSize18,
+              fontWeight: FontWeight.w700,
+              color: accentColor,
+            ),
+            SizedBox(height: responsive.spacing8),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: responsive.spacing8),
+              child: text(
+                text: 'This will remove all items from your cart.',
+                size: responsive.fontSize13,
+                color: AppColor.black.withOpacity(0.5),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+              ),
+            ),
+            SizedBox(height: responsive.spacing24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: isSubmitting ? null : onCancel,
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                        vertical: responsive.spacing14,
+                      ),
+                      side: BorderSide(color: AppColor.black.withOpacity(0.15)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: text(
+                      text: 'Cancel',
+                      size: responsive.fontSize14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColor.black.withOpacity(0.55),
+                    ),
+                  ),
+                ),
+                SizedBox(width: responsive.spacing12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: isSubmitting ? null : onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      disabledBackgroundColor: accentColor.withOpacity(0.35),
+                      padding: EdgeInsets.symmetric(
+                        vertical: responsive.spacing14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child:
+                        isSubmitting
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                            : text(
+                              text: 'Clear Cart',
+                              size: responsive.fontSize14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

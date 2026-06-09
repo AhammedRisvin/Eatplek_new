@@ -61,8 +61,11 @@ class TimeSuggestBottomSheet extends StatelessWidget {
             text(
               text:
                   controller.rejectionReason ??
-                  'The restaurant is unable to prepare your order at your selected time. '
-                      'They have suggested a new time for you.',
+                  (controller.hasSuggestedTime()
+                      ? 'The restaurant is unable to prepare your order at your selected time. '
+                          'They have suggested a new time for you.'
+                      : 'The restaurant requested a time update, but no suggested time was returned. '
+                          'Please select a new time.'),
               size: responsive.fontSize14,
               fontWeight: FontWeight.w400,
               color: AppColor.black.withOpacity(0.6),
@@ -154,21 +157,25 @@ class TimeSuggestBottomSheet extends StatelessWidget {
                               ),
                               SizedBox(height: responsive.spacing12),
 
-                              // ✅ Restaurant's suggested time
-                              _buildTimeBox(
-                                responsive: responsive,
-                                label: 'Restaurant Suggested Time',
-                                timeText:
-                                    controller.getFormattedSuggestedTime(),
-                                borderColor: Colors.green.withOpacity(0.3),
-                                timeBackground: Colors.green.withOpacity(0.05),
-                                timeTextColor: Colors.green,
-                                icon: Icon(
-                                  Icons.thumb_up_alt_outlined,
-                                  size: responsive.iconSizeSmall,
-                                  color: Colors.green,
+                              if (controller.hasSuggestedTime()) ...[
+                                // ✅ Restaurant's suggested time
+                                _buildTimeBox(
+                                  responsive: responsive,
+                                  label: 'Restaurant Suggested Time',
+                                  timeText:
+                                      controller.getFormattedSuggestedTime(),
+                                  borderColor: Colors.green.withOpacity(0.3),
+                                  timeBackground: Colors.green.withOpacity(
+                                    0.05,
+                                  ),
+                                  timeTextColor: Colors.green,
+                                  icon: Icon(
+                                    Icons.thumb_up_alt_outlined,
+                                    size: responsive.iconSizeSmall,
+                                    color: Colors.green,
+                                  ),
                                 ),
-                              ),
+                              ],
                               SizedBox(height: responsive.spacing20),
                             ],
                           ),
@@ -221,45 +228,60 @@ class TimeSuggestBottomSheet extends StatelessWidget {
                     // ── Select New Time / Accept Suggestion ──────────
                     : Column(
                       children: [
-                        Row(
-                          children: [
-                            // Outline button — pick a different time
-                            Expanded(
-                              child: button(
-                                name: 'Select New Time',
-                                height: responsive.formFieldHeight,
-                                borderRadius: BorderRadius.circular(
-                                  responsive.extraLargeBorderRadius,
+                        controller.hasSuggestedTime()
+                            ? Row(
+                              children: [
+                                // Outline button — pick a different time
+                                Expanded(
+                                  child: button(
+                                    name: 'Select New Time',
+                                    height: responsive.formFieldHeight,
+                                    borderRadius: BorderRadius.circular(
+                                      responsive.extraLargeBorderRadius,
+                                    ),
+                                    fontSize: responsive.fontSize16,
+                                    fontWeight: FontWeight.w600,
+                                    onTap: () {
+                                      controller
+                                          .toggleTimeSuggestionTimePicker();
+                                    },
+                                    borderColor: AppColor.appPrimary,
+                                    textColor: AppColor.appPrimary,
+                                    color: AppColor.transparent,
+                                  ),
                                 ),
-                                fontSize: responsive.fontSize16,
-                                fontWeight: FontWeight.w600,
-                                onTap: () {
-                                  controller.toggleTimeSuggestionTimePicker();
-                                },
-                                borderColor: AppColor.appPrimary,
-                                textColor: AppColor.appPrimary,
-                                color: AppColor.transparent,
-                              ),
-                            ),
-                            SizedBox(width: responsive.spacing20),
+                                SizedBox(width: responsive.spacing20),
 
-                            // Filled button — accept restaurant's time
-                            Expanded(
-                              child: button(
-                                name: 'Accept Suggestion',
-                                height: responsive.formFieldHeight,
-                                borderRadius: BorderRadius.circular(
-                                  responsive.extraLargeBorderRadius,
+                                // Filled button — accept restaurant's time
+                                Expanded(
+                                  child: button(
+                                    name: 'Accept Suggestion',
+                                    height: responsive.formFieldHeight,
+                                    borderRadius: BorderRadius.circular(
+                                      responsive.extraLargeBorderRadius,
+                                    ),
+                                    fontSize: responsive.fontSize16,
+                                    fontWeight: FontWeight.w600,
+                                    onTap: () async {
+                                      await controller.acceptSuggestedTime();
+                                    },
+                                  ),
                                 ),
-                                fontSize: responsive.fontSize16,
-                                fontWeight: FontWeight.w600,
-                                onTap: () async {
-                                  await controller.acceptSuggestedTime();
-                                },
+                              ],
+                            )
+                            : button(
+                              name: 'Select New Time',
+                              width: responsive.widthPercent(100),
+                              height: responsive.formFieldHeight,
+                              borderRadius: BorderRadius.circular(
+                                responsive.extraLargeBorderRadius,
                               ),
+                              fontSize: responsive.fontSize16,
+                              fontWeight: FontWeight.w600,
+                              onTap: () {
+                                controller.toggleTimeSuggestionTimePicker();
+                              },
                             ),
-                          ],
-                        ),
                         SizedBox(height: responsive.spacing10),
                       ],
                     );

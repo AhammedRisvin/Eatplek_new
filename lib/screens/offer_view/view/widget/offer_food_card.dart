@@ -1,26 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/price_formatter.dart';
 import '../../../../core/util/responsive_helper.dart';
+import '../../../cart/controller/cart_service.dart';
+import '../../../restaurant_detail_view/view/widget/quantity_control_widget.dart';
 import '../../model/today_offers_model.dart';
 
 class OfferFoodCard extends StatelessWidget {
   final OfferFood offer;
   final int animationIndex;
+  final VoidCallback? onActionTap;
+  final VoidCallback? onIncrease;
+  final VoidCallback? onDecrease;
 
   const OfferFoodCard({
     super.key,
     required this.offer,
     this.animationIndex = 0,
+    this.onActionTap,
+    this.onIncrease,
+    this.onDecrease,
   });
 
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
     final food = offer.food;
+    final hasOptions =
+        (food.customizations?.isNotEmpty ?? false) ||
+        (food.addOns?.isNotEmpty ?? false);
 
     return Container(
           decoration: BoxDecoration(
@@ -81,6 +94,14 @@ class OfferFoodCard extends StatelessWidget {
                     ],
                     SizedBox(height: responsive.spacing6),
                     _PriceRow(offer: offer),
+                    SizedBox(height: responsive.spacing8),
+                    _OfferAction(
+                      offer: offer,
+                      hasOptions: hasOptions,
+                      onActionTap: onActionTap,
+                      onIncrease: onIncrease,
+                      onDecrease: onDecrease,
+                    ),
                   ],
                 ),
               ),
@@ -112,6 +133,81 @@ class OfferFoodCard extends StatelessWidget {
   }
 }
 
+class _OfferAction extends StatelessWidget {
+  final OfferFood offer;
+  final bool hasOptions;
+  final VoidCallback? onActionTap;
+  final VoidCallback? onIncrease;
+  final VoidCallback? onDecrease;
+
+  const _OfferAction({
+    required this.offer,
+    required this.hasOptions,
+    required this.onActionTap,
+    required this.onIncrease,
+    required this.onDecrease,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final responsive = ResponsiveHelper();
+    final foodId = offer.food.foodId ?? '';
+    if (foodId.isEmpty) return const SizedBox.shrink();
+
+    return Obx(() {
+      final cartService = Get.find<CartService>();
+      final quantity = cartService.getFoodQuantity(foodId);
+      final inCart = quantity > 0 || cartService.foodHasCustomizations(foodId);
+
+      if (hasOptions) {
+        final label = inCart ? 'Edit' : 'Add';
+        final background =
+            inCart
+                ? AppColor.appPrimary.withOpacity(0.12)
+                : AppColor.appPrimary;
+        final foreground = inCart ? AppColor.appPrimary : AppColor.white;
+
+        return GestureDetector(
+          onTap: onActionTap,
+          child: Container(
+            width: double.infinity,
+            height: responsive.spacing36,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+              border:
+                  inCart
+                      ? Border.all(color: AppColor.appPrimary, width: 1.2)
+                      : null,
+            ),
+            child: Center(
+              child: text(
+                text: label,
+                size: responsive.fontSize12,
+                fontWeight: FontWeight.w700,
+                color: foreground,
+              ),
+            ),
+          ),
+        );
+      }
+
+      return SizedBox(
+        height: responsive.spacing36,
+        child: QuantityControlWidget(
+          quantity: quantity,
+          onIncrease: onIncrease ?? () {},
+          onDecrease: onDecrease ?? () {},
+          showRemoveButton: true,
+          buttonSize: responsive.spacing28,
+          iconSize: responsive.fontSize13,
+          addButtonText: 'Add',
+        ),
+      );
+    });
+  }
+}
+
 class _RestaurantMetaRow extends StatelessWidget {
   final OfferFood offer;
 
@@ -125,20 +221,14 @@ class _RestaurantMetaRow extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(
-          Icons.storefront_rounded,
-          size: responsive.fontSize11,
-          color: AppColor.appPrimary.withOpacity(0.55),
-        ),
-        SizedBox(width: responsive.spacing3),
         if (restaurantText.isNotEmpty)
           Expanded(
             child: text(
               text: restaurantText,
-              size: responsive.fontSize10,
-              fontWeight: FontWeight.w500,
-              color: AppColor.black.withOpacity(0.48),
-              maxLines: 1,
+              size: responsive.fontSize13,
+              fontWeight: FontWeight.w800,
+              color: AppColor.black.withOpacity(0.72),
+              maxLines: 2,
               overFlow: TextOverflow.ellipsis,
             ),
           )
@@ -227,10 +317,7 @@ class _ShareButton extends StatelessWidget {
           color: AppColor.white.withOpacity(0.94),
           shape: BoxShape.circle,
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 8),
           ],
         ),
         child: const Icon(
@@ -263,7 +350,7 @@ class _PriceRow extends StatelessWidget {
     return Row(
       children: [
         text(
-          text: 'Rs ${offerPrice.toInt()}',
+          text: 'Rs ${formatPrice(offerPrice)}',
           size: responsive.fontSize13,
           fontWeight: FontWeight.w700,
           color: AppColor.appPrimary,
@@ -271,7 +358,7 @@ class _PriceRow extends StatelessWidget {
         if (hasDiscount) ...[
           SizedBox(width: responsive.spacing6),
           text(
-            text: 'Rs ${actualPrice.toInt()}',
+            text: 'Rs ${formatPrice(actualPrice)}',
             size: responsive.fontSize10,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.35),
@@ -281,8 +368,7 @@ class _PriceRow extends StatelessWidget {
           SizedBox(width: responsive.spacing5),
           Flexible(
             child: text(
-              text:
-                  '${_discountPercent(actualPrice, offerPrice).toInt()}% off',
+              text: '${_discountPercent(actualPrice, offerPrice).toInt()}% off',
               size: responsive.fontSize9,
               fontWeight: FontWeight.w700,
               color: const Color(0xFFFF6B6B),

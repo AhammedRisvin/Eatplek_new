@@ -81,6 +81,7 @@ class Routes {
       name: home,
       page: () => const HomeView(),
       transition: Transition.circularReveal,
+      binding: HomeBindings(),
     ),
 
     // ── Profile completion — owns its own controller, fully independent

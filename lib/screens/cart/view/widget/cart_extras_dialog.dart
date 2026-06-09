@@ -2,6 +2,7 @@
 
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -518,7 +519,7 @@ class _ExtraItemTile extends StatelessWidget {
                   ),
                   SizedBox(height: responsive.spacing4),
                   Text(
-                    'Rs.${item.price ?? 0}',
+                    'Rs.${formatPrice(item.price)}',
                     style: TextStyle(
                       fontSize: responsive.fontSize13,
                       fontWeight: FontWeight.w500,

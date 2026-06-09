@@ -31,7 +31,10 @@ class _OrderSuccessViewState extends State<OrderSuccessView> {
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.black.withOpacity(0.06), width: 1.5),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.06),
+                  width: 1.5,
+                ),
               ),
               child: SvgPicture.string(arrowBack2),
             ),
@@ -40,7 +43,13 @@ class _OrderSuccessViewState extends State<OrderSuccessView> {
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(20),
-        child: Column(children: [OrderSuccessSection(), TrackYourOrderSection(), OrderSummarySection()]),
+        child: Column(
+          children: [
+            OrderSuccessSection(),
+            TrackYourOrderSection(),
+            OrderSummarySection(),
+          ],
+        ),
       ),
       bottomNavigationBar: Container(
         width: context.wp(100),
@@ -91,7 +100,13 @@ class OrderSummarySection extends StatelessWidget {
         color: AppColor.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColor.black.withOpacity(0.03)),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.black.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 0),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -165,8 +180,18 @@ class OrderSummarySection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                text(text: 'Arrival Time', size: 16, fontWeight: FontWeight.w600, color: AppColor.white),
-                text(text: '20 Mins', size: 16, fontWeight: FontWeight.w600, color: AppColor.white),
+                text(
+                  text: 'Arrival Time',
+                  size: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColor.white,
+                ),
+                text(
+                  text: '20 Mins',
+                  size: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColor.white,
+                ),
               ],
             ),
           ),
@@ -206,7 +231,11 @@ class OrderSummarySection extends StatelessWidget {
             child: SizedBox(
               height: 1,
               width: double.infinity,
-              child: CustomPaint(painter: DottedLinePainter(color: AppColor.black.withOpacity(0.1))),
+              child: CustomPaint(
+                painter: DottedLinePainter(
+                  color: AppColor.black.withOpacity(0.1),
+                ),
+              ),
             ),
           ),
           20.h,
@@ -215,8 +244,18 @@ class OrderSummarySection extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                text(text: 'Subtotal', size: 16, fontWeight: FontWeight.w500, color: AppColor.black.withOpacity(0.6)),
-                text(text: 'Rs.357', size: 16, fontWeight: FontWeight.w500, color: AppColor.black),
+                text(
+                  text: 'Subtotal',
+                  size: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColor.black.withOpacity(0.6),
+                ),
+                text(
+                  text: 'Rs.357.00',
+                  size: 16,
+                  fontWeight: FontWeight.w500,
+                  color: AppColor.black,
+                ),
               ],
             ),
           ),
@@ -240,7 +279,13 @@ class TrackYourOrderSection extends StatelessWidget {
         color: AppColor.appPrimary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColor.black.withOpacity(0.03)),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.black.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 0),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -250,7 +295,12 @@ class TrackYourOrderSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                text(text: 'Track Your Order', size: 18, fontWeight: FontWeight.w600, color: AppColor.white),
+                text(
+                  text: 'Track Your Order',
+                  size: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColor.white,
+                ),
                 6.h,
                 text(
                   text: 'Know exactly when your food will arrive.',
@@ -291,7 +341,13 @@ class OrderSuccessSection extends StatelessWidget {
         color: AppColor.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColor.black.withOpacity(0.03)),
-        boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 0))],
+        boxShadow: [
+          BoxShadow(
+            color: AppColor.black.withOpacity(0.05),
+            blurRadius: 24,
+            offset: const Offset(0, 0),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -302,10 +358,15 @@ class OrderSuccessSection extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
           ),
           20.h,
-          text(text: 'Order Placed Successfully!', size: 20, fontWeight: FontWeight.w600),
+          text(
+            text: 'Order Placed Successfully!',
+            size: 20,
+            fontWeight: FontWeight.w600,
+          ),
           6.h,
           text(
-            text: 'Your delicious meal is on its way. You’ll receive a notification once it\'s out for delivery.".',
+            text:
+                'Your delicious meal is on its way. You’ll receive a notification once it\'s out for delivery.".',
             size: 16,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.6),

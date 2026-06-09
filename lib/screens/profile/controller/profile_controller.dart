@@ -137,6 +137,7 @@ class ProfileController extends GetxController {
 
   /// Clears local storage and sends user to splash.
   Future<void> _clearSessionAndRedirect() async {
+    _apiClient.clearAuthToken();
     await Store.clear();
     Get.offAllNamed(Routes.splash);
   }

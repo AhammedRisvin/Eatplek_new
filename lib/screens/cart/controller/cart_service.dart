@@ -26,6 +26,10 @@ class CartService extends GetxService with WidgetsBindingObserver {
 
   final RxInt itemCount = 0.obs;
   final RxDouble totalPrice = 0.0.obs;
+  final RxDouble subtotalPrice = 0.0.obs;
+
+  final Map<String, Set<String>> _locallyRemovedAddOns = {};
+  final Map<String, Set<String>> _locallyRemovedCustomizations = {};
 
   final FittorConnect _apiClient = FittorConnect();
 
@@ -226,7 +230,10 @@ class CartService extends GetxService with WidgetsBindingObserver {
   void updateCartFromApi(Map<String, dynamic> cartData) {
     try {
       if (cartData['items'] != null) {
-        cartItems.value = List<Map<String, dynamic>>.from(cartData['items']);
+        cartItems.value =
+            List<Map<String, dynamic>>.from(
+              cartData['items'],
+            ).map(_sanitizeCartItem).toList();
       }
 
       cartFoodQuantity.clear();
@@ -267,12 +274,79 @@ class CartService extends GetxService with WidgetsBindingObserver {
       }
 
       if (cartData['totals'] != null) {
-        itemCount.value = cartData['totals']['itemCount'] ?? 0;
-        totalPrice.value = (cartData['totals']['grandTotal'] ?? 0).toDouble();
+        final totals = cartData['totals'] as Map<String, dynamic>;
+        itemCount.value = totals['itemCount'] ?? 0;
+        totalPrice.value = (totals['grandTotal'] ?? 0).toDouble();
+        subtotalPrice.value = _resolveSubtotal(totals);
       }
     } catch (e) {
       debugPrint('❌ CartService: Error updating cart - $e');
     }
+  }
+
+  double _resolveSubtotal(Map<String, dynamic> totals) {
+    double itemsTotal = 0;
+    for (final item in cartItems) {
+      itemsTotal += _cartItemFoodTotal(item);
+    }
+
+    if (itemsTotal > 0) return itemsTotal;
+    final subtotal = totals['subTotal'] ?? totals['subtotal'];
+    if (subtotal is num) {
+      final addOnTotal = totals['addOnTotal'];
+      final customizationTotal = totals['customizationTotal'];
+      return subtotal.toDouble() +
+          (addOnTotal is num ? addOnTotal.toDouble() : 0) +
+          (customizationTotal is num ? customizationTotal.toDouble() : 0);
+    }
+    return (totals['grandTotal'] ?? 0).toDouble();
+  }
+
+  double _cartItemFoodTotal(Map<String, dynamic> item) {
+    final itemTotal = _asDouble(item['itemTotal']);
+    final quantity = _asDouble(item['quantity']) ?? 1;
+    final basePrice =
+        _asDouble(item['effectivePrice']) ??
+        _asDouble(item['basePrice']) ??
+        _asDouble(item['discountPrice']) ??
+        0;
+    final baseTotal = basePrice * quantity;
+    final addOnsTotal = _nestedOptionsTotal(item['addOns']);
+    final customizationsTotal = _nestedOptionsTotal(item['customizations']);
+    final hasCustomizations =
+        item['customizations'] is List &&
+        (item['customizations'] as List).isNotEmpty;
+
+    if (hasCustomizations) {
+      if (customizationsTotal > 0 || addOnsTotal > 0) {
+        return customizationsTotal + addOnsTotal;
+      }
+      return itemTotal ?? baseTotal;
+    }
+
+    if (basePrice > 0) return baseTotal + addOnsTotal;
+
+    return itemTotal ?? addOnsTotal;
+  }
+
+  double _nestedOptionsTotal(dynamic options) {
+    if (options is! List) return 0;
+
+    double total = 0;
+    for (final option in options) {
+      if (option is Map) {
+        total +=
+            (_asDouble(option['price']) ?? 0) *
+            (_asDouble(option['quantity']) ?? 0);
+      }
+    }
+    return total;
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
   }
 
   void clearCart() {
@@ -282,7 +356,119 @@ class CartService extends GetxService with WidgetsBindingObserver {
     cartAddOnQuantity.clear();
     itemCount.value = 0;
     totalPrice.value = 0.0;
+    subtotalPrice.value = 0.0;
+    _locallyRemovedAddOns.clear();
+    _locallyRemovedCustomizations.clear();
     debugPrint('🗑️ CartService: Cart cleared locally');
+  }
+
+  void recordSubmittedOptionState({
+    required String foodId,
+    dynamic addOns,
+    dynamic customizations,
+  }) {
+    _recordOptionState(
+      foodId: foodId,
+      options: addOns,
+      removedOptions: _locallyRemovedAddOns,
+      idKey: 'addOnId',
+    );
+    _recordOptionState(
+      foodId: foodId,
+      options: customizations,
+      removedOptions: _locallyRemovedCustomizations,
+      idKey: 'customizationId',
+    );
+  }
+
+  bool isOptionLocallyRemoved({
+    required String foodId,
+    required String optionId,
+    required bool isCustomization,
+  }) {
+    if (foodId.isEmpty || optionId.isEmpty) return false;
+    final removedOptions =
+        isCustomization ? _locallyRemovedCustomizations : _locallyRemovedAddOns;
+    return removedOptions[foodId]?.contains(optionId) ?? false;
+  }
+
+  void _recordOptionState({
+    required String foodId,
+    required dynamic options,
+    required Map<String, Set<String>> removedOptions,
+    required String idKey,
+  }) {
+    if (options is! List || foodId.isEmpty) return;
+
+    for (final option in options) {
+      if (option is! Map) continue;
+      final id = _optionId(option, idKey);
+      if (id.isEmpty) continue;
+
+      final quantity = _asDouble(option['quantity']) ?? 0;
+      if (quantity <= 0) {
+        removedOptions.putIfAbsent(foodId, () => <String>{}).add(id);
+      } else {
+        removedOptions[foodId]?.remove(id);
+        if (removedOptions[foodId]?.isEmpty ?? false) {
+          removedOptions.remove(foodId);
+        }
+      }
+    }
+  }
+
+  Map<String, dynamic> _sanitizeCartItem(Map<String, dynamic> item) {
+    final foodId = item['foodId']?.toString() ?? '';
+    if (foodId.isEmpty) return item;
+
+    return {
+      ...item,
+      'addOns': _sanitizeOptions(
+        foodId: foodId,
+        options: item['addOns'],
+        removedOptions: _locallyRemovedAddOns,
+        idKey: 'addOnId',
+      ),
+      'customizations': _sanitizeOptions(
+        foodId: foodId,
+        options: item['customizations'],
+        removedOptions: _locallyRemovedCustomizations,
+        idKey: 'customizationId',
+      ),
+    };
+  }
+
+  List<Map<String, dynamic>> _sanitizeOptions({
+    required String foodId,
+    required dynamic options,
+    required Map<String, Set<String>> removedOptions,
+    required String idKey,
+  }) {
+    if (options is! List) return [];
+
+    final removedIds = removedOptions[foodId] ?? <String>{};
+    return options
+        .whereType<Map>()
+        .where((option) {
+          final id = _optionId(option, idKey);
+          final quantity = _asDouble(option['quantity']) ?? 0;
+          return quantity > 0 && !removedIds.contains(id);
+        })
+        .map((option) => Map<String, dynamic>.from(option))
+        .toList();
+  }
+
+  String _optionId(Map option, String idKey) {
+    final nested =
+        idKey == 'addOnId' ? option['addOn'] : option['customization'];
+    return (option[idKey] ??
+            option['id'] ??
+            option['_id'] ??
+            (nested is Map
+                ? nested[idKey] ?? nested['id'] ?? nested['_id']
+                : null) ??
+            '')
+        .toString();
   }
 
   // ── Query helpers ──────────────────────────────────────────────────────────

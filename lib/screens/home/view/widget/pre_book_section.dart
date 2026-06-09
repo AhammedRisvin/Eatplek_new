@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../core/routes/routes.dart';
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/price_formatter.dart';
 import '../../../../core/util/responsive_helper.dart';
 import '../../model/new_home_model.dart';
 
@@ -48,7 +49,9 @@ class PrebookListSection extends StatelessWidget {
                 width: responsive.spacing4,
                 decoration: BoxDecoration(
                   color: AppColor.appPrimary,
-                  borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                  borderRadius: BorderRadius.circular(
+                    responsive.largeBorderRadius,
+                  ),
                 ),
                 margin: EdgeInsets.only(right: responsive.spacing8),
               ),
@@ -60,10 +63,15 @@ class PrebookListSection extends StatelessWidget {
               ),
               SizedBox(width: responsive.spacing8),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: responsive.spacing8, vertical: responsive.spacing3),
+                padding: EdgeInsets.symmetric(
+                  horizontal: responsive.spacing8,
+                  vertical: responsive.spacing3,
+                ),
                 decoration: BoxDecoration(
                   color: AppColor.appPrimary.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
+                  borderRadius: BorderRadius.circular(
+                    responsive.smallBorderRadius,
+                  ),
                 ),
                 child: text(
                   text: 'Limited Time',
@@ -112,7 +120,20 @@ class _PrebookCard extends StatelessWidget {
   }
 
   String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -133,7 +154,13 @@ class _PrebookCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColor.white,
           borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
-          boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+              color: AppColor.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
           border: Border.all(color: AppColor.black.withOpacity(0.06)),
         ),
         child: Column(
@@ -169,11 +196,21 @@ class _PrebookCard extends StatelessWidget {
                   top: responsive.spacing8,
                   right: responsive.spacing8,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: responsive.spacing8, vertical: responsive.spacing4),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: responsive.spacing8,
+                      vertical: responsive.spacing4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColor.appPrimary,
-                      borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
-                      boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.1), blurRadius: 4)],
+                      borderRadius: BorderRadius.circular(
+                        responsive.smallBorderRadius,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColor.black.withOpacity(0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                     child: text(
                       text: _getRemainingTimeText(prebook.prebookEndDate),
@@ -187,11 +224,21 @@ class _PrebookCard extends StatelessWidget {
                   top: responsive.spacing8,
                   left: responsive.spacing8,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: responsive.spacing6, vertical: responsive.spacing3),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: responsive.spacing6,
+                      vertical: responsive.spacing3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColor.white,
-                      borderRadius: BorderRadius.circular(responsive.smallBorderRadius),
-                      boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.1), blurRadius: 4)],
+                      borderRadius: BorderRadius.circular(
+                        responsive.smallBorderRadius,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColor.black.withOpacity(0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                     child: text(
                       text: 'PRE-BOOK',
@@ -237,13 +284,17 @@ class _PrebookCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceSection(double basePrice, double effectivePrice, ResponsiveHelper responsive) {
+  Widget _buildPriceSection(
+    double basePrice,
+    double effectivePrice,
+    ResponsiveHelper responsive,
+  ) {
     final showStrikethrough = basePrice != effectivePrice && basePrice > 0;
 
     return Row(
       children: [
         text(
-          text: '₹${effectivePrice.toStringAsFixed(0)}',
+          text: formatCurrency(effectivePrice),
           size: responsive.fontSize13,
           fontWeight: FontWeight.w600,
           color: AppColor.appPrimary,
@@ -251,7 +302,7 @@ class _PrebookCard extends StatelessWidget {
         SizedBox(width: responsive.spacing7),
         if (showStrikethrough) ...[
           text(
-            text: '₹${basePrice.toStringAsFixed(0)}',
+            text: formatCurrency(basePrice),
             size: responsive.fontSize11,
             fontWeight: FontWeight.w400,
             color: AppColor.black.withOpacity(0.5),

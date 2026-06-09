@@ -464,6 +464,11 @@ class OrderConfirmationController extends GetxController {
     return '${suggestedHour.toString().padLeft(2, '0')}:${suggestedMinute.toString().padLeft(2, '0')} $suggestedPeriod';
   }
 
+  bool hasSuggestedTime() =>
+      suggestedHour != null &&
+      suggestedMinute != null &&
+      suggestedPeriod != null;
+
   // ========== GUEST COUNT ==========
 
   void updateGuestCount(String value) {
@@ -719,6 +724,10 @@ class OrderConfirmationController extends GetxController {
       case 'accepted':
         _handleOrderAccepted(data);
         break;
+      case 'update_requested':
+      case 'time_suggestion':
+        _handleTimeSuggestion(_buildTimeSuggestionDetails(response, data));
+        break;
       case 'rejected':
         final rejectionDetails =
             data['rejectionDetails'] as Map<String, dynamic>?;
@@ -738,6 +747,58 @@ class OrderConfirmationController extends GetxController {
           'Received unexpected order status: $orderStatusRaw',
         );
     }
+  }
+
+  Map<String, dynamic> _buildTimeSuggestionDetails(
+    Map<String, dynamic> response,
+    Map<String, dynamic> data,
+  ) {
+    final rejectionDetails = data['rejectionDetails'] as Map<String, dynamic>?;
+    if (rejectionDetails != null) return rejectionDetails;
+
+    final extractedSuggestedTime = _extractSuggestedTime(data);
+    if (extractedSuggestedTime == null) {
+      debugPrint(
+        '⚠️ update_requested response did not include a suggestedTime field',
+      );
+    }
+
+    return {
+      'rejectionReason':
+          response['message'] as String? ??
+          'The restaurant requested an update on your booking time.',
+      'suggestedTime': extractedSuggestedTime,
+      'hasTimeSuggestion': true,
+    };
+  }
+
+  String? _extractSuggestedTime(Map<String, dynamic> data) {
+    final candidateSources = <Map<String, dynamic>?>[
+      data,
+      data['updateDetails'] as Map<String, dynamic>?,
+      data['vendorUpdate'] as Map<String, dynamic>?,
+      data['requestedUpdate'] as Map<String, dynamic>?,
+      data['timeUpdate'] as Map<String, dynamic>?,
+      data['serviceDetails'] as Map<String, dynamic>?,
+    ];
+
+    const candidateKeys = [
+      'suggestedTime',
+      'suggestedReachTime',
+      'updatedReachTime',
+      'newReachTime',
+      'requestedReachTime',
+    ];
+
+    for (final source in candidateSources) {
+      if (source == null) continue;
+      for (final key in candidateKeys) {
+        final value = source[key];
+        if (value is String && value.trim().isNotEmpty) return value;
+      }
+    }
+
+    return null;
   }
 
   /// ✅ Store orderId and user phone from the accepted response.
@@ -802,7 +863,14 @@ class OrderConfirmationController extends GetxController {
     rejectionReason = rejectionDetails['rejectionReason'] as String?;
     suggestedTime = rejectionDetails['suggestedTime'] as String?;
 
-    if (suggestedTime != null) _parseSuggestedTime(suggestedTime!);
+    if (suggestedTime != null) {
+      _parseSuggestedTime(suggestedTime!);
+    } else {
+      suggestedHour = null;
+      suggestedMinute = null;
+      suggestedPeriod = null;
+      _suggestedDateTime = null;
+    }
     isTimeSuggestionTimePickerVisible = false;
 
     _dismissWaitingSheet();
@@ -883,15 +951,33 @@ class OrderConfirmationController extends GetxController {
   }
 
   /// ✅ Called from PaymentResultBottomSheet after successful payment
-  Future<void> clearCartAfterPayment() async {
+  Future<bool> clearCartAfterPayment() async {
+    CartService? cartService;
     try {
-      debugPrint('🧹 Clearing cart...');
-      Get.find<CartService>().clearCart();
-      debugPrint('✅ Cart cleared');
+      cartService = Get.find<CartService>();
+      cartService.localMutationInFlight = true;
+
+      debugPrint('Clearing cart after successful payment...');
+      final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
+
+      if (response != null &&
+          response is Map<String, dynamic> &&
+          response['success'] == true) {
+        cartService.clearCart();
+        debugPrint('Cart cleared via API after payment');
+        return true;
+      }
+
+      debugPrint('Clear cart API failed after payment: $response');
     } catch (e) {
-      // Non-fatal — don't block navigation on cart clear failure
-      debugPrint('⚠️ Cart clear failed (non-fatal): $e');
+      // Non-fatal: don't block successful payment navigation on cart clear failure.
+      debugPrint('Cart clear after payment failed (non-fatal): $e');
+    } finally {
+      cartService?.localMutationInFlight = false;
     }
+
+    cartService?.clearCart();
+    return false;
   }
 
   // ─────────────────────────────────────────────────────────────

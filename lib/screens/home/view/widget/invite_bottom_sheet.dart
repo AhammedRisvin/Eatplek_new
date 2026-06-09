@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../../core/util/app_color.dart';
 import '../../../../core/util/common_widgets.dart';
+import '../../../../core/util/price_formatter.dart';
 import '../../../../core/util/responsive_helper.dart';
 import '../../model/invite_model.dart';
 
@@ -201,7 +202,7 @@ class _InviteBottomSheetState extends State<InviteBottomSheet> {
                           responsive,
                           icon: Icons.currency_rupee_rounded,
                           label: 'Total so far',
-                          value: '₹${grandTotal.toStringAsFixed(0)}',
+                          value: formatCurrency(grandTotal),
                         ),
                       ],
                     ],

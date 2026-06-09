@@ -43,13 +43,25 @@ class OfferFoodGrid extends StatelessWidget {
                   crossAxisCount: responsive.gridCrossAxisCount,
                   mainAxisSpacing: responsive.gridMainAxisSpacing,
                   crossAxisSpacing: responsive.gridCrossAxisSpacing,
-                  childAspectRatio: responsive.gridChildAspectRatioForFood,
+                  childAspectRatio: responsive.gridChildAspectRatioForOfferFood,
                 ),
                 itemCount: controller.offers.length,
                 itemBuilder:
                     (context, index) => OfferFoodCard(
                       offer: controller.offers[index],
                       animationIndex: index,
+                      onActionTap:
+                          () => controller.onOfferActionTapped(
+                            controller.offers[index],
+                          ),
+                      onIncrease:
+                          () => controller.increasePlainOfferQuantity(
+                            controller.offers[index].food,
+                          ),
+                      onDecrease:
+                          () => controller.decreasePlainOfferQuantity(
+                            controller.offers[index].food,
+                          ),
                     ),
               ),
               if (controller.isLoadingMore) ...[

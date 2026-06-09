@@ -33,6 +33,8 @@ class HomeView extends StatelessWidget {
                   HomeHeaderSection(controller: controller),
                   Expanded(
                     child: GetBuilder<HomeController>(
+                      init: controller,
+                      global: false,
                       id: HomeController.vendorsId,
                       builder: (controller) {
                         if (controller.hasError && controller.vendors.isEmpty) {
@@ -86,6 +88,8 @@ class HomeView extends StatelessWidget {
 
               // Loading overlay while switching service types
               GetBuilder<HomeController>(
+                init: controller,
+                global: false,
                 id: HomeController.carouselId,
                 builder:
                     (controller) => LoadingOverlay(

@@ -1,6 +1,7 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/assets.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:get/get.dart';
@@ -225,8 +226,7 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
             color: Colors.green,
           ),
           text(
-            // ✅ Show discount as integer (no unnecessary decimals like 180.0)
-            text: '- ₹${controller.promoDiscount.toInt()}',
+            text: '- ${formatCurrency(controller.promoDiscount)}',
             size: responsive.fontSize14,
             fontWeight: FontWeight.w600,
             color: Colors.green,
@@ -298,8 +298,10 @@ class _OrderConfirmationViewState extends State<OrderConfirmationView> {
           color: isBold ? color : AppColor.black.withOpacity(0.7),
         ),
         text(
-          // ✅ Prefix discount rows with "-" sign
-          text: isDiscount ? '- ₹ ${amount.toInt()}' : '₹ ${amount.toInt()}',
+          text:
+              isDiscount
+                  ? '- ${formatCurrency(amount, space: true)}'
+                  : formatCurrency(amount, space: true),
           size: isBold ? responsive.fontSize15 : responsive.fontSize14,
           fontWeight: isBold ? FontWeight.w600 : FontWeight.w500,
           color:

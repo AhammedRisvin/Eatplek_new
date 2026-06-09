@@ -1,6 +1,7 @@
 // ignore_for_file: unnecessary_underscores
 
 import 'package:eatplek_app/core/util/app_color.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -325,7 +326,7 @@ class _CouponCard extends StatelessWidget {
                         coupon.discountValue != null
                             ? coupon.discountType == 'percentage'
                                 ? '${coupon.discountValue}%'
-                                : '₹${coupon.discountValue}'
+                                : formatCurrency(coupon.discountValue)
                             : '',
                         style: const TextStyle(
                           color: Colors.white,

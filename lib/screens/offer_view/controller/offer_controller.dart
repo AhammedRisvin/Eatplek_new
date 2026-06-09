@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:eatplek_app/core/network/api_endpoints.dart';
 import 'package:eatplek_app/core/util/service_type.dart';
 import 'package:eatplek_app/core/util/storage.dart';
+import 'package:eatplek_app/screens/cart/controller/cart_service.dart';
 import 'package:eatplek_app/screens/home/controller/home_controller.dart';
+import 'package:eatplek_app/screens/restaurant_detail_view/controller/restaurant_detail_view_controller.dart';
+import 'package:eatplek_app/screens/restaurant_detail_view/model/restaurent_details_model.dart';
+import 'package:eatplek_app/screens/restaurant_detail_view/view/widget/food_details_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -48,7 +52,6 @@ class OfferController extends GetxController {
   void onClose() {
     _homeSyncRetryTimer?.cancel();
     scrollController.removeListener(_onScroll);
-    scrollController.dispose();
     super.onClose();
   }
 
@@ -63,7 +66,7 @@ class OfferController extends GetxController {
   }
 
   Future<void> refreshOffers() async {
-    _syncFromHome(fetchAfterSync: false);
+    _syncFromHome(fetchAfterSync: false, forceRefresh: true);
     currentPage = 1;
     offers.clear();
     await _fetchOffers(isRefresh: true);
@@ -83,6 +86,105 @@ class OfferController extends GetxController {
     _fetchOffers(isRefresh: true);
   }
 
+  Future<void> onOfferActionTapped(OfferFood offer) async {
+    final food = offer.food;
+    final foodId = food.foodId ?? '';
+    if (foodId.isEmpty) return;
+
+    final hasCustomizations = food.customizations?.isNotEmpty ?? false;
+    final hasAddOns = food.addOns?.isNotEmpty ?? false;
+
+    if (!hasCustomizations && !hasAddOns) {
+      await increasePlainOfferQuantity(food);
+      return;
+    }
+
+    _openFoodOptionsSheet(food);
+  }
+
+  Future<void> increasePlainOfferQuantity(Food food) async {
+    final foodId = food.foodId ?? '';
+    if (foodId.isEmpty) return;
+
+    final cartService = Get.find<CartService>();
+    await _setPlainFoodQuantity(food, cartService.getFoodQuantity(foodId) + 1);
+  }
+
+  Future<void> decreasePlainOfferQuantity(Food food) async {
+    final foodId = food.foodId ?? '';
+    if (foodId.isEmpty) return;
+
+    final cartService = Get.find<CartService>();
+    final currentQuantity = cartService.getFoodQuantity(foodId);
+    if (currentQuantity <= 0) return;
+
+    await _setPlainFoodQuantity(food, currentQuantity - 1);
+  }
+
+  Future<void> _setPlainFoodQuantity(Food food, int quantity) async {
+    final foodId = food.foodId ?? '';
+    if (foodId.isEmpty) return;
+
+    try {
+      final cartService = Get.find<CartService>();
+      final response = await _apiClient.post(
+        endpoint: Urls.addOrUpdateCartUrl,
+        data: {
+          'foodId': foodId,
+          'quantity': quantity,
+          'serviceType': ServiceType.normalize(selectedPreference),
+        },
+      );
+
+      if (response is Map<String, dynamic> &&
+          response['success'] == true &&
+          response['data'] != null) {
+        cartService.updateCartFromApi(response['data']);
+      } else {
+        Get.snackbar(
+          'Error',
+          response is Map
+              ? response['message'] ?? 'Failed to add item'
+              : 'Failed to add item',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      debugPrint('Offer add plain food error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to add item to cart',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void _openFoodOptionsSheet(Food food) {
+    final detailController = _ensureFoodSheetController();
+    final cartService = Get.find<CartService>();
+    final isEdit = cartService.isFoodInCart(food.foodId ?? '');
+
+    detailController.selectFoodItem(food, isEdit: isEdit);
+
+    showModalBottomSheet(
+      context: Get.context!,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      enableDrag: true,
+      builder: (_) => const FoodDetailsBottomSheet(),
+    ).then((_) => detailController.resetBottomSheetState());
+  }
+
+  RestaurantDetailViewController _ensureFoodSheetController() {
+    if (Get.isRegistered<RestaurantDetailViewController>()) {
+      return Get.find<RestaurantDetailViewController>();
+    }
+
+    return Get.put<RestaurantDetailViewController>(
+      RestaurantDetailViewController(skipInitialFetch: true),
+    );
+  }
+
   void _syncFromHome({
     required bool fetchAfterSync,
     bool forceRefresh = false,
@@ -100,12 +202,20 @@ class OfferController extends GetxController {
       userLongitude = homeController.userLongitude;
 
       final homePreference = homeController.orderPreference;
-      selectedPreference =
-          _resolveSelectedPreference(homePreference: homePreference);
+      selectedPreference = _resolveSelectedPreference(
+        homePreference: homePreference,
+      );
     } else {
       userLatitude = Store.userLatitude;
       userLongitude = Store.userLongitude;
       selectedPreference = _resolveSelectedPreference();
+    }
+
+    if (availableServices.isEmpty && Store.availableServices.isNotEmpty) {
+      availableServices = _normalizeAvailableServices(Store.availableServices);
+      selectedPreference = _resolveSelectedPreference(
+        homePreference: selectedPreference,
+      );
     }
 
     if (userLatitude == 0.0 && Store.userLatitude != 0.0) {
@@ -201,10 +311,13 @@ class OfferController extends GetxController {
     _homeSyncRetryTimer?.cancel();
     _homeSyncRetryTimer = Timer(const Duration(seconds: 1), () {
       if (isClosed) return;
-      final homeServices = Get.find<HomeController>().availableServices;
+      if (!Get.isRegistered<HomeController>()) return;
+
+      final homeController = Get.find<HomeController>();
+      final homeServices = homeController.availableServices;
       final homeHasLocation =
-          Get.find<HomeController>().userLatitude != 0.0 ||
-          Get.find<HomeController>().userLongitude != 0.0;
+          homeController.userLatitude != 0.0 ||
+          homeController.userLongitude != 0.0;
       _syncFromHome(fetchAfterSync: homeServices.isNotEmpty && homeHasLocation);
     });
   }
@@ -250,6 +363,15 @@ class OfferController extends GetxController {
           parsed.message.isNotEmpty ? parsed.message : 'Failed to load offers',
         );
         return;
+      }
+
+      final responseServices = parsed.data?.availableServices ?? [];
+      if (responseServices.isNotEmpty) {
+        availableServices = _normalizeAvailableServices(responseServices);
+        selectedPreference = _resolveSelectedPreference(
+          homePreference: selectedPreference,
+        );
+        update([preferencesId]);
       }
 
       final newOffers = parsed.data?.offers ?? [];

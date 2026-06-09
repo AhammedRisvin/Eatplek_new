@@ -24,7 +24,8 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
         final buttonText = controller.getBottomSheetButtonText();
 
         final scenarioAQuantity = controller.getBottomSheetItemQuantity();
-        final totalCustomizationQty = controller.getTotalCustomizationQuantity();
+        final totalCustomizationQty =
+            controller.getTotalCustomizationQuantity();
 
         bool isButtonEnabled = true;
 
@@ -52,8 +53,16 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
           width: Get.width,
           decoration: BoxDecoration(
             color: AppColor.white,
-            border: BorderDirectional(top: BorderSide(color: AppColor.black.withOpacity(0.1), width: 1)),
-            boxShadow: [BoxShadow(color: AppColor.black.withOpacity(0.08), blurRadius: 14, offset: Offset(0, -2))],
+            border: BorderDirectional(
+              top: BorderSide(color: AppColor.black.withOpacity(0.1), width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColor.black.withOpacity(0.08),
+                blurRadius: 14,
+                offset: Offset(0, -2),
+              ),
+            ],
           ),
           padding: EdgeInsets.only(
             top: responsive.spacing11,
@@ -72,11 +81,15 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                     return QuantityControlWidget(
                       quantity: quantity,
                       onIncrease: () {
-                        debugPrint('🟢 Increase quantity in bottom sheet - old: $quantity');
+                        debugPrint(
+                          '🟢 Increase quantity in bottom sheet - old: $quantity',
+                        );
                         controller.increaseBottomSheetItemQuantity();
                       },
                       onDecrease: () {
-                        debugPrint('🟢 Decrease quantity in bottom sheet - old: $quantity');
+                        debugPrint(
+                          '🟢 Decrease quantity in bottom sheet - old: $quantity',
+                        );
                         controller.decreaseBottomSheetItemQuantity();
                       },
                       showRemoveButton: true,
@@ -97,7 +110,7 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                       color: AppColor.black.withOpacity(0.6),
                     ),
                     text(
-                      text: '₹${totalPrice.toStringAsFixed(0)}',
+                      text: '₹${totalPrice.toStringAsFixed(2)}',
                       size: responsive.fontSize22,
                       fontWeight: FontWeight.w600,
                       color: AppColor.black,
@@ -124,9 +137,11 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                         isSubmitting
                             ? AppColor.appPrimary.withOpacity(0.75)
                             : canSubmit
-                                ? AppColor.appPrimary
-                                : AppColor.black.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(responsive.largeBorderRadius),
+                            ? AppColor.appPrimary
+                            : AppColor.black.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(
+                      responsive.largeBorderRadius,
+                    ),
                   ),
                   child: Center(
                     child:
@@ -142,23 +157,29 @@ class FoodBottomSheetCheckoutSection extends StatelessWidget {
                               ),
                             )
                             : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        text(
-                          text: buttonText,
-                          size: responsive.fontSize12,
-                          fontWeight: FontWeight.w600,
-                          color: canSubmit ? AppColor.white : AppColor.black.withOpacity(0.5),
-                        ),
-                        SizedBox(height: responsive.spacing2),
-                        text(
-                          text: '₹${totalPrice.toStringAsFixed(0)}',
-                          size: responsive.fontSize16,
-                          fontWeight: FontWeight.w700,
-                          color: canSubmit ? AppColor.white : AppColor.black.withOpacity(0.5),
-                        ),
-                      ],
-                    ),
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                text(
+                                  text: buttonText,
+                                  size: responsive.fontSize12,
+                                  fontWeight: FontWeight.w600,
+                                  color:
+                                      canSubmit
+                                          ? AppColor.white
+                                          : AppColor.black.withOpacity(0.5),
+                                ),
+                                SizedBox(height: responsive.spacing2),
+                                text(
+                                  text: '₹${totalPrice.toStringAsFixed(2)}',
+                                  size: responsive.fontSize16,
+                                  fontWeight: FontWeight.w700,
+                                  color:
+                                      canSubmit
+                                          ? AppColor.white
+                                          : AppColor.black.withOpacity(0.5),
+                                ),
+                              ],
+                            ),
                   ),
                 ),
               ),

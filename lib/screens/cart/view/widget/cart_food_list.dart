@@ -1,5 +1,6 @@
 import 'package:eatplek_app/core/util/app_color.dart';
 import 'package:eatplek_app/core/util/common_widgets.dart';
+import 'package:eatplek_app/core/util/price_formatter.dart';
 import 'package:eatplek_app/core/util/responsive_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -286,7 +287,7 @@ class CartFoodListWidget extends StatelessWidget {
       return Padding(
         padding: EdgeInsets.only(top: responsive.spacing8),
         child: Text(
-          'Rs.${cartItem.basePrice?.toInt() ?? 0}',
+          'Rs.${formatPrice(cartItem.basePrice)}',
           style: TextStyle(
             fontWeight: FontWeight.w500,
             fontSize: responsive.fontSize18,
@@ -302,7 +303,7 @@ class CartFoodListWidget extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Rs.${cartItem.basePrice?.toInt() ?? 0}',
+              'Rs.${formatPrice(cartItem.basePrice)}',
               style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: responsive.fontSize18,
@@ -415,7 +416,7 @@ class CartFoodListWidget extends StatelessWidget {
                 ),
                 SizedBox(height: responsive.spacing4),
                 Text(
-                  'Rs.${_formatPrice(addOn.price)}',
+                  'Rs.${formatPrice(addOn.price)}',
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
                     fontSize: responsive.fontSize12,
@@ -536,7 +537,7 @@ class CartFoodListWidget extends StatelessWidget {
                 ),
                 SizedBox(height: responsive.spacing4),
                 Text(
-                  'Rs.${_formatPrice(customization.price)}',
+                  'Rs.${formatPrice(customization.price)}',
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
                     fontSize: responsive.fontSize12,
@@ -584,10 +585,5 @@ class CartFoodListWidget extends StatelessWidget {
         painter: DottedLinePainter(color: AppColor.black.withOpacity(0.1)),
       ),
     );
-  }
-
-  String _formatPrice(num? value) {
-    final price = value ?? 0;
-    return price % 1 == 0 ? price.toInt().toString() : price.toStringAsFixed(2);
   }
 }

@@ -22,11 +22,21 @@ class CartController extends GetxController {
 
   CartModel? cartModel;
 
-  final TextEditingController instructionsController = TextEditingController();
+  TextEditingController? _instructionsController;
+  TextEditingController get instructionsController {
+    _ensureTextControllers();
+    return _instructionsController!;
+  }
+
   String _instructionsError = '';
   String get instructionsError => _instructionsError;
 
-  final TextEditingController promoCodeController = TextEditingController();
+  TextEditingController? _promoCodeController;
+  TextEditingController get promoCodeController {
+    _ensureTextControllers();
+    return _promoCodeController!;
+  }
+
   String _promoCodeError = '';
   String get promoCodeError => _promoCodeError;
   String _appliedPromoCode = '';
@@ -35,6 +45,7 @@ class CartController extends GetxController {
   double get promoDiscount => _promoDiscount;
 
   bool isPromoApplying = false;
+  bool isClearingCart = false;
 
   Timer? _quantityDebounceTimer;
   static const Duration _debounceDuration = Duration(milliseconds: 500);
@@ -53,11 +64,42 @@ class CartController extends GetxController {
     return [];
   }
 
+  List<CartItem> _sanitizeCartItems(List<CartItem>? items) {
+    return (items ?? []).map((item) {
+      item.addOns =
+          (item.addOns ?? [])
+              .where(
+                (addOn) =>
+                    (addOn.quantity ?? 0) > 0 &&
+                    !_cartService.isOptionLocallyRemoved(
+                      foodId: item.foodId ?? '',
+                      optionId: addOn.addOnId ?? '',
+                      isCustomization: false,
+                    ),
+              )
+              .toList();
+      item.customizations =
+          (item.customizations ?? [])
+              .where(
+                (customization) =>
+                    (customization.quantity ?? 0) > 0 &&
+                    !_cartService.isOptionLocallyRemoved(
+                      foodId: item.foodId ?? '',
+                      optionId: customization.customizationId ?? '',
+                      isCustomization: true,
+                    ),
+              )
+              .toList();
+      return item;
+    }).toList();
+  }
+
   bool get isCartEmpty => cartItems.isEmpty;
 
   @override
   void onInit() {
     super.onInit();
+    _ensureTextControllers();
     // ✅ DO NOT call _fetchCartData() here.
     // CartView is mounted inside IndexedStack at app start even when not visible.
     // Fetching here would fire the cart API on every app launch regardless of screen.
@@ -65,10 +107,20 @@ class CartController extends GetxController {
     _listenToCartServiceUpdates();
   }
 
+  void _ensureTextControllers() {
+    _instructionsController ??= TextEditingController();
+    _promoCodeController ??= TextEditingController();
+  }
+
   void _listenToCartServiceUpdates() {
     ever(_cartService.cartItems, (_) {
       _syncCartModelWithService();
-      update(['cart_items', 'price_summary', 'empty_cart']);
+      update([
+        'cart_items',
+        'price_summary',
+        'empty_cart',
+        'clear_cart_button',
+      ]);
     });
 
     ever(_cartService.totalPrice, (_) {
@@ -76,7 +128,7 @@ class CartController extends GetxController {
     });
 
     ever(_cartService.itemCount, (_) {
-      update(['price_summary', 'empty_cart']);
+      update(['price_summary', 'empty_cart', 'clear_cart_button']);
     });
   }
 
@@ -100,7 +152,7 @@ class CartController extends GetxController {
           serviceType: fresh.data!.serviceType,
           isPrebookCart: fresh.data!.isPrebookCart,
           vendor: fresh.data!.vendor ?? cartModel?.data?.vendor,
-          items: fresh.data!.items,
+          items: _sanitizeCartItems(fresh.data!.items),
           couponCode: fresh.data!.couponCode,
           totals: fresh.data!.totals,
           lastUpdatedAt: fresh.data!.lastUpdatedAt,
@@ -123,6 +175,7 @@ class CartController extends GetxController {
         'cart_items',
         'price_summary',
         'empty_cart',
+        'clear_cart_button',
         'promo_validation',
         'friend_invitations',
       ]);
@@ -227,7 +280,12 @@ class CartController extends GetxController {
       isLoading = true;
       hasError = false;
       errorMessage = '';
-      update(['cart_items', 'price_summary', 'empty_cart']);
+      update([
+        'cart_items',
+        'price_summary',
+        'empty_cart',
+        'clear_cart_button',
+      ]);
 
       final response = await _apiClient.get(endpoint: Urls.getCartUrl);
 
@@ -298,6 +356,9 @@ class CartController extends GetxController {
 
       if (response != null && response is Map<String, dynamic>) {
         cartModel = CartModel.fromJson(response);
+        if (cartModel?.data != null) {
+          cartModel!.data!.items = _sanitizeCartItems(cartModel!.data!.items);
+        }
 
         debugPrint('📦 PARSED MODEL DEBUG');
         debugPrint('CartModel success: ${cartModel?.success}');
@@ -362,6 +423,7 @@ class CartController extends GetxController {
         'cart_items',
         'price_summary',
         'empty_cart',
+        'clear_cart_button',
         'promo_validation',
         'friend_invitations',
       ]);
@@ -369,7 +431,12 @@ class CartController extends GetxController {
       hasError = true;
       errorMessage = 'Error loading cart: $e';
       isLoading = false;
-      update(['cart_items', 'price_summary', 'empty_cart']);
+      update([
+        'cart_items',
+        'price_summary',
+        'empty_cart',
+        'clear_cart_button',
+      ]);
       debugPrint('❌ Error fetching cart: $e');
     }
   }
@@ -461,6 +528,11 @@ class CartController extends GetxController {
 
       if (response != null && response is Map<String, dynamic>) {
         if (response['success'] == true && response['data'] != null) {
+          _cartService.recordSubmittedOptionState(
+            foodId: foodId,
+            addOns: requestBody['addOns'],
+            customizations: requestBody['customizations'],
+          );
           final updatedModel = CartModel.fromJson(response);
 
           if (updatedModel.data != null) {
@@ -474,7 +546,7 @@ class CartController extends GetxController {
                 serviceType: updatedModel.data!.serviceType,
                 isPrebookCart: updatedModel.data!.isPrebookCart,
                 vendor: updatedModel.data!.vendor ?? cartModel?.data?.vendor,
-                items: updatedModel.data!.items,
+                items: _sanitizeCartItems(updatedModel.data!.items),
                 couponCode:
                     updatedModel.data!.couponCode ??
                     cartModel?.data?.couponCode,
@@ -509,7 +581,12 @@ class CartController extends GetxController {
             },
           });
 
-          update(['cart_items', 'price_summary', 'empty_cart']);
+          update([
+            'cart_items',
+            'price_summary',
+            'empty_cart',
+            'clear_cart_button',
+          ]);
         } else {
           Get.snackbar('Error', response['message'] ?? 'Failed to update cart');
         }
@@ -658,15 +735,14 @@ class CartController extends GetxController {
             .where((item) => item['foodId'] != itemId)
             .toList();
     _cartService.cartItems.value = items;
-    update(['cart_items', 'price_summary', 'empty_cart']);
+    update(['cart_items', 'price_summary', 'empty_cart', 'clear_cart_button']);
   }
 
   // ─── Price getters ────────────────────────────────────────────────────────
   double get subtotal => cartModel?.data?.totals?.subTotal ?? 0;
   double get deliveryFee => 0.0;
   double get taxAmount => cartModel?.data?.totals?.taxAmount ?? 0;
-  double get taxPercentageValue =>
-      cartModel?.data?.totals?.taxPercentage ?? 0;
+  double get taxPercentageValue => cartModel?.data?.totals?.taxPercentage ?? 0;
   double get packingCharge =>
       (cartModel?.data?.totals?.packingChargeTotal ?? 0).toDouble();
   double get discountAmount =>
@@ -757,6 +833,8 @@ class CartController extends GetxController {
   // ─── Clear Cart ───────────────────────────────────────────────────────────
   Future<bool> clearCartApi({Function(String error)? onError}) async {
     _cartService.localMutationInFlight = true;
+    isClearingCart = true;
+    update(['clear_cart_button']);
     try {
       final response = await _apiClient.delete(endpoint: Urls.clearCartUrl);
 
@@ -772,6 +850,7 @@ class CartController extends GetxController {
             'price_summary',
             'empty_cart',
             'promo_validation',
+            'clear_cart_button',
           ]);
           debugPrint('✅ Cart cleared via API');
           return true;
@@ -788,7 +867,9 @@ class CartController extends GetxController {
       final message = e.toString().replaceAll('Exception: ', '');
       onError?.call(message);
     } finally {
+      isClearingCart = false;
       _cartService.localMutationInFlight = false;
+      update(['clear_cart_button']);
     }
     return false;
   }
@@ -918,8 +999,10 @@ class CartController extends GetxController {
   @override
   void onClose() {
     _quantityDebounceTimer?.cancel();
-    instructionsController.dispose();
-    promoCodeController.dispose();
+    _instructionsController?.dispose();
+    _promoCodeController?.dispose();
+    _instructionsController = null;
+    _promoCodeController = null;
     super.onClose();
   }
 }

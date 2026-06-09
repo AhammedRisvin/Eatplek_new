@@ -9,7 +9,6 @@ import 'package:fittor/fittor.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../screens/profile/controller/profile_controller.dart';
 import '../routes/routes.dart';
 import '../util/storage.dart';
 import 'api_endpoints.dart';
@@ -281,21 +280,9 @@ class FittorConnect {
               TextButton(
                 onPressed: () async {
                   Navigator.of(Get.overlayContext!).pop();
-                  // Use ProfileController.logout() — it calls the logout API,
-                  // clears storage, and redirects to splash cleanly
-                  try {
-                    final profileController = Get.find<ProfileController>();
-                    await profileController.logout();
-                  } catch (e) {
-                    // ProfileController not found — fallback to direct clear
-                    log(
-                      '⚠️ ProfileController not found, falling back to direct logout',
-                      name: 'FittorConnect',
-                    );
-                    await Store.clear();
-                    clearAuthToken();
-                    Get.offAllNamed(Routes.splash);
-                  }
+                  await Store.clear();
+                  clearAuthToken();
+                  Get.offAllNamed(Routes.login);
                 },
                 child: const Text('Login'),
               ),
@@ -369,6 +356,7 @@ class FittorConnect {
   Future<T> _processResponse<T>(
     FittorResponse response, {
     Future<FittorResponse> Function()? retryCallback,
+    bool showLoginRequiredDialog = true,
   }) async {
     if (response.isSuccessful) {
       return parseResponse<T>(response);
@@ -404,7 +392,9 @@ class FittorConnect {
 
     // ── 401 + no token → show login required dialog ───────────────────────
     if (response.statusCode == 401) {
-      await _showLoginRequiredDialog();
+      if (showLoginRequiredDialog) {
+        await _showLoginRequiredDialog();
+      }
       throw _handleError(
         FittorHttpException(
           message.isNotEmpty ? message : 'Login required.',
@@ -483,6 +473,7 @@ class FittorConnect {
                   headers: headers,
                 )
                 .timeout(timeout ?? const Duration(seconds: 30)),
+        showLoginRequiredDialog: endpoint != Urls.logout,
       );
     } catch (e) {
       if (e is String) rethrow;

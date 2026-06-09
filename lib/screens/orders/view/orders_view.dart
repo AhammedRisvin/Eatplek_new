@@ -14,24 +14,38 @@ class OrdersView extends StatefulWidget {
   State<OrdersView> createState() => _OrdersViewState();
 }
 
-class _OrdersViewState extends State<OrdersView> {
+class _OrdersViewState extends State<OrdersView>
+    with SingleTickerProviderStateMixin {
   late List<GlobalKey> _tabKeys;
+  late TabController _tabController;
   final ScrollController _tabScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _tabKeys = List.generate(5, (_) => GlobalKey());
+    _tabController = TabController(length: 5, vsync: this);
+    _tabController.addListener(_handleTabChange);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
+    _tabController.dispose();
     _tabScrollController.dispose();
     super.dispose();
   }
 
+  void _handleTabChange() {
+    if (!mounted || _tabController.indexIsChanging) return;
+    if (Get.isRegistered<OrdersController>()) {
+      Get.find<OrdersController>().selectTab(_tabController.index);
+    }
+  }
+
   void _scrollToTab(int index) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       if (!_tabScrollController.hasClients) return;
       final key = _tabKeys[index];
       final ctx = key.currentContext;
@@ -99,10 +113,12 @@ class _OrdersViewState extends State<OrdersView> {
                         highlightColor: Colors.transparent,
                       ),
                       child: TabBarView(
-                        controller: controller.tabController,
+                        controller: _tabController,
                         children: List.generate(
                           controller.tabs.length,
                           (index) => GetBuilder<OrdersController>(
+                            init: controller,
+                            global: false,
                             id: 'orders_tab_$index',
                             builder:
                                 (ctrl) => OrdersList(
@@ -114,7 +130,7 @@ class _OrdersViewState extends State<OrdersView> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 80),
+                  // const SizedBox(height: 30),
                 ],
               ),
             ),
@@ -152,6 +168,8 @@ class _OrdersViewState extends State<OrdersView> {
         ],
       ),
       child: GetBuilder<OrdersController>(
+        init: controller,
+        global: false,
         id: 'tab_bar',
         builder:
             (ctrl) => SingleChildScrollView(
@@ -160,13 +178,15 @@ class _OrdersViewState extends State<OrdersView> {
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: List.generate(ctrl.tabs.length, (index) {
-                  final isSelected = ctrl.tabController.index == index;
+                  final isSelected = ctrl.currentTabIndex == index;
                   final label = ctrl.tabs[index]['label']!;
 
                   return GestureDetector(
                     key: _tabKeys[index],
                     onTap: () {
-                      ctrl.tabController.animateTo(index);
+                      if (!mounted) return;
+                      ctrl.selectTab(index);
+                      _tabController.animateTo(index);
                       _scrollToTab(index);
                     },
                     child: AnimatedContainer(
