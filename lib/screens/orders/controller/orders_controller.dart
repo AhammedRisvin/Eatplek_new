@@ -46,6 +46,7 @@ class OrdersController extends GetxController {
   Timer? _pollingTimer;
   bool _isPolling = false;
   bool _isPollingActive = false;
+  final Set<String> _loggedInitialResponseTabs = {};
 
   // ── Per-tab accessors ─────────────────────────────────────────────────────
   TabOrderState stateForTab(int index) => tabStates[index];
@@ -156,9 +157,10 @@ class OrdersController extends GetxController {
       final endpoint =
           '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=${Uri.encodeQueryComponent(serviceType)}';
 
-      debugPrint('📦 Fetching orders: $endpoint');
       final response = await _apiClient.get(endpoint: endpoint);
-      log('Orders API [$serviceType] page $page: $response');
+      if (page == 1 && _loggedInitialResponseTabs.add(serviceType)) {
+        log('Orders API [$serviceType] first response: $response');
+      }
 
       if (response != null && response is Map<String, dynamic>) {
         final parsed = OrdersApiModel.fromJson(response);
@@ -198,9 +200,7 @@ class OrdersController extends GetxController {
     final endpoint =
         '${Urls.getordersUrl}?page=$page&limit=$_pageLimit&serviceType=${Uri.encodeQueryComponent(serviceType)}';
 
-    debugPrint('📦 Polling orders: $endpoint');
     final response = await _apiClient.get(endpoint: endpoint);
-    log('Orders poll [$serviceType] page $page: $response');
 
     if (response is Map<String, dynamic>) {
       return OrdersApiModel.fromJson(response);

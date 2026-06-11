@@ -54,39 +54,42 @@ class FoodWidget extends StatelessWidget {
               ),
 
               // ── Details ────────────────────────────────────────────────────
-              Padding(
-                padding: EdgeInsets.all(responsive.spacing10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // _buildVegIndicator(responsive),
-                        // SizedBox(width: responsive.spacing5),
-                        Expanded(
-                          child: text(
-                            text: foodName,
-                            size: responsive.fontSize13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColor.black,
-                            maxLines: 2,
-                            overFlow: TextOverflow.ellipsis,
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.all(responsive.spacing10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // _buildVegIndicator(responsive),
+                          // SizedBox(width: responsive.spacing5),
+                          Expanded(
+                            child: text(
+                              text: foodName,
+                              size: responsive.fontSize13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColor.black,
+                              maxLines: 2,
+                              overFlow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: responsive.spacing6),
-                    _buildPrice(responsive),
-                    SizedBox(height: responsive.spacing8),
-                    _buildAction(
-                      context,
-                      controller,
-                      hasCustomizations,
-                      hasAddOns,
-                      responsive,
-                    ),
-                  ],
+                        ],
+                      ),
+                      SizedBox(height: responsive.spacing6),
+                      _buildPrice(responsive),
+                      const Spacer(),
+                      SizedBox(height: responsive.spacing8),
+                      _buildAction(
+                        context,
+                        controller,
+                        hasCustomizations,
+                        hasAddOns,
+                        responsive,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -203,18 +206,18 @@ class FoodWidget extends StatelessWidget {
   }
 
   Widget _buildPrice(ResponsiveHelper responsive) {
-    final discounted =
-        _asDouble(foodItem.specialOfferPrice) ??
-        foodItem.discountPrice ??
+    final foodPrice =
         foodItem.foodPrice ??
+        foodItem.discountPrice ??
+        _asDouble(foodItem.specialOfferPrice) ??
         0;
-    final actual = foodItem.actualPrice ?? foodItem.foodPrice ?? discounted;
-    final hasDiscount = actual > discounted;
+    final actual = foodItem.actualPrice ?? foodPrice;
+    final hasDiscount = actual != foodPrice;
 
     return Row(
       children: [
         text(
-          text: '₹${_formatPrice(discounted)}',
+          text: '₹${_formatPrice(foodPrice)}',
           size: responsive.fontSize13,
           fontWeight: FontWeight.w700,
           color: AppColor.appPrimary,
@@ -241,7 +244,7 @@ class FoodWidget extends StatelessWidget {
             ),
             child: text(
               text:
-                  '${_calcDiscount(actual.toDouble(), discounted.toDouble()).toInt()}% off',
+                  '${_calcDiscount(actual.toDouble(), foodPrice.toDouble()).toInt()}% off',
               size: responsive.fontSize9,
               fontWeight: FontWeight.w600,
               color: const Color(0xFFFF6B6B),

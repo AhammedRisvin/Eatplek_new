@@ -75,34 +75,37 @@ class OfferFoodCard extends StatelessWidget {
                     ),
                 ],
               ),
-              Padding(
-                padding: EdgeInsets.all(responsive.spacing10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    text(
-                      text: _capitalize(food.foodName ?? 'Food item'),
-                      size: responsive.fontSize13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColor.black,
-                      maxLines: 2,
-                      overFlow: TextOverflow.ellipsis,
-                    ),
-                    if (_hasRestaurantMeta) ...[
-                      SizedBox(height: responsive.spacing4),
-                      _RestaurantMetaRow(offer: offer),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.all(responsive.spacing10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      text(
+                        text: _capitalize(food.foodName ?? 'Food item'),
+                        size: responsive.fontSize13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColor.black,
+                        maxLines: 2,
+                        overFlow: TextOverflow.ellipsis,
+                      ),
+                      if (_hasRestaurantMeta) ...[
+                        SizedBox(height: responsive.spacing4),
+                        _RestaurantMetaRow(offer: offer),
+                      ],
+                      SizedBox(height: responsive.spacing6),
+                      _PriceRow(offer: offer),
+                      const Spacer(),
+                      SizedBox(height: responsive.spacing8),
+                      _OfferAction(
+                        offer: offer,
+                        hasOptions: hasOptions,
+                        onActionTap: onActionTap,
+                        onIncrease: onIncrease,
+                        onDecrease: onDecrease,
+                      ),
                     ],
-                    SizedBox(height: responsive.spacing6),
-                    _PriceRow(offer: offer),
-                    SizedBox(height: responsive.spacing8),
-                    _OfferAction(
-                      offer: offer,
-                      hasOptions: hasOptions,
-                      onActionTap: onActionTap,
-                      onIncrease: onIncrease,
-                      onDecrease: onDecrease,
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -339,18 +342,18 @@ class _PriceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper();
     final food = offer.food;
-    final offerPrice =
-        _asDouble(food.specialOfferPrice) ??
-        food.discountPrice ??
+    final foodPrice =
         food.foodPrice ??
+        food.discountPrice ??
+        _asDouble(food.specialOfferPrice) ??
         0.0;
-    final actualPrice = food.actualPrice ?? food.foodPrice ?? offerPrice;
-    final hasDiscount = actualPrice > offerPrice;
+    final actualPrice = food.actualPrice ?? foodPrice;
+    final hasDiscount = actualPrice != foodPrice;
 
     return Row(
       children: [
         text(
-          text: 'Rs ${formatPrice(offerPrice)}',
+          text: 'Rs ${formatPrice(foodPrice)}',
           size: responsive.fontSize13,
           fontWeight: FontWeight.w700,
           color: AppColor.appPrimary,
@@ -368,7 +371,7 @@ class _PriceRow extends StatelessWidget {
           SizedBox(width: responsive.spacing5),
           Flexible(
             child: text(
-              text: '${_discountPercent(actualPrice, offerPrice).toInt()}% off',
+              text: '${_discountPercent(actualPrice, foodPrice).toInt()}% off',
               size: responsive.fontSize9,
               fontWeight: FontWeight.w700,
               color: const Color(0xFFFF6B6B),

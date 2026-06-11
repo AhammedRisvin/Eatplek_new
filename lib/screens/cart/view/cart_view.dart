@@ -81,7 +81,14 @@ class _CartViewState extends State<CartView> {
             if (controller.isCartEmpty) return const EmptyCartWidget();
 
             return SingleChildScrollView(
-              padding: EdgeInsets.all(responsive.spacing20),
+              padding: EdgeInsets.fromLTRB(
+                responsive.spacing20,
+                responsive.spacing20,
+                responsive.spacing20,
+                widget.isFromBottomNav
+                    ? responsive.spacing40
+                    : responsive.spacing20,
+              ),
               physics: const BouncingScrollPhysics(),
               child: Column(
                 children: [
@@ -298,16 +305,17 @@ class _CartViewState extends State<CartView> {
   }
 
   Widget _buildBottomBar(CartController controller) {
+    if (widget.isFromBottomNav) {
+      return _buildBottomNavCartBar(controller);
+    }
+
     return Container(
       color: AppColor.scaffoldColor,
       padding: EdgeInsets.only(
         left: responsive.spacing20,
         right: responsive.spacing20,
         top: responsive.spacing16,
-        bottom:
-            widget.isFromBottomNav
-                ? responsive.bottomPadding + responsive.spacing10
-                : responsive.spacing20,
+        bottom: responsive.spacing20,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -364,6 +372,93 @@ class _CartViewState extends State<CartView> {
               .fade(duration: 300.ms, delay: 50.ms)
               .slideY(begin: 0.1, end: 0, duration: 300.ms, delay: 50.ms),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavCartBar(CartController controller) {
+    final double sideGap = responsive.spacing20;
+    final double centerGap = responsive.spacing80;
+    final double buttonHeight = responsive.buttonHeight;
+    final bool canInviteFriend = controller.isCartOwner;
+
+    return Container(
+      color: AppColor.scaffoldColor,
+      padding: EdgeInsets.fromLTRB(
+        sideGap,
+        responsive.spacing12,
+        sideGap,
+        responsive.spacing8,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child:
+                  canInviteFriend
+                      ? _buildAddFriendButton(height: buttonHeight)
+                      : const SizedBox.shrink(),
+            ),
+            SizedBox(width: centerGap),
+            Expanded(
+              child: button(
+                name: 'Place Order',
+                width: double.infinity,
+                fontSize: responsive.fontSize15,
+                height: buttonHeight,
+                fontWeight: FontWeight.w700,
+                borderRadius: BorderRadius.circular(responsive.spacing40),
+                onTap: () => _navigateToConfirmation(controller),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddFriendButton({required double height}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => AddFriendToCartBottomSheet.show(),
+        borderRadius: BorderRadius.circular(responsive.spacing40),
+        child: Ink(
+          height: height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(responsive.spacing40),
+            border: Border.all(color: AppColor.appPrimary, width: 1.5),
+          ),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: responsive.spacing10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.person_add_alt_1_rounded,
+                    size: responsive.spacing20,
+                    color: AppColor.appPrimary,
+                  ),
+                  SizedBox(width: responsive.spacing6),
+                  Text(
+                    'Add Friend to Order',
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: responsive.fontSize13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColor.appPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

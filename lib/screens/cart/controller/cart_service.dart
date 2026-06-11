@@ -143,11 +143,8 @@ class CartService extends GetxService with WidgetsBindingObserver {
           _buildItemsSnapshot(cartItems) != _buildItemsSnapshot(freshItems);
 
       if (!hasChanged) {
-        debugPrint('🔄 CartService poll: no change');
         return;
       }
-
-      debugPrint('🔄 CartService poll: change detected — syncing');
 
       updateCartFromApi({
         'items': freshItems,

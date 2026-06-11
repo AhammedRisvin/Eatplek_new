@@ -11,6 +11,7 @@ import '../../cart/controller/cart_service.dart';
 import '../../cart/model/cart_api_model.dart';
 import '../service/phonepay_service.dart';
 import '../view/widget/order_accepted_sheet.dart';
+import '../view/widget/order_item_update_sheet.dart';
 import '../view/widget/order_rejected_sheet.dart';
 import '../view/widget/payment_result_bottom_sheet.dart';
 import '../view/widget/time_suggest_bottom_sheet.dart';
@@ -80,6 +81,8 @@ class OrderConfirmationController extends GetxController {
   String? suggestedPeriod;
   DateTime? _suggestedDateTime;
   bool isTimeSuggestionTimePickerVisible = false;
+  List<VendorOrderItemChange> vendorItemChanges = [];
+  Map<String, dynamic>? _pendingTimeSuggestionAfterItemChanges;
 
   // ========== PAYMENT UI (kept for rejected sheet display) ==========
   List<Map<String, dynamic>> paymentMethods = [
@@ -164,7 +167,7 @@ class OrderConfirmationController extends GetxController {
     for (var cartItem in cartItems!) {
       mainDishes.add(
         OrderItem(
-          id: cartItem.id ?? cartItem.foodId ?? '',
+          id: cartItem.foodId ?? cartItem.id ?? '',
           name: cartItem.foodName ?? 'Unknown Item',
           price: cartItem.effectivePrice ?? cartItem.basePrice ?? 0,
           quantity: cartItem.quantity ?? 1,
@@ -210,14 +213,16 @@ class OrderConfirmationController extends GetxController {
 
   String? validateFullName(String? value) {
     if (value == null || value.trim().isEmpty) return 'Full name is required';
-    if (value.trim().length < 2)
+    if (value.trim().length < 2) {
       return 'Full name must be at least 2 characters';
+    }
     return null;
   }
 
   String? validatePhoneNumber(String? value) {
-    if (value == null || value.trim().isEmpty)
+    if (value == null || value.trim().isEmpty) {
       return 'Phone number is required';
+    }
     final cleanedPhone = value.replaceAll(RegExp(r'[\s\-\(\)]'), '');
     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(cleanedPhone)) {
       return 'Please enter a valid 10-digit Indian phone number';
@@ -242,8 +247,9 @@ class OrderConfirmationController extends GetxController {
   }
 
   String? validateVehicleDetails(String? value) {
-    if (value == null || value.trim().isEmpty)
+    if (value == null || value.trim().isEmpty) {
       return 'Vehicle details are required';
+    }
     if (value.trim().length < 5) {
       return 'Please enter valid vehicle details (e.g., KL-07-AB-1234 White Swift)';
     }
@@ -430,7 +436,7 @@ class OrderConfirmationController extends GetxController {
 
   void _parseSuggestedTime(String isoTimeString) {
     try {
-      final dateTime = DateTime.parse(isoTimeString);
+      final dateTime = DateTime.parse(isoTimeString).toLocal();
       final hour24 = dateTime.hour;
       final minute = dateTime.minute;
 
@@ -438,11 +444,10 @@ class OrderConfirmationController extends GetxController {
       suggestedMinute = minute;
       suggestedPeriod = hour24 >= 12 ? 'PM' : 'AM';
 
-      final now = DateTime.now();
       _suggestedDateTime = DateTime(
-        now.year,
-        now.month,
-        now.day,
+        dateTime.year,
+        dateTime.month,
+        dateTime.day,
         hour24,
         minute,
       );
@@ -725,8 +730,22 @@ class OrderConfirmationController extends GetxController {
         _handleOrderAccepted(data);
         break;
       case 'update_requested':
+        _handleUpdateRequested(response, data);
+        break;
       case 'time_suggestion':
-        _handleTimeSuggestion(_buildTimeSuggestionDetails(response, data));
+        final timeSuggestionDetails = _buildTimeSuggestionDetails(
+          response,
+          data,
+        );
+        if (timeSuggestionDetails != null) {
+          _handleTimeSuggestion(timeSuggestionDetails);
+        } else {
+          _dismissWaitingSheet();
+          _showErrorMessage(
+            'Update Required',
+            'The restaurant requested a time update, but no suggested time was returned.',
+          );
+        }
         break;
       case 'rejected':
         final rejectionDetails =
@@ -749,18 +768,58 @@ class OrderConfirmationController extends GetxController {
     }
   }
 
-  Map<String, dynamic> _buildTimeSuggestionDetails(
+  void _handleUpdateRequested(
+    Map<String, dynamic> response,
+    Map<String, dynamic> data,
+  ) {
+    final itemChanges = _buildVendorItemChanges(data);
+    final timeSuggestionDetails = _buildTimeSuggestionDetails(response, data);
+
+    if (itemChanges.isNotEmpty) {
+      _pendingTimeSuggestionAfterItemChanges = timeSuggestionDetails;
+      _handleVendorItemChanges(itemChanges);
+      return;
+    }
+
+    if (timeSuggestionDetails != null) {
+      _handleTimeSuggestion(timeSuggestionDetails);
+      return;
+    }
+
+    final rejectionDetails = data['rejectionDetails'] as Map<String, dynamic>?;
+    _handleOrderRejected(rejectionDetails);
+  }
+
+  Map<String, dynamic>? _buildTimeSuggestionDetails(
     Map<String, dynamic> response,
     Map<String, dynamic> data,
   ) {
     final rejectionDetails = data['rejectionDetails'] as Map<String, dynamic>?;
-    if (rejectionDetails != null) return rejectionDetails;
-
     final extractedSuggestedTime = _extractSuggestedTime(data);
+
+    if (rejectionDetails != null) {
+      final details = Map<String, dynamic>.from(rejectionDetails);
+      final hasTimeSuggestion =
+          details['hasTimeSuggestion'] == true ||
+          (details['suggestedTime'] is String &&
+              (details['suggestedTime'] as String).trim().isNotEmpty) ||
+          extractedSuggestedTime != null;
+
+      if (!hasTimeSuggestion) return null;
+
+      details['suggestedTime'] ??= extractedSuggestedTime;
+      details['hasTimeSuggestion'] = true;
+      details['rejectionReason'] ??=
+          response['message'] as String? ??
+          'The restaurant requested an update on your booking time.';
+      return details;
+    }
+
     if (extractedSuggestedTime == null) {
       debugPrint(
         '⚠️ update_requested response did not include a suggestedTime field',
       );
+      return null;
     }
 
     return {
@@ -799,6 +858,72 @@ class OrderConfirmationController extends GetxController {
     }
 
     return null;
+  }
+
+  List<VendorOrderItemChange> _buildVendorItemChanges(
+    Map<String, dynamic> data,
+  ) {
+    final cartSnapshot = data['cartSnapshot'] as Map<String, dynamic>?;
+    final snapshotItems = cartSnapshot?['items'] as List?;
+    if (snapshotItems == null || snapshotItems.isEmpty) return [];
+
+    final modifiedItems = <Map<String, dynamic>>[
+      ...?((data['modifiedItems'] as List?)?.whereType<Map>().map(
+        (item) => Map<String, dynamic>.from(item),
+      )),
+      ...?(((data['rejectionDetails']
+                  as Map<String, dynamic>?)?['modifiedItems']
+              as List?)
+          ?.whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))),
+    ];
+
+    final modificationsByFoodId = <String, Map<String, dynamic>>{};
+    for (final item in modifiedItems) {
+      final foodId = (item['foodId'] ?? item['food'])?.toString();
+      if (foodId != null && foodId.isNotEmpty) {
+        modificationsByFoodId[foodId] = item;
+      }
+    }
+
+    if (modificationsByFoodId.isEmpty) return [];
+
+    return snapshotItems.whereType<Map>().map((rawItem) {
+      final item = Map<String, dynamic>.from(rawItem);
+      final foodId = (item['food'] ?? item['foodId'] ?? item['id']).toString();
+      final modification = modificationsByFoodId[foodId];
+      final currentQuantity = _asInt(item['quantity']) ?? 0;
+      final updatedQuantity =
+          _asInt(modification?['updatedQuantity']) ?? currentQuantity;
+      final requestedQuantity =
+          _asInt(modification?['userRequestedQuantity']) ?? currentQuantity;
+
+      return VendorOrderItemChange(
+        foodId: foodId,
+        foodName:
+            (modification?['foodName'] ?? item['foodName'] ?? 'Food item')
+                .toString(),
+        foodImage:
+            (modification?['foodImage'] ?? item['foodImage'] ?? '').toString(),
+        price: _asDouble(item['effectivePrice'] ?? item['basePrice']) ?? 0,
+        requestedQuantity: requestedQuantity,
+        updatedQuantity: updatedQuantity,
+        reason: modification?['reason']?.toString(),
+        isModified: modification != null,
+      );
+    }).toList();
+  }
+
+  int? _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  double? _asDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '');
   }
 
   /// ✅ Store orderId and user phone from the accepted response.
@@ -855,6 +980,22 @@ class OrderConfirmationController extends GetxController {
     _showRejectedBottomSheet();
   }
 
+  void _handleVendorItemChanges(List<VendorOrderItemChange> itemChanges) {
+    debugPrint('🧾 Vendor item changes received: ${itemChanges.length}');
+    orderStatus = 'update_requested';
+    vendorItemChanges = itemChanges;
+
+    final unavailableCount =
+        itemChanges.where((item) => item.isUnavailable).length;
+    rejectionReason =
+        unavailableCount > 0
+            ? 'Some items in your order are currently unavailable.'
+            : 'The restaurant can continue with updated item quantities.';
+
+    _dismissWaitingSheet();
+    _showVendorItemUpdateBottomSheet();
+  }
+
   // ========== TIME SUGGESTION ==========
 
   void _handleTimeSuggestion(Map<String, dynamic> rejectionDetails) {
@@ -902,6 +1043,81 @@ class OrderConfirmationController extends GetxController {
     _dismissTimeSuggestionSheet();
     _showWaitingBottomSheet();
     await _placeOrder();
+  }
+
+  Future<void> continueWithVendorItemChanges() async {
+    _applyVendorItemChanges();
+    _dismissVendorItemUpdateSheet();
+
+    final pendingTimeSuggestion = _pendingTimeSuggestionAfterItemChanges;
+    _pendingTimeSuggestionAfterItemChanges = null;
+
+    if (pendingTimeSuggestion != null) {
+      _handleTimeSuggestion(pendingTimeSuggestion);
+      return;
+    }
+
+    _showWaitingBottomSheet();
+    await _placeOrder();
+  }
+
+  void reorderVendorItem(VendorOrderItemChange item) {
+    cartItems?.removeWhere((cartItem) => cartItem.foodId == item.foodId);
+    mainDishes.removeWhere((dish) => dish.id == item.foodId);
+    vendorItemChanges.removeWhere((change) => change.foodId == item.foodId);
+    _recalculateTotalFromVisibleItems();
+    update(['order_summary', 'place_order_button', 'vendor_item_update_sheet']);
+
+    _dismissVendorItemUpdateSheet();
+    Get.back(result: {'reorderFoodId': item.foodId});
+  }
+
+  void cancelVendorUpdateFlow() {
+    _dismissVendorItemUpdateSheet();
+    Get.back();
+  }
+
+  void _applyVendorItemChanges() {
+    for (final change in vendorItemChanges.where((item) => item.isModified)) {
+      if (change.isUnavailable) {
+        cartItems?.removeWhere((item) => item.foodId == change.foodId);
+      } else {
+        final cartIndex =
+            cartItems?.indexWhere((item) => item.foodId == change.foodId) ?? -1;
+        if (cartIndex >= 0) {
+          cartItems![cartIndex].quantity = change.updatedQuantity;
+        }
+      }
+
+      final dishIndex = mainDishes.indexWhere(
+        (item) => item.id == change.foodId,
+      );
+      if (dishIndex >= 0) {
+        if (change.isUnavailable) {
+          mainDishes.removeAt(dishIndex);
+        } else {
+          final dish = mainDishes[dishIndex];
+          mainDishes[dishIndex] = OrderItem(
+            id: dish.id,
+            name: dish.name,
+            price: dish.price,
+            quantity: change.updatedQuantity,
+            isMainDish: dish.isMainDish,
+            imageUrl: dish.imageUrl,
+          );
+        }
+      }
+    }
+
+    _recalculateTotalFromVisibleItems();
+    update(['order_summary', 'place_order_button']);
+  }
+
+  void _recalculateTotalFromVisibleItems() {
+    totalAmount = [
+      ...mainDishes,
+      ...addOns,
+    ].fold<double>(0, (total, item) => total + (item.price * item.quantity));
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1043,6 +1259,20 @@ class OrderConfirmationController extends GetxController {
     if (Get.isBottomSheetOpen ?? false) Get.back();
   }
 
+  void _showVendorItemUpdateBottomSheet() {
+    Get.bottomSheet(
+      OrderItemUpdateSheet(controller: this),
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  void _dismissVendorItemUpdateSheet() {
+    if (Get.isBottomSheetOpen ?? false) Get.back();
+  }
+
   /// ✅ Replaces the old static payment selection sheet.
   void _showPaymentResultSheet(PhonePePaymentResult result) {
     Get.bottomSheet(
@@ -1076,31 +1306,6 @@ class OrderConfirmationController extends GetxController {
           backgroundColor: Colors.red.withOpacity(0.8),
           colorText: Colors.white,
           duration: const Duration(seconds: 3),
-        );
-      } catch (e) {
-        debugPrint('⚠️ Could not show snackbar: $message');
-      }
-    }
-  }
-
-  void _showSuccessMessage(String title, String message) {
-    if (Get.context != null) {
-      ScaffoldMessenger.of(Get.context!).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green.withOpacity(0.8),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } else {
-      try {
-        Get.snackbar(
-          title,
-          message,
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green.withOpacity(0.8),
-          colorText: Colors.white,
-          duration: const Duration(seconds: 2),
         );
       } catch (e) {
         debugPrint('⚠️ Could not show snackbar: $message');
@@ -1166,4 +1371,30 @@ class OrderItem {
     'is_main_dish': isMainDish,
     'image_url': imageUrl,
   };
+}
+
+class VendorOrderItemChange {
+  final String foodId;
+  final String foodName;
+  final String foodImage;
+  final double price;
+  final int requestedQuantity;
+  final int updatedQuantity;
+  final String? reason;
+  final bool isModified;
+
+  VendorOrderItemChange({
+    required this.foodId,
+    required this.foodName,
+    required this.foodImage,
+    required this.price,
+    required this.requestedQuantity,
+    required this.updatedQuantity,
+    required this.reason,
+    required this.isModified,
+  });
+
+  bool get isUnavailable => isModified && updatedQuantity <= 0;
+  bool get hasQuantityUpdate =>
+      isModified && !isUnavailable && requestedQuantity != updatedQuantity;
 }

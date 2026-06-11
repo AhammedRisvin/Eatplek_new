@@ -64,7 +64,21 @@ class _BottomNavViewState extends State<BottomNavView>
       builder: (ctrl) {
         return Scaffold(
           // IndexedStack keeps all pages mounted — no rebuild on tab switch
-          body: IndexedStack(index: ctrl.currentIndex, children: _pages),
+          body: Stack(
+            children: [
+              IndexedStack(index: ctrl.currentIndex, children: _pages),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildNavTapGuard(
+                  size: size,
+                  navHeight: navHeight,
+                  ctrl: ctrl,
+                ),
+              ),
+            ],
+          ),
 
           bottomNavigationBar: _buildBottomNav(
             context,
@@ -175,6 +189,34 @@ class _BottomNavViewState extends State<BottomNavView>
               size: size,
               ctrl: ctrl,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavTapGuard({
+    required Size size,
+    required double navHeight,
+    required BottomNavController ctrl,
+  }) {
+    final double bumpClearance = navHeight * 0.42 * 0.9;
+    final double fabSize = size.width * 0.14;
+
+    return SizedBox(
+      height: bumpClearance,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: const SizedBox.expand(),
+          ),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => ctrl.setBottomBarIndex(2),
+            child: SizedBox(width: fabSize, height: bumpClearance),
           ),
         ],
       ),

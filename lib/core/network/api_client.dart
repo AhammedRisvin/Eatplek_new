@@ -26,6 +26,14 @@ class FittorConnect {
 
   // ── Refresh token lock ─────────────────────────────────────────────────────
   Completer<bool>? _refreshCompleter;
+  final List<bool> _skipStructuredResponseLogQueue = [];
+
+  bool _shouldSkipStructuredLog(String url) {
+    final uri = Uri.tryParse(url);
+    final path = uri?.path ?? url;
+    return path.contains('/api/cart') ||
+        path.contains('/api/bookings/my-orders');
+  }
 
   FittorConnect._internal() {
     _client = FittorClient(
@@ -37,6 +45,10 @@ class FittorConnect {
     _client.addInterceptor(
       CallbackInterceptor(
         onRequest: (request) async {
+          final skipStructuredLog = _shouldSkipStructuredLog(request.url);
+          _skipStructuredResponseLogQueue.add(skipStructuredLog);
+          if (skipStructuredLog) return request;
+
           final body = request.body;
           String bodyPreview = '';
           if (body != null) {
@@ -46,10 +58,7 @@ class FittorConnect {
                 final pretty = const JsonEncoder.withIndent(
                   '  ',
                 ).convert(decoded);
-                bodyPreview =
-                    pretty.length > 500
-                        ? '${pretty.substring(0, 500)}\n  ... (truncated)'
-                        : pretty;
+                bodyPreview = pretty;
               }
             } catch (_) {
               bodyPreview = body.toString();
@@ -65,14 +74,17 @@ class FittorConnect {
           return request;
         },
         onResponse: (response) async {
+          final skipStructuredLog =
+              _skipStructuredResponseLogQueue.isNotEmpty
+                  ? _skipStructuredResponseLogQueue.removeAt(0)
+                  : false;
+          if (skipStructuredLog) return response;
+
           String bodyPreview = '';
           try {
             final decoded = jsonDecode(utf8.decode(response.bodyBytes));
             final pretty = const JsonEncoder.withIndent('  ').convert(decoded);
-            bodyPreview =
-                pretty.length > 500
-                    ? '${pretty.substring(0, 500)}\n  ... (truncated)'
-                    : pretty;
+            bodyPreview = pretty;
           } catch (_) {
             bodyPreview = response.body;
           }
@@ -86,6 +98,12 @@ class FittorConnect {
           return response;
         },
         onError: (error, stack) async {
+          final skipStructuredLog =
+              _skipStructuredResponseLogQueue.isNotEmpty
+                  ? _skipStructuredResponseLogQueue.removeAt(0)
+                  : false;
+          if (skipStructuredLog) return error;
+
           log(
             '┌─ 🔴 ERROR\n'
             '│  $error\n'
